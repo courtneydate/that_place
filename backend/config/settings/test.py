@@ -4,6 +4,7 @@ Used by pytest-django via pytest.ini DJANGO_SETTINGS_MODULE.
 Optimised for speed: faster password hashing, eager Celery tasks, in-memory email.
 """
 from .base import *  # noqa: F401, F403
+from .base import env  # noqa: F811
 
 DEBUG = True
 
