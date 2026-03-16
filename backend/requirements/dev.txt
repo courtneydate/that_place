@@ -1,0 +1,10 @@
+-r base.txt
+pytest>=7.4
+pytest-django>=4.7
+pytest-cov>=4.1
+factory-boy>=3.3
+Faker>=22.0
+flake8>=7.0
+isort>=5.13
+django-extensions>=3.2
+ipython>=8.20
