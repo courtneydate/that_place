@@ -3,7 +3,7 @@
  * Allows editing name/timezone, deactivating the tenant, and sending an invite.
  */
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useTenant, useUpdateTenant, useSendInvite } from '../../hooks/useTenants';
 import styles from './AdminPage.module.css';
 
@@ -15,7 +15,6 @@ const TIMEZONES = [
 
 function TenantDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { data: tenant, isLoading, isError } = useTenant(id);
   const { mutateAsync: updateTenant, isPending: isSaving } = useUpdateTenant(id);
   const { mutateAsync: sendInvite, isPending: isInviting } = useSendInvite(id);

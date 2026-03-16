@@ -5,6 +5,7 @@
  * Ref: SPEC.md § Feature: Tenant User & Role Management
  */
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { useAuth } from '../../context/AuthContext';
 import { useUsers, useInviteUser, useUpdateUserRole, useRemoveUser } from '../../hooks/useUsers';
 import styles from '../admin/AdminPage.module.css';
@@ -195,5 +196,18 @@ function UserRow({ tenantUser, isMe, isAdmin, onRemove }) {
     </tr>
   );
 }
+
+UserRow.propTypes = {
+  tenantUser: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    email: PropTypes.string.isRequired,
+    first_name: PropTypes.string,
+    last_name: PropTypes.string,
+    role: PropTypes.string.isRequired,
+  }).isRequired,
+  isMe: PropTypes.bool.isRequired,
+  isAdmin: PropTypes.bool.isRequired,
+  onRemove: PropTypes.func.isRequired,
+};
 
 export default UserManagement;

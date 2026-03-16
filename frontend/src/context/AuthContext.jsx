@@ -5,6 +5,7 @@
  * is_fieldmouse_admin) so the app can render the correct layout.
  */
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
@@ -75,6 +76,10 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 export function useAuth() {
   const context = useContext(AuthContext);
