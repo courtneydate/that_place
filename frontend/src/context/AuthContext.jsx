@@ -1,24 +1,42 @@
 /**
- * AuthContext — manages JWT tokens and authentication state.
+ * AuthContext — manages JWT tokens, authentication state, and current user profile.
  *
- * Provides: isAuthenticated, user, login(email, password), logout()
- * Tokens stored in localStorage. Access token auto-refreshed via api.js interceptors.
+ * After login, fetches /api/v1/auth/me/ to populate user info (including
+ * is_fieldmouse_admin) so the app can render the correct layout.
  */
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(
-    () => !!localStorage.getItem('access_token')
+    () => !!localStorage.getItem('access_token'),
   );
+  const [user, setUser] = useState(null);
+
+  // On mount, if tokens exist, fetch user profile
+  useEffect(() => {
+    if (isAuthenticated && !user) {
+      api.get('/api/v1/auth/me/')
+        .then((r) => setUser(r.data))
+        .catch(() => {
+          // Token may have expired — clear session
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          setIsAuthenticated(false);
+        });
+    }
+  }, [isAuthenticated, user]);
 
   const login = useCallback(async (email, password) => {
     const response = await api.post('/api/v1/auth/login/', { email, password });
     localStorage.setItem('access_token', response.data.access);
     localStorage.setItem('refresh_token', response.data.refresh);
     setIsAuthenticated(true);
+    // Fetch user profile immediately after login
+    const meResponse = await api.get('/api/v1/auth/me/');
+    setUser(meResponse.data);
   }, []);
 
   const logout = useCallback(async () => {
@@ -33,11 +51,12 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       setIsAuthenticated(false);
+      setUser(null);
     }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

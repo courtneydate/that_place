@@ -243,6 +243,8 @@ MQTT_PASSWORD = env('MQTT_PASSWORD', default='')
 
 ENCRYPTION_KEY = env('ENCRYPTION_KEY')
 
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------

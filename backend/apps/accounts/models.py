@@ -58,3 +58,58 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class Tenant(models.Model):
+    """An organisation (customer) on the Fieldmouse platform.
+
+    Each tenant is a completely isolated data silo. All tenant data
+    (devices, streams, rules, alerts) is filtered by tenant_id.
+    """
+
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True)
+    timezone = models.CharField(
+        max_length=100,
+        default='Australia/Sydney',
+        help_text='IANA timezone string, e.g. "Australia/Brisbane".',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class TenantUser(models.Model):
+    """Links a User to a Tenant with a role.
+
+    A User belongs to at most one Tenant (Fieldmouse Admins belong to none).
+    """
+
+    class Role(models.TextChoices):
+        ADMIN = 'admin', 'Admin'
+        OPERATOR = 'operator', 'Operator'
+        VIEWER = 'viewer', 'View-Only'
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='tenantuser',
+    )
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name='tenant_users',
+    )
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.ADMIN)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['joined_at']
+
+    def __str__(self):
+        return f'{self.user.email} @ {self.tenant.name} ({self.role})'
