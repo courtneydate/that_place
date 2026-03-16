@@ -12,10 +12,13 @@ import AcceptInvite from './pages/AcceptInvite';
 import TenantList from './pages/admin/TenantList';
 import TenantCreate from './pages/admin/TenantCreate';
 import TenantDetail from './pages/admin/TenantDetail';
+import DeviceTypeLibrary from './pages/admin/DeviceTypeLibrary';
+import PendingDevices from './pages/admin/PendingDevices';
 import UserManagement from './pages/tenant/UserManagement';
 import Sites from './pages/tenant/Sites';
 import Groups from './pages/tenant/Groups';
 import Settings from './pages/tenant/Settings';
+import Devices from './pages/tenant/Devices';
 
 function App() {
   const { user } = useAuth();
@@ -39,6 +42,8 @@ function App() {
         <Route path="tenants" element={<TenantList />} />
         <Route path="tenants/new" element={<TenantCreate />} />
         <Route path="tenants/:id" element={<TenantDetail />} />
+        <Route path="device-types" element={<DeviceTypeLibrary />} />
+        <Route path="pending-devices" element={<PendingDevices />} />
       </Route>
 
       {/* Tenant user routes */}
@@ -53,6 +58,7 @@ function App() {
         <Route index element={<Navigate to="/app/users" replace />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="sites" element={<Sites />} />
+        <Route path="devices" element={<Devices />} />
         <Route path="groups" element={<Groups />} />
         <Route path="settings" element={<Settings />} />
       </Route>

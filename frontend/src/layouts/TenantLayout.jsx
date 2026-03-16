@@ -35,6 +35,12 @@ function TenantLayout() {
             Sites
           </NavLink>
           <NavLink
+            to="/app/devices"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Devices
+          </NavLink>
+          <NavLink
             to="/app/groups"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
           >
