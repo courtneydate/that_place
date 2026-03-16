@@ -1,14 +1,25 @@
 /**
  * Root application component.
- * Routes are added here as each sprint delivers new pages.
+ * Routes added sprint by sprint — see ROADMAP.md.
  */
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
     <Routes>
-      {/* Routes added sprint by sprint — see ROADMAP.md */}
-      <Route path="/" element={<div>Fieldmouse — coming soon</div>} />
+      <Route path="/login" element={<Login />} />
+      {/* Protected routes added from Sprint 2 onwards */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <div>Fieldmouse — authenticated placeholder</div>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

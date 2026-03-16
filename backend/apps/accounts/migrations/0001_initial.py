@@ -1,17 +1,16 @@
 """Initial migration for the accounts app.
 
-Creates the custom User model which extends AbstractUser.
-All Sprint-1 fields (is_fieldmouse_admin, etc.) are added in a subsequent migration.
+Creates the custom User model with email as the primary identifier.
+No username field — email is used for authentication.
 """
-import django.contrib.auth.models
-import django.contrib.auth.validators
-import django.db.models.deletion
 import django.utils.timezone
 from django.db import migrations, models
 
+import apps.accounts.models
+
 
 class Migration(migrations.Migration):
-    """Create the custom User model (extends AbstractUser)."""
+    """Create the custom User model (email-based, no username)."""
 
     initial = True
 
@@ -31,17 +30,9 @@ class Migration(migrations.Migration):
                     help_text='Designates that this user has all permissions without explicitly assigning them.',
                     verbose_name='superuser status',
                 )),
-                ('username', models.CharField(
-                    error_messages={'unique': 'A user with that username already exists.'},
-                    help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.',
-                    max_length=150,
-                    unique=True,
-                    validators=[django.contrib.auth.validators.UnicodeUsernameValidator()],
-                    verbose_name='username',
-                )),
                 ('first_name', models.CharField(blank=True, max_length=150, verbose_name='first name')),
                 ('last_name', models.CharField(blank=True, max_length=150, verbose_name='last name')),
-                ('email', models.EmailField(blank=True, max_length=254, verbose_name='email address')),
+                ('email', models.EmailField(max_length=254, unique=True, verbose_name='email address')),
                 ('is_staff', models.BooleanField(
                     default=False,
                     help_text='Designates whether the user can log into this admin site.',
@@ -56,6 +47,10 @@ class Migration(migrations.Migration):
                     verbose_name='active',
                 )),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
+                ('is_fieldmouse_admin', models.BooleanField(
+                    default=False,
+                    help_text='Designates whether this user is a Fieldmouse platform admin with access to all tenants.',
+                )),
                 ('groups', models.ManyToManyField(
                     blank=True,
                     help_text=(
@@ -81,7 +76,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'users',
             },
             managers=[
-                ('objects', django.contrib.auth.models.UserManager()),
+                ('objects', apps.accounts.models.UserManager()),
             ],
         ),
     ]

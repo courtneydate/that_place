@@ -154,7 +154,7 @@ REST_FRAMEWORK = {
     # Error responses use the standard format:
     # { "error": { "code": "...", "message": "..." } }
     # Custom exception handler is wired up in Sprint 1.
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'EXCEPTION_HANDLER': 'config.exceptions.fieldmouse_exception_handler',
 }
 
 # ---------------------------------------------------------------------------
