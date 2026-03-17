@@ -97,3 +97,6 @@ $RECYCLE.BIN/
 *.bak
 *.tmp
 *.orig
+
+#claude
+.claude
