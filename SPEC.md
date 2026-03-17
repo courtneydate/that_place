@@ -122,8 +122,9 @@ Devices bridged by a Scout are registered as their own Device records with a ref
 All Scout-to-cloud communication uses the following topic structure:
 
 ```
+fieldmouse/scout/{scout_serial}/telemetry
 fieldmouse/scout/{scout_serial}/health
-fieldmouse/scout/{scout_serial}/{device_serial}/telemetry/{stream_key}
+fieldmouse/scout/{scout_serial}/{device_serial}/telemetry
 fieldmouse/scout/{scout_serial}/{device_serial}/health
 fieldmouse/scout/{scout_serial}/cmd/{command_name}
 fieldmouse/scout/{scout_serial}/{device_serial}/cmd/{command_name}
@@ -132,8 +133,9 @@ fieldmouse/scout/{scout_serial}/{device_serial}/cmd/ack
 
 | Topic | Direction | Purpose |
 |-------|-----------|---------|
+| `.../telemetry` | Scout → Cloud | Scout's own telemetry — all stream values in one JSON payload |
 | `.../health` | Scout → Cloud | Scout's own health (battery, signal, uptime) |
-| `.../{device_serial}/telemetry/{stream_key}` | Scout → Cloud | Stream reading from a connected device |
+| `.../{device_serial}/telemetry` | Scout → Cloud | Telemetry from a connected device — all stream values in one JSON payload |
 | `.../{device_serial}/health` | Scout → Cloud | Health data for a connected device |
 | `.../cmd/{command_name}` | Cloud → Scout | Command sent directly to the Scout |
 | `.../{device_serial}/cmd/{command_name}` | Cloud → Scout | Command for a connected device — Scout routes it |
@@ -142,11 +144,16 @@ fieldmouse/scout/{scout_serial}/{device_serial}/cmd/ack
 **Scout subscribes to:** `fieldmouse/scout/{scout_serial}/#`
 **Backend subscribes to:** `fieldmouse/scout/+/#`
 
-**All payloads are JSON.**
+**Telemetry payloads — stream values are sent as a JSON key-value object in a single message per device per interval:**
 
-Telemetry payload:
+v2 Scout own telemetry:
 ```json
-{ "value": 23.4, "timestamp": "2026-03-05T10:30:00Z" }
+{ "Relay_1": 0, "Relay_2": 1, "Relay_3": 0, "Relay_4": 0, "Analog_1": 3.2, "Analog_2": 0.0, "Analog_3": 1.5, "Analog_4": 0.8, "Digital_1": 1, "Digital_2": 0, "Digital_3": 0, "Digital_4": 1 }
+```
+
+v2 bridged device telemetry (any device type including MODBUS — Scout handles protocol translation, Fieldmouse sees JSON):
+```json
+{ "temperature": 23.4, "humidity": 60.1, "pressure": 1013.2 }
 ```
 
 Health payload:
@@ -164,17 +171,44 @@ Health payload:
 
 The backend subscribes to both legacy and new topic formats simultaneously to support ~500 Scouts across ~30 customers on old firmware during the migration period.
 
-| Format | Topic pattern | Backend subscription |
-|--------|--------------|----------------------|
-| Legacy v1 | `fm/mm/{scout_serial}/weatherstation\|relays\|tbox\|admin` | `fm/mm/+/#` |
-| Fieldmouse v2 | `fieldmouse/scout/{scout_serial}/{device_serial}/telemetry/{stream_key}` | `fieldmouse/scout/+/#` |
+| Format | Topic pattern | Payload format | Backend subscription |
+|--------|--------------|----------------|----------------------|
+| Legacy v1 | `fm/mm/{scout_serial}/telemetry` | CSV string — 12 values: 4 relays, 4 analog inputs, 4 digital inputs | `fm/mm/+/#` |
+| Legacy v1 | `fm/mm/{scout_serial}/weatherstation` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
+| Legacy v1 | `fm/mm/{scout_serial}/tbox` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
+| Legacy v1 | `fm/mm/{scout_serial}/abb` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
+| Fieldmouse v2 | `fieldmouse/scout/{scout_serial}/telemetry` | JSON key-value object | `fieldmouse/scout/+/#` |
+| Fieldmouse v2 | `fieldmouse/scout/{scout_serial}/{device_serial}/telemetry` | JSON key-value object | `fieldmouse/scout/+/#` |
+
+**Legacy v1 telemetry CSV field mapping (confirmed):**
+
+`fm/mm/{scout_serial}/telemetry` publishes a 12-value comma-separated string. Field order:
+
+| Position | Stream key | Type |
+|----------|-----------|------|
+| 0 | `Relay_1` | boolean |
+| 1 | `Relay_2` | boolean |
+| 2 | `Relay_3` | boolean |
+| 3 | `Relay_4` | boolean |
+| 4 | `Analog_1` | numeric |
+| 5 | `Analog_2` | numeric |
+| 6 | `Analog_3` | numeric |
+| 7 | `Analog_4` | numeric |
+| 8 | `Digital_1` | boolean |
+| 9 | `Digital_2` | boolean |
+| 10 | `Digital_3` | boolean |
+| 11 | `Digital_4` | boolean |
 
 **Topic router — dynamic pattern matching:**
 - Incoming messages matched against a registry of topic patterns — no hardcoded parsing logic
-- Each registered pattern defines how to extract: scout_serial, device_serial (or derived ID), message_type, stream_key, value
-- Legacy patterns map fixed topic types to derived device identifiers — e.g. `fm/mm/{scout}/weatherstation` → device serial derived as `{scout}_weatherstation` (one device of each type assumed per Scout)
-- New patterns follow the standard `{scout}/{device}/telemetry/{stream_key}` structure
+- Each registered pattern defines how to extract: scout_serial, device_serial, message_type
+- Stream values extracted from payload according to format (JSON key-value for v2, CSV with fixed mapping for legacy v1 telemetry)
 - New topic formats onboarded by registering a new pattern — no code changes required
+
+**MODBUS and other bridged protocols:**
+- The Scout handles all protocol translation (MODBUS, RS485, etc.) at the edge
+- Fieldmouse always receives JSON key-value telemetry regardless of the underlying device protocol
+- MODBUS register-to-stream-key mapping is configured on the Scout; Fieldmouse treats MODBUS devices identically to any other JSON-publishing device
 
 **Legacy firmware tracking:**
 - Device record includes `topic_format` field: `legacy_v1` / `fieldmouse_v2`
@@ -183,9 +217,9 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 - Fieldmouse Admin can filter devices by `topic_format` to track fleet migration progress
 - Old Scouts re-registered as new Device records in Fieldmouse v2 during tenant onboarding — operate on `legacy_v1` until firmware updated, then seamlessly transition
 
-**Flagged for hardware team deep dive:**
-- ⚑ **Legacy telemetry payload format** — exact field names, value types, and payload structure for `weatherstation`, `relays`, `tbox`, and `admin` messages needed before legacy parser can be built
-- ⚑ **Legacy command format** — current command format to Scouts is inconsistent (strings, JSON, raw characters). Needs clarification and a defined migration path before legacy command handling can be specced
+**Remaining hardware team input required:**
+- ⚑ **Legacy weatherstation/tbox/abb payload format** — payload structure for these message types still required before their parsers can be built
+- ⚑ **Legacy command format** — current command format sent to Scouts is inconsistent (strings, JSON, raw characters). Needs clarification and a defined migration path before legacy command handling can be specced
 
 ### Non-Negotiables
 - All tenant data is strictly isolated — Tenant A must never see Tenant B's data
@@ -1074,7 +1108,8 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 
 - [ ] **SMS provider** — which provider is preferred? (Twilio preferred — works on any deployment. AWS SNS as alternative for AWS-only deployments.)
 - [x] **MQTT broker** — resolved: Mosquitto for local dev and self-hosted production deployments. AWS IoT Core supported as an alternative for AWS production deployments. Both use the same ingestion code path — broker connection configured entirely via env vars (`MQTT_BROKER_HOST`, `MQTT_BROKER_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`).
-- [ ] ⚑ **Legacy telemetry payload format** — exact field names, value types, and payload structure for `weatherstation`, `relays`, `tbox`, and `admin` MQTT messages required before the legacy topic parser can be built. Requires hardware team input.
+- [x] **Legacy telemetry payload format (Scout/telemetry)** — resolved: 12-value CSV string, fixed field order (4 relays, 4 analog inputs, 4 digital inputs). Stream keys match v2 Scout JSON keys. See MQTT Topic Structure section for full mapping.
+- [ ] ⚑ **Legacy weatherstation/tbox/abb payload format** — payload structure for these three legacy message types still required before their parsers can be built. Hardware team input needed.
 - [ ] ⚑ **Legacy command format** — current command format sent to Scouts is inconsistent (strings, JSON, raw characters). Clarify with hardware team and define migration path before legacy command handling can be specced.
 - [ ] **Scout firmware rollout plan** — ~500 Scouts across ~30 customers need firmware updates to move from `legacy_v1` to `fieldmouse_v2` topic format. Dual-format support handles the transition period. Coordinate update timeline and rollout order with hardware team.
 - [ ] **Existing customer migration** — post-launch activity. No migration tooling required for MVP. Approach to be planned separately.
