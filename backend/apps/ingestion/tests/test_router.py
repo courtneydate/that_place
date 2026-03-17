@@ -10,7 +10,6 @@ import pytest
 
 from apps.ingestion.router import router
 
-
 # ---------------------------------------------------------------------------
 # Legacy v1 — fm/mm/{unit_serial}/{message_type}
 # ---------------------------------------------------------------------------

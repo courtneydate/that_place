@@ -1,8 +1,7 @@
 """Tests for Sprint 4: Notification groups and system group auto-maintenance."""
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
-
-import pytest
 
 from apps.accounts.models import (
     SYSTEM_GROUP_ALL_ADMINS,

@@ -1,8 +1,7 @@
 """Tests for Sprint 4: Tenant settings endpoint."""
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
-
-import pytest
 
 from apps.accounts.models import Tenant, TenantUser, User
 

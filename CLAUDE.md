@@ -112,6 +112,7 @@ cd frontend && npx eslint src/
 ---
 
 ## Things to Always Do
+- Always run `flake8 apps/` and `isort --check-only apps/` inside Docker before considering a backend task complete — fix any errors before handing back, do not wait for CI to catch them
 - Always write tests for new API endpoints (happy path + at least one permission/error case)
 - Always use environment variables for all external service credentials, secrets, and configuration — never hardcode AWS or any provider-specific values
 - Always validate input on both frontend (form validation) and backend (serializer validation)

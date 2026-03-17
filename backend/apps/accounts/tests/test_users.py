@@ -9,15 +9,12 @@ Covers:
 """
 from unittest.mock import patch
 
-from django.core import signing
-from django.core import mail
+import pytest
+from django.core import mail, signing
 from rest_framework import status
 from rest_framework.test import APIClient
 
-import pytest
-
 from apps.accounts.models import Tenant, TenantUser, User
-
 
 # ---------------------------------------------------------------------------
 # Helpers

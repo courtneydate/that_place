@@ -7,7 +7,6 @@ from rest_framework.test import APIClient
 from apps.accounts.models import Tenant, TenantUser, User
 from apps.devices.models import Device, DeviceType, Site
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
