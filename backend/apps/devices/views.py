@@ -9,8 +9,8 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import IsFieldmouseAdmin, IsTenantAdmin, IsViewOnly
 
-from .models import Device, DeviceType, Site
-from .serializers import DeviceSerializer, DeviceTypeSerializer, SiteSerializer
+from .models import Device, DeviceHealth, DeviceType, Site
+from .serializers import DeviceHealthSerializer, DeviceSerializer, DeviceTypeSerializer, SiteSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -141,10 +141,10 @@ class DeviceViewSet(viewsets.GenericViewSet):
         for the approval queue and cross-tenant operations.
         """
         if self.request.user.is_fieldmouse_admin:
-            qs = Device.objects.select_related('tenant', 'site', 'device_type').all()
+            qs = Device.objects.select_related('tenant', 'site', 'device_type', 'devicehealth').all()
         else:
             tenant = self.request.user.tenantuser.tenant
-            qs = Device.objects.select_related('site', 'device_type').filter(tenant=tenant)
+            qs = Device.objects.select_related('site', 'device_type', 'devicehealth').filter(tenant=tenant)
 
         # Optional query param filters
         status_filter = self.request.query_params.get('status')
@@ -237,3 +237,20 @@ class DeviceViewSet(viewsets.GenericViewSet):
         device.save(update_fields=['status'])
         logger.info('Device "%s" (id=%s) rejected by %s', device.name, device.pk, request.user.email)
         return Response(DeviceSerializer(device).data)
+
+    @action(detail=True, methods=['get'], url_path='health')
+    def health(self, request, pk=None):
+        """GET /api/v1/devices/:id/health/ — return the health record for a device.
+
+        Accessible to all authenticated users (View-Only and above).
+        Returns 404 if the device has never been heard from.
+        """
+        device = self.get_object()
+        try:
+            health = device.devicehealth
+        except DeviceHealth.DoesNotExist:
+            return Response(
+                {'error': {'code': 'no_health_data', 'message': 'No health data received yet.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(DeviceHealthSerializer(health).data)

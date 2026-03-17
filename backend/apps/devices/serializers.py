@@ -1,7 +1,7 @@
 """Serializers for the devices app."""
 from rest_framework import serializers
 
-from .models import Device, DeviceType, Site
+from .models import Device, DeviceHealth, DeviceType, Site
 
 
 class SiteSerializer(serializers.ModelSerializer):
@@ -44,11 +44,26 @@ class DeviceSerializer(serializers.ModelSerializer):
 
     `status` and `topic_format` are read-only — status is managed via the
     approve/reject actions, topic_format is auto-detected from MQTT traffic.
+    `health` is a read-only summary of the device's current health (null if
+    no telemetry has been received yet).
     """
 
     device_type_name = serializers.CharField(source='device_type.name', read_only=True)
     site_name = serializers.CharField(source='site.name', read_only=True)
     tenant_name = serializers.CharField(source='tenant.name', read_only=True)
+    health = serializers.SerializerMethodField()
+
+    def get_health(self, obj):
+        """Return a brief health summary for list views, or None if unavailable."""
+        try:
+            h = obj.devicehealth
+        except DeviceHealth.DoesNotExist:
+            return None
+        return {
+            'is_online': h.is_online,
+            'activity_level': h.activity_level,
+            'last_seen_at': h.last_seen_at,
+        }
 
     class Meta:
         model = Device
@@ -65,9 +80,10 @@ class DeviceSerializer(serializers.ModelSerializer):
             'status',
             'offline_threshold_override_minutes',
             'topic_format',
+            'health',
             'created_at',
         )
-        read_only_fields = ('id', 'status', 'topic_format', 'created_at', 'tenant_name')
+        read_only_fields = ('id', 'status', 'topic_format', 'created_at', 'tenant_name', 'health')
 
     def validate_site(self, site):
         """Ensure the site belongs to the registering tenant."""
@@ -92,3 +108,20 @@ class DeviceSerializer(serializers.ModelSerializer):
                     'Gateway device does not belong to your tenant.'
                 )
         return gateway_device
+
+
+class DeviceHealthSerializer(serializers.ModelSerializer):
+    """Read-only serializer for DeviceHealth. Used by GET /api/v1/devices/:id/health/."""
+
+    class Meta:
+        model = DeviceHealth
+        fields = (
+            'is_online',
+            'last_seen_at',
+            'first_active_at',
+            'signal_strength',
+            'battery_level',
+            'activity_level',
+            'updated_at',
+        )
+        read_only_fields = fields

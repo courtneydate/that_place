@@ -39,8 +39,15 @@ function Login() {
 
     setIsLoading(true);
     try {
-      await login(email, password);
-      navigate(from, { replace: true });
+      const userData = await login(email, password);
+      // Redirect based on user type — ignore `from` if it crosses the admin/tenant boundary
+      if (userData.is_fieldmouse_admin) {
+        const dest = from.startsWith('/admin') ? from : '/admin/tenants';
+        navigate(dest, { replace: true });
+      } else {
+        const dest = from.startsWith('/app') ? from : '/app/users';
+        navigate(dest, { replace: true });
+      }
     } catch (err) {
       const message =
         err.response?.data?.error?.message ||

@@ -75,6 +75,33 @@ class Tenant(models.Model):
         help_text='IANA timezone string, e.g. "Australia/Brisbane".',
     )
     is_active = models.BooleanField(default=True)
+
+    # Activity level thresholds — configurable per tenant, platform defaults applied if not changed.
+    # Ref: SPEC.md § Feature: Device Health Monitoring
+    signal_degraded_threshold = models.IntegerField(
+        default=-70,
+        help_text='Signal strength (dBm) below which activity level becomes degraded.',
+    )
+    signal_critical_threshold = models.IntegerField(
+        default=-85,
+        help_text='Signal strength (dBm) below which activity level becomes critical.',
+    )
+    battery_degraded_threshold = models.IntegerField(
+        default=40,
+        help_text='Battery level (%) below which activity level becomes degraded.',
+    )
+    battery_critical_threshold = models.IntegerField(
+        default=20,
+        help_text='Battery level (%) below which activity level becomes critical.',
+    )
+    offline_approaching_percent = models.IntegerField(
+        default=75,
+        help_text=(
+            'Percentage of the offline threshold elapsed that triggers degraded activity level. '
+            'e.g. 75 means "degraded when 75%% of the threshold time has passed without a message".'
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

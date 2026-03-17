@@ -38,6 +38,7 @@ export function AuthProvider({ children }) {
     // Fetch user profile immediately after login
     const meResponse = await api.get('/api/v1/auth/me/');
     setUser(meResponse.data);
+    return meResponse.data;
   }, []);
 
   const acceptInvite = useCallback(async (token, firstName, lastName, password) => {

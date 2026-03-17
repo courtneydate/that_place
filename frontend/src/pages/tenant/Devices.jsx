@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDevices, useCreateDevice, useDeleteDevice } from '../../hooks/useDevices';
 import { useDeviceTypes } from '../../hooks/useDeviceTypes';
@@ -37,6 +38,29 @@ function StatusBadge({ status }) {
 
 StatusBadge.propTypes = {
   status: PropTypes.string.isRequired,
+};
+
+const ACTIVITY_COLORS = {
+  normal: '#22C55E',
+  degraded: '#F59E0B',
+  critical: '#EF4444',
+};
+
+function ActivityBadge({ level, isOnline }) {
+  if (!isOnline) {
+    return <span style={{ color: '#6B7280', fontWeight: 600 }}>Offline</span>;
+  }
+  if (!level) {
+    return <span style={{ color: '#9CA3AF' }}>—</span>;
+  }
+  const color = ACTIVITY_COLORS[level] || '#9CA3AF';
+  const label = level.charAt(0).toUpperCase() + level.slice(1);
+  return <span style={{ color, fontWeight: 600 }}>{label}</span>;
+}
+
+ActivityBadge.propTypes = {
+  level: PropTypes.string,
+  isOnline: PropTypes.bool,
 };
 
 function formatDate(iso) {
@@ -252,6 +276,7 @@ function Devices() {
                 <th>Site</th>
                 <th>Device type</th>
                 <th>Status</th>
+                <th>Health</th>
                 <th>Registered</th>
                 {isAdmin && <th>Actions</th>}
               </tr>
@@ -259,11 +284,21 @@ function Devices() {
             <tbody>
               {devices.map((device) => (
                 <tr key={device.id}>
-                  <td>{device.name}</td>
+                  <td>
+                    <Link to={`/app/devices/${device.id}`} className={styles.link}>
+                      {device.name}
+                    </Link>
+                  </td>
                   <td>{device.serial_number}</td>
                   <td>{device.site_name || '—'}</td>
                   <td>{device.device_type_name || '—'}</td>
                   <td><StatusBadge status={device.status} /></td>
+                  <td>
+                    <ActivityBadge
+                      level={device.health?.activity_level}
+                      isOnline={device.health?.is_online}
+                    />
+                  </td>
                   <td>{formatDate(device.created_at)}</td>
                   {isAdmin && (
                     <td>

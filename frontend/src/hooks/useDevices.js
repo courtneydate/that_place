@@ -51,3 +51,13 @@ export function useDeleteDevice() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: DEVICES_KEY }),
   });
 }
+
+export function useDeviceHealth(deviceId) {
+  return useQuery({
+    queryKey: ['device-health', deviceId],
+    queryFn: () =>
+      api.get(`/api/v1/devices/${deviceId}/health/`).then((r) => r.data),
+    enabled: !!deviceId,
+    retry: false,
+  });
+}

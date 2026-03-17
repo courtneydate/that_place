@@ -19,6 +19,7 @@ import Sites from './pages/tenant/Sites';
 import Groups from './pages/tenant/Groups';
 import Settings from './pages/tenant/Settings';
 import Devices from './pages/tenant/Devices';
+import DeviceDetail from './pages/tenant/DeviceDetail';
 
 function App() {
   const { user } = useAuth();
@@ -59,6 +60,7 @@ function App() {
         <Route path="users" element={<UserManagement />} />
         <Route path="sites" element={<Sites />} />
         <Route path="devices" element={<Devices />} />
+        <Route path="devices/:id" element={<DeviceDetail />} />
         <Route path="groups" element={<Groups />} />
         <Route path="settings" element={<Settings />} />
       </Route>

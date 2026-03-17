@@ -170,3 +170,49 @@ class Device(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.serial_number})'
+
+
+class DeviceHealth(models.Model):
+    """Real-time health snapshot for a device.
+
+    Created on first message receipt. Updated on every subsequent message.
+    is_online is flipped to False by the offline detection Celery beat task
+    when no message has been received within the device's offline threshold.
+
+    battery_level and signal_strength are null for legacy v1 devices (no
+    health data in their telemetry payload).
+
+    Ref: SPEC.md § Data Model: DeviceHealth
+         SPEC.md § Feature: Device Health Monitoring
+    """
+
+    class ActivityLevel(models.TextChoices):
+        NORMAL = 'normal', 'Normal'
+        DEGRADED = 'degraded', 'Degraded'
+        CRITICAL = 'critical', 'Critical'
+
+    device = models.OneToOneField(
+        Device,
+        on_delete=models.CASCADE,
+        related_name='devicehealth',
+    )
+    is_online = models.BooleanField(default=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    first_active_at = models.DateTimeField(null=True, blank=True)
+    signal_strength = models.IntegerField(
+        null=True, blank=True,
+        help_text='Signal strength in dBm. Null for legacy v1 devices.',
+    )
+    battery_level = models.IntegerField(
+        null=True, blank=True,
+        help_text='Battery level as a percentage (0–100). Null for legacy v1 devices.',
+    )
+    activity_level = models.CharField(
+        max_length=20,
+        choices=ActivityLevel.choices,
+        default=ActivityLevel.NORMAL,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.device.serial_number} — {self.activity_level} (online={self.is_online})'

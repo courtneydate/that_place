@@ -15,6 +15,7 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+from apps.devices.health import update_device_health
 from apps.devices.models import Device
 from apps.readings.models import Stream, StreamReading
 
@@ -107,19 +108,50 @@ def process_mqtt_message(topic: str, payload: str) -> None:
         )
         return
 
+    ingestion_time = timezone.now()
+
     if not stream_values:
         logger.warning('Empty telemetry payload on topic "%s" — nothing to store', topic)
+        # Still update health — device was heard from even if payload was empty
+        update_device_health(device, ingestion_time)
         return
 
-    # Store all stream readings atomically
-    ingestion_time = timezone.now()
+    # Extract reserved health keys before storing streams
+    # _battery and _signal are also stored as virtual StreamReadings (per SPEC)
+    battery = _extract_health_value(stream_values, '_battery')
+    signal = _extract_health_value(stream_values, '_signal')
+
+    # Store all stream readings atomically (including _battery/_signal as virtual streams)
     _store_stream_readings(device, stream_values, ingestion_time)
+
+    # Update device health record on every message
+    update_device_health(device, ingestion_time, battery=battery, signal=signal)
+
     logger.debug(
         'Stored %d reading(s) for device "%s" (tenant=%s)',
         len(stream_values),
         device.serial_number,
         device.tenant.name,
     )
+
+
+def _extract_health_value(
+    stream_values: dict[str, tuple[Any, str | None]],
+    key: str,
+) -> Any | None:
+    """Extract a numeric health value from stream_values by key, or return None.
+
+    Used to pull ``_battery`` and ``_signal`` out of v2 telemetry payloads.
+    The keys remain in stream_values so they are also stored as StreamReadings.
+    """
+    entry = stream_values.get(key)
+    if entry is None:
+        return None
+    value, _ = entry
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_telemetry(topic_format: str, payload: str) -> dict[str, tuple[Any, str | None]]:
