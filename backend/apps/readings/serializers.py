@@ -4,7 +4,16 @@ Ref: SPEC.md § Feature: Stream Discovery & Configuration
 """
 from rest_framework import serializers
 
-from .models import Stream
+from .models import Stream, StreamReading
+
+
+class StreamReadingSerializer(serializers.ModelSerializer):
+    """Read-only serializer for StreamReading — used by the readings list endpoint."""
+
+    class Meta:
+        model = StreamReading
+        fields = ('id', 'value', 'timestamp', 'ingested_at')
+        read_only_fields = ('id', 'value', 'timestamp', 'ingested_at')
 
 
 class StreamSerializer(serializers.ModelSerializer):

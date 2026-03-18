@@ -22,6 +22,8 @@ import Settings from './pages/tenant/Settings';
 import Devices from './pages/tenant/Devices';
 import DeviceDetail from './pages/tenant/DeviceDetail';
 import DataSources from './pages/tenant/DataSources';
+import Dashboards from './pages/tenant/Dashboards';
+import DashboardDetail from './pages/tenant/DashboardDetail';
 
 function App() {
   const { user } = useAuth();
@@ -60,6 +62,8 @@ function App() {
         }
       >
         <Route index element={<Navigate to="/app/users" replace />} />
+        <Route path="dashboards" element={<Dashboards />} />
+        <Route path="dashboards/:id" element={<DashboardDetail />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="sites" element={<Sites />} />
         <Route path="devices" element={<Devices />} />

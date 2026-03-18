@@ -6,6 +6,7 @@ import logging
 
 from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_datetime
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,7 +14,7 @@ from rest_framework.response import Response
 from apps.accounts.permissions import IsTenantAdmin
 
 from .models import Stream, StreamReading
-from .serializers import StreamSerializer
+from .serializers import StreamReadingSerializer, StreamSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -85,3 +86,36 @@ class StreamViewSet(viewsets.GenericViewSet):
             request.user.email,
         )
         return Response(serializer.data)
+
+    def readings(self, request, pk=None):
+        """GET /api/v1/streams/:id/readings/ — list readings with optional time/limit filtering.
+
+        Query params:
+            from  — ISO 8601 datetime; only readings at or after this time
+            to    — ISO 8601 datetime; only readings at or before this time
+            limit — max number of results (default 100, max 1000); newest first
+        """
+        stream = get_object_or_404(self.get_queryset(), pk=pk)
+        qs = StreamReading.objects.filter(stream=stream).order_by('-timestamp')
+
+        from_param = request.query_params.get('from')
+        to_param = request.query_params.get('to')
+        limit_param = request.query_params.get('limit', '100')
+
+        if from_param:
+            from_dt = parse_datetime(from_param)
+            if from_dt:
+                qs = qs.filter(timestamp__gte=from_dt)
+
+        if to_param:
+            to_dt = parse_datetime(to_param)
+            if to_dt:
+                qs = qs.filter(timestamp__lte=to_dt)
+
+        try:
+            limit = min(int(limit_param), 1000)
+        except (ValueError, TypeError):
+            limit = 100
+
+        qs = qs[:limit]
+        return Response(StreamReadingSerializer(qs, many=True).data)

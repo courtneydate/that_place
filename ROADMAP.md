@@ -262,12 +262,12 @@
 
 ---
 
-**Phase 2 Sign-Off Checklist:**
-- [ ] All Sprint 0–10 tests passing (full cumulative suite — no failures, no skips)
-- [ ] Manual smoke test: register Scout → send MQTT message → verify StreamReading stored → verify device health updated
-- [ ] Manual smoke test: add 3rd party data source → discover devices → confirm readings stored
-- [ ] Legacy topic format confirmed working with a test client
-- [ ] Offline detection confirmed by stopping MQTT messages and waiting for threshold
+**Phase 2 Sign-Off Checklist:** ✅ Signed off 2026-03-18
+- [x] All Sprint 0–10 tests passing (full cumulative suite — no failures, no skips)
+- [x] Manual smoke test: register Scout → send MQTT message → verify StreamReading stored → verify device health updated
+- [x] Manual smoke test: add 3rd party data source → discover devices → confirm readings stored
+- [x] Legacy topic format confirmed working with a test client
+- [x] Offline detection confirmed by stopping MQTT messages and waiting for threshold
 
 ---
 

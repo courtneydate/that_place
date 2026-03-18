@@ -23,6 +23,12 @@ function TenantLayout() {
         <span className={styles.brand}>Fieldmouse</span>
         <nav className={styles.nav}>
           <NavLink
+            to="/app/dashboards"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Dashboards
+          </NavLink>
+          <NavLink
             to="/app/users"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
           >

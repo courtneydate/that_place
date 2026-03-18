@@ -1,0 +1,75 @@
+.card {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+
+.value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.unit {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+.trend {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+}
+
+.trendUp { color: #22C55E; }
+.trendDown { color: #EF4444; }
+.trendStable { color: #9CA3AF; }
+
+.lastSeen {
+  font-size: 0.75rem;
+  color: #9CA3AF;
+  margin-top: 0.25rem;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.removeBtn:hover {
+  background: #FEF2F2;
+  color: #EF4444;
+}
