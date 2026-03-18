@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.devices',
     'apps.ingestion',
+    'apps.integrations',
     'apps.readings',
     'apps.rules',
     'apps.alerts',
@@ -200,6 +201,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'devices.check_devices_offline',
         'schedule': 60.0,  # every 60 seconds
     },
+    'poll-datasource-devices': {
+        'task': 'integrations.poll_datasource_devices',
+        'schedule': 60.0,  # every 60 seconds — task self-throttles per provider interval
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -251,6 +256,10 @@ MQTT_CLIENT_ID = env('MQTT_CLIENT_ID', default='fieldmouse-backend')
 # ---------------------------------------------------------------------------
 
 ENCRYPTION_KEY = env('ENCRYPTION_KEY')
+
+# Fernet key read by django-encrypted-model-fields for DataSource.credentials
+# and DataSource.auth_token_cache. Must be a valid 32-byte Fernet key.
+FIELD_ENCRYPTION_KEY = env('FIELD_ENCRYPTION_KEY')
 
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:5173')
 

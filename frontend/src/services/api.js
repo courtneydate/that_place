@@ -21,6 +21,13 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // For FormData requests, remove the default Content-Type so the browser
+  // sets it automatically with the correct multipart/form-data boundary.
+  // Without this, the axios default 'application/json' Content-Type persists
+  // and Django uses the JSON parser instead of MultiPartParser.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 

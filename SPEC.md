@@ -59,7 +59,8 @@ fieldmouse/
 │   ├── apps/
 │   │   ├── accounts/        # User auth, tenants, tenant-user relationships, notification groups
 │   │   ├── devices/         # Device type library, device registry, streams, health, provisioning
-│   │   ├── ingestion/       # MQTT ingestion pipeline, 3rd-party API polling
+│   │   ├── ingestion/       # MQTT ingestion pipeline
+│   │   ├── integrations/    # 3rd-party API provider library, data sources, polling
 │   │   ├── readings/        # Raw stream data storage and retrieval, CSV export
 │   │   ├── rules/           # Rule builder, conditions, actions, audit trail
 │   │   ├── alerts/          # Alert generation and management
@@ -436,7 +437,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **Platform-level (Fieldmouse Admin):**
 - [ ] Fieldmouse Admin creates and maintains a library of provider configs (`ThirdPartyAPIProvider`)
 - [ ] Each provider config defines:
-  - Identity: name, slug, description, logo
+  - Identity: name, slug, description, logo (file upload — stored in S3/MinIO, not a URL)
   - Base URL
   - Auth type: `api_key_header` / `api_key_query` / `bearer_token` / `basic_auth` / `oauth2_client_credentials` / `oauth2_password`
   - Auth param schema (JSONB): declares credential fields the tenant must fill in — label, type, whether secret. Used to auto-generate the credential form.
@@ -446,22 +447,40 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
   - Default poll interval (seconds)
 - [ ] Provider configs are visible to Tenant Admins (name + description only) — credential schemas and JSONPath internals are not exposed
 
-**Tenant-level (Tenant Admin):**
-- [ ] Tenant Admin selects a provider from the library and enters credentials (form auto-generated from provider's auth param schema)
-- [ ] On credential entry, platform immediately calls the discovery endpoint and returns a list of devices found on that account
-- [ ] Tenant Admin selects which discovered devices to connect — one virtual Device record is created per selected device
-- [ ] Tenant Admin selects which streams to activate per device (from the provider's available stream list)
-- [ ] Each connected device is tracked as a `DataSourceDevice` record linking the external device ID to its virtual Device record
-- [ ] Celery beat task polls the detail endpoint for each active DataSourceDevice on the provider's poll interval
+**Tenant-level (Tenant Admin) — connection wizard:**
+
+The connection flow is a two-phase wizard:
+
+_Phase A — Select & assign devices_
+- [ ] Tenant Admin picks a provider from the library and enters credentials (form auto-generated from provider's `auth_param_schema`)
+- [ ] On credential submission, platform calls the discovery endpoint and returns the list of devices found on that account
+- [ ] Tenant Admin sets a **default site** for all discovered devices (dropdown), with per-device site override per row
+- [ ] Tenant Admin selects which devices to connect via checkboxes (select-all supported)
+- [ ] Virtual devices are auto-named `{ProviderName} — {external_device_name}` (editable later from device detail)
+
+_Phase B — Configure streams_
+- [ ] Tenant Admin activates/deactivates streams from the provider's available stream list — applies to all selected devices as a batch
+- [ ] Default label and unit values come from the provider config; editable per stream at this step
+- [ ] Individual per-device stream overrides (label, unit, display_enabled) are available after connection via the device detail Streams tab
+
+_Post-wizard:_
+- [ ] One `DataSource` record created (encrypted credentials stored)
+- [ ] One virtual `Device` record created per selected device, assigned to the chosen site, with `status=active` (no approval required — provider is pre-approved by FM Admin)
+- [ ] One `DataSourceDevice` record per virtual device
+- [ ] Streams activated at connection time as regular `Stream` records on the virtual device
+
+**Ongoing management:**
+- [ ] Celery beat task polls the detail endpoint for each active `DataSourceDevice` on the provider's poll interval
 - [ ] Response values extracted via each active stream's JSONPath expression and stored as StreamReadings on the virtual device
-- [ ] For `oauth2_password` auth: platform handles token refresh automatically — tenant never re-enters credentials unless they change
-- [ ] Failed polls retried with exponential backoff; consecutive failures logged and surfaced as a device health warning
-- [ ] Tenant Admin can add or remove connected devices from an existing DataSource without re-entering credentials
+- [ ] For `oauth2_password` and `oauth2_client_credentials` auth: platform handles token refresh automatically — tenant never re-enters credentials unless they change
+- [ ] Failed polls retried with exponential backoff; consecutive failures incremented on `DataSourceDevice.consecutive_poll_failures`; after threshold → device health warning surfaced
+- [ ] **Re-discover devices on an existing DataSource** — Tenant Admin can click "Add devices" on any connected DataSource to re-run discovery against the saved account credentials without re-entering them. The discovery result shows all devices on the account; already-connected (active) devices are shown as greyed-out and non-selectable. The user selects new devices, assigns sites, and configures streams — following the same Phase A → B flow as the initial connection wizard but skipping Step 1 (credential entry). New devices start polling immediately on completion. No backend changes required — the existing `POST /api/v1/data-sources/:id/discover/` and `POST /api/v1/data-sources/:id/devices/` endpoints support this natively.
+- [ ] Removing a device **deactivates** it (`DataSourceDevice.is_active = False`, polling stops) — the virtual Device record and all StreamReadings are retained. Hard delete is available from the device detail page.
+- [ ] Virtual device streams are identical `Stream` records to MQTT device streams — label, unit, and display_enabled are all configurable via the existing Streams tab after connection
 
 **MVP scope:**
 - [ ] Discovery endpoint (list devices) + detail endpoint (current/latest measurement per device) — MVP
-- [ ] History endpoint (date-range polling for backfill) — Phase 2
-- [ ] ⚑ **Flagged for deep dive:** a single tenant account may have many devices on the same provider (e.g. 20 SoilScout sensors on one account). The DataSourceDevice model handles this, but the full UX flow for bulk device management needs a dedicated deep dive.
+- [ ] History endpoint (date-range polling for backfill) — Phase 2 (see Open Questions)
 
 ---
 
@@ -699,9 +718,9 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
 | Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
 | StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
-| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo_url, base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), detail_endpoint (JSONB: path template with {device_id}, method), available_streams (JSONB array: key/label/unit/data_type/jsonpath), default_poll_interval_seconds, is_active, created_at |
+| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), detail_endpoint (JSONB: path template with {device_id}, method), available_streams (JSONB array: key/label/unit/data_type/jsonpath), default_poll_interval_seconds, is_active, created_at |
 | DataSource | belongs to Tenant | id, tenant_id, provider_id (FK → ThirdPartyAPIProvider), name, credentials (encrypted JSONB — filled from provider's auth_param_schema), auth_token_cache (encrypted JSONB — stores access/refresh tokens for oauth2 types), is_active, created_at |
-| DataSourceDevice | belongs to DataSource | id, datasource_id, external_device_id (device ID as returned by provider's discovery endpoint), external_device_name (nullable), virtual_device_id (FK → Device), active_stream_keys (array — subset of provider's available_streams the tenant has activated), last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text), is_active |
+| DataSourceDevice | belongs to DataSource | id, datasource_id, external_device_id (device ID as returned by provider's discovery endpoint), external_device_name (nullable), virtual_device_id (FK → Device), active_stream_keys (array — subset of provider's available_streams the tenant has activated), last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text), consecutive_poll_failures (int, default 0), is_active |
 | NotificationGroup | belongs to Tenant | id, tenant_id, name, is_system (bool — for pre-defined groups), created_at |
 | NotificationGroupMember | links TenantUser ↔ NotificationGroup | id, group_id, tenant_user_id, added_at |
 | Rule | belongs to Tenant | id, tenant_id, name, description, is_active, cooldown_minutes (nullable int), active_days (int array, nullable — 0=Mon…6=Sun), active_from (time, nullable), active_to (time, nullable), condition_group_operator (AND/OR), current_state (bool — tracks last evaluated result for re-trigger suppression), last_fired_at (nullable datetime), created_by, created_at, updated_at |
@@ -734,6 +753,9 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 - A RuleCondition with condition_type = staleness does not use operator or threshold_value — only staleness_minutes
 - Pre-defined NotificationGroups (All Users, All Admins, All Operators) are maintained automatically by the system — membership derived from TenantUser roles, not manually managed
 - DataSource credentials must be stored encrypted
+- Virtual devices (created from 3rd-party API connection) are created with `status=active` — no FM Admin approval required (the provider itself is pre-approved)
+- Virtual device `serial_number` is generated as `api-{provider_slug}-{tenant_id}-{external_device_id}` — guaranteed unique across all tenants
+- Removing a device from a DataSource deactivates it (`DataSourceDevice.is_active=False`) — the virtual Device record and all StreamReadings are retained; hard delete is available from the device detail page
 
 ---
 
@@ -857,6 +879,7 @@ GET    /api/v1/api-providers/
 POST   /api/v1/api-providers/
 GET    /api/v1/api-providers/:id/
 PUT    /api/v1/api-providers/:id/
+DELETE /api/v1/api-providers/:id/
 
 # Data Sources (Tenant Admin)
 GET    /api/v1/data-sources/
@@ -864,10 +887,11 @@ POST   /api/v1/data-sources/
 GET    /api/v1/data-sources/:id/
 PUT    /api/v1/data-sources/:id/
 DELETE /api/v1/data-sources/:id/
-POST   /api/v1/data-sources/:id/discover/      # trigger device discovery call, returns device list
-GET    /api/v1/data-sources/:id/devices/       # list connected DataSourceDevices
-POST   /api/v1/data-sources/:id/devices/       # add a discovered device (creates virtual Device)
-DELETE /api/v1/data-sources/:id/devices/:did/  # disconnect a device
+POST   /api/v1/data-sources/:id/discover/            # trigger device discovery, returns device list
+GET    /api/v1/data-sources/:id/devices/             # list connected DataSourceDevices
+POST   /api/v1/data-sources/:id/devices/             # connect a discovered device (creates virtual Device + streams)
+PATCH  /api/v1/data-sources/:id/devices/:did/        # update active_stream_keys for a connected device
+DELETE /api/v1/data-sources/:id/devices/:did/        # deactivate a device (keeps virtual Device + history)
 
 # Rules
 GET    /api/v1/rules/
@@ -1122,7 +1146,7 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 - [ ] **Dashboard public/shared links** — is sharing a dashboard view (read-only link) ever needed?
 - [ ] ⚑ **Unknown condition state** — when a stream referenced in a rule condition stops reporting, the last known value is used OR the condition is treated as unknown/false. Decision: if a stream goes stale, should point-in-time conditions using that stream be treated as false (rule cannot fire) or continue using the last known value? Staleness conditions handle the "offline sensor" case explicitly, but this edge case remains for standard stream conditions.
 - [ ] ⚑ **Additional stream types** — beyond Numeric / Boolean / String/Enum. Candidates include GPS coordinates, images, compound/structured values. Some types may not be usable in rule conditions even if they exist as streams. Revisit when designing the device type library in detail.
-- [ ] ⚑ **3rd party API — bulk device management UX** — when a tenant account has many devices on a single provider (e.g. 20 SoilScout sensors), the flow for discovering, selecting, naming, and managing them in bulk needs a dedicated deep dive. The data model (`DataSourceDevice`) supports this but the UX is not yet designed.
+- [x] **3rd party API — bulk device management UX** — resolved: two-phase wizard. Phase A: tenant sets a default site for all discovered devices with per-device site override, selects devices via checkboxes (select-all supported). Phase B: stream activation configured as a batch across all selected devices; per-device overrides available later via the device detail Streams tab. Post-connection management page shows all connected devices with add/deactivate actions. See Feature: Data Ingestion — 3rd Party APIs for full detail.
 - [ ] ⚑ **3rd party API — history endpoint** — some providers offer a date-range endpoint for historical data (e.g. `/history/?from=&to=`). Phase 2 item: design a backfill polling pattern that does not conflict with the regular detail endpoint polling.
 - [ ] ⚑ **Notification event registry** — system event notifications should be registered centrally rather than hardcoded. Architectural design required during Phase 5 implementation — how event types are registered, what metadata they carry, and how they map to notification templates.
 - [ ] ⚑ **Fieldmouse Admin notification channel** — delivery mechanism (in-app, email, external alerting tool) and full platform event list to be defined in a dedicated deep dive before Phase 5.

@@ -243,17 +243,17 @@
 **Goal:** Fieldmouse Admin can add a provider; Tenant Admin can connect their account and have devices auto-discovered.
 
 **Deliverables:**
-- [ ] Backend: `ThirdPartyAPIProvider` model + CRUD (Fieldmouse Admin)
-- [ ] Backend: `DataSource` + `DataSourceDevice` models
-- [ ] Backend: Device discovery endpoint — calls provider's discovery endpoint using tenant credentials, returns device list
-- [ ] Backend: DataSourceDevice connect endpoint — creates virtual Device records for selected devices
-- [ ] Backend: Celery beat poller — calls detail endpoint per active DataSourceDevice on provider's interval
-- [ ] Backend: OAuth2 password grant token handling + refresh
-- [ ] Backend: Poll failure logging, retry with exponential backoff, device health warning on consecutive failures
-- [ ] Backend: Tests — discovery flow, polling stores StreamReadings, auth failure handled, retry logic
-- [ ] Frontend: Fieldmouse Admin — provider library (create provider, define auth schema, discovery/detail endpoints, available streams)
-- [ ] Frontend: Tenant Admin — add data source (pick provider → enter credentials → discover devices → select devices → select streams)
-- [ ] Frontend: DataSource management page (list connected devices, add/remove devices)
+- [x] Backend: `ThirdPartyAPIProvider` model + CRUD (Fieldmouse Admin)
+- [x] Backend: `DataSource` + `DataSourceDevice` models
+- [x] Backend: Device discovery endpoint — calls provider's discovery endpoint using tenant credentials, returns device list
+- [x] Backend: DataSourceDevice connect endpoint — creates virtual Device records for selected devices
+- [x] Backend: Celery beat poller — calls detail endpoint per active DataSourceDevice on provider's interval
+- [x] Backend: OAuth2 password grant token handling + refresh
+- [x] Backend: Poll failure logging, retry with exponential backoff, device health warning on consecutive failures
+- [x] Backend: Tests — discovery flow, polling stores StreamReadings, auth failure handled, retry logic
+- [x] Frontend: Fieldmouse Admin — provider library (create provider, define auth schema, discovery/detail endpoints, available streams)
+- [x] Frontend: Tenant Admin — add data source (pick provider → enter credentials → discover devices → select devices → select streams)
+- [x] Frontend: DataSource management page (list connected devices, add/remove devices)
 
 **Definition of Done:**
 - SoilScouts (or equivalent) provider can be configured by Fieldmouse Admin

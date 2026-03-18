@@ -12,3 +12,5 @@ paho-mqtt>=1.6
 django-encrypted-model-fields>=0.6
 django-celery-beat>=2.6
 Pillow>=10.0
+requests>=2.31
+jsonpath-ng>=1.6

@@ -41,6 +41,12 @@ function FieldmouseAdminLayout() {
           >
             Pending Devices
           </NavLink>
+          <NavLink
+            to="/admin/api-providers"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            API Providers
+          </NavLink>
         </nav>
         <button onClick={handleLogout} className={styles.logoutButton}>
           Sign out

@@ -14,12 +14,14 @@ import TenantCreate from './pages/admin/TenantCreate';
 import TenantDetail from './pages/admin/TenantDetail';
 import DeviceTypeLibrary from './pages/admin/DeviceTypeLibrary';
 import PendingDevices from './pages/admin/PendingDevices';
+import ProviderLibrary from './pages/admin/ProviderLibrary';
 import UserManagement from './pages/tenant/UserManagement';
 import Sites from './pages/tenant/Sites';
 import Groups from './pages/tenant/Groups';
 import Settings from './pages/tenant/Settings';
 import Devices from './pages/tenant/Devices';
 import DeviceDetail from './pages/tenant/DeviceDetail';
+import DataSources from './pages/tenant/DataSources';
 
 function App() {
   const { user } = useAuth();
@@ -45,6 +47,7 @@ function App() {
         <Route path="tenants/:id" element={<TenantDetail />} />
         <Route path="device-types" element={<DeviceTypeLibrary />} />
         <Route path="pending-devices" element={<PendingDevices />} />
+        <Route path="api-providers" element={<ProviderLibrary />} />
       </Route>
 
       {/* Tenant user routes */}
@@ -61,6 +64,7 @@ function App() {
         <Route path="sites" element={<Sites />} />
         <Route path="devices" element={<Devices />} />
         <Route path="devices/:id" element={<DeviceDetail />} />
+        <Route path="data-sources" element={<DataSources />} />
         <Route path="groups" element={<Groups />} />
         <Route path="settings" element={<Settings />} />
       </Route>

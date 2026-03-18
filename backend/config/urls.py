@@ -7,4 +7,5 @@ urlpatterns = [
     path('api/v1/', include('apps.accounts.urls')),
     path('api/v1/', include('apps.devices.urls')),
     path('api/v1/', include('apps.readings.urls')),
+    path('api/v1/', include('apps.integrations.urls')),
 ]

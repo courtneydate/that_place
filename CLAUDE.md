@@ -58,7 +58,7 @@ Deployable on AWS (EC2 + S3 + SES, preferred) or any Linux server (MinIO + SMTP,
 - Preserve all existing tests — if refactoring, make sure tests still pass
 - If you need to change the data model, update SPEC.md Section 4 as well
 - Check for downstream effects — changing a serializer may break frontend expectations
-
+- Codex will review your code when you're done
 ---
 
 ## Key Commands
