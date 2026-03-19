@@ -97,8 +97,14 @@ function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
   const handleAxis = (e) => onChange({ ...row, axis: e.target.value });
 
   return (
-    <div className={styles.streamRow}>
-      <div className={styles.streamRowSelects}>
+    <div className={styles.streamRowCard}>
+      <div className={styles.streamRowHeader}>
+        <span className={styles.streamRowLabel}>Stream {index + 1}</span>
+        {onRemove && (
+          <button type="button" className={styles.rowRemoveBtn} onClick={onRemove}>×</button>
+        )}
+      </div>
+      <div className={styles.streamRowTop}>
         <select className={styles.select} value={row.siteId} onChange={handleSite}>
           <option value="">All sites</option>
           {sites.map((s) => (
@@ -111,6 +117,8 @@ function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </select>
+      </div>
+      <div className={styles.streamRowBottom}>
         <select
           className={styles.select}
           value={row.streamId}
@@ -131,9 +139,6 @@ function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
           </select>
         )}
       </div>
-      {onRemove && (
-        <button type="button" className={styles.rowRemoveBtn} onClick={onRemove}>×</button>
-      )}
     </div>
   );
 }

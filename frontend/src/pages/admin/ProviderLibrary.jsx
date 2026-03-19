@@ -227,6 +227,7 @@ const EMPTY_FIELDS = {
   detail_method: 'GET',
   available_streams: [],
   default_poll_interval_seconds: 300,
+  max_requests_per_second: '',
   is_active: true,
 };
 
@@ -249,6 +250,7 @@ function fieldsFromProvider(p) {
     detail_method: p.detail_endpoint?.method || 'GET',
     available_streams: p.available_streams || [],
     default_poll_interval_seconds: p.default_poll_interval_seconds ?? 300,
+    max_requests_per_second: p.max_requests_per_second ?? '',
     is_active: p.is_active ?? true,
   };
 }
@@ -322,6 +324,9 @@ function buildFormData(fields) {
   }));
   fd.append('available_streams', JSON.stringify(fields.available_streams));
   fd.append('default_poll_interval_seconds', String(fields.default_poll_interval_seconds));
+  if (fields.max_requests_per_second !== '' && fields.max_requests_per_second !== null) {
+    fd.append('max_requests_per_second', String(fields.max_requests_per_second));
+  }
   fd.append('is_active', fields.is_active ? 'true' : 'false');
   return fd;
 }
@@ -528,13 +533,30 @@ function ProviderFormFields({ fields, setFields, disabled }) {
 
       <div className={styles.inlineFields} style={{ marginTop: '0.75rem' }}>
         <div className={styles.field}>
-          <label className={styles.label}>Poll interval (seconds)</label>
+          <label className={styles.label}>Poll interval (seconds, min 30)</label>
           <input
             type="number"
             min="30"
             value={fields.default_poll_interval_seconds}
             onChange={(e) =>
               setFields((f) => ({ ...f, default_poll_interval_seconds: Number(e.target.value) }))
+            }
+            className={styles.input}
+            disabled={disabled}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Rate limit (requests/second, optional)</label>
+          <input
+            type="number"
+            min="1"
+            placeholder="e.g. 5"
+            value={fields.max_requests_per_second}
+            onChange={(e) =>
+              setFields((f) => ({
+                ...f,
+                max_requests_per_second: e.target.value === '' ? '' : Number(e.target.value),
+              }))
             }
             className={styles.input}
             disabled={disabled}
@@ -736,6 +758,7 @@ function ProviderLibrary() {
                 <th>Slug</th>
                 <th>Auth type</th>
                 <th>Poll interval</th>
+                <th>Rate limit</th>
                 <th>Streams</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -757,6 +780,7 @@ function ProviderLibrary() {
                   <td>{p.slug}</td>
                   <td>{AUTH_TYPES.find((a) => a.value === p.auth_type)?.label || p.auth_type}</td>
                   <td>{p.default_poll_interval_seconds}s</td>
+                  <td>{p.max_requests_per_second ? `${p.max_requests_per_second}/s` : '—'}</td>
                   <td>{(p.available_streams || []).length}</td>
                   <td>
                     <span style={{ color: p.is_active ? 'var(--success)' : 'var(--text-muted)' }}>

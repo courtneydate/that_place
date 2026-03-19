@@ -6,6 +6,7 @@ Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
 """
 import logging
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from .fields import EncryptedJSONField
@@ -92,7 +93,13 @@ class ThirdPartyAPIProvider(models.Model):
     )
     default_poll_interval_seconds = models.PositiveIntegerField(
         default=300,
-        help_text='How often to poll each connected device (seconds). Default: 5 minutes.',
+        validators=[MinValueValidator(30)],
+        help_text='How often to poll each connected device (seconds). Minimum: 30s, default: 5 minutes (300s).',
+    )
+    max_requests_per_second = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Provider API rate limit (requests/second). Leave blank for no rate limiting.',
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -393,36 +393,54 @@ class DataSourceViewSet(viewsets.GenericViewSet):
                 serial = f'api-{provider.slug}-{tenant.pk}-{ext_id}'[:255]
                 overrides = v.get('stream_overrides', {})
 
-                # Create virtual Device
-                virtual_device = Device.objects.create(
-                    tenant=tenant,
-                    site=site,
-                    device_type=device_type,
-                    name=device_name,
-                    serial_number=serial,
-                    status=Device.Status.ACTIVE,
-                )
+                # Reactivate existing virtual Device if previously disconnected,
+                # otherwise create fresh.
+                try:
+                    virtual_device = Device.objects.get(serial_number=serial, tenant=tenant)
+                    virtual_device.site = site
+                    virtual_device.name = device_name
+                    virtual_device.status = Device.Status.ACTIVE
+                    virtual_device.save(update_fields=['site', 'name', 'status'])
+                except Device.DoesNotExist:
+                    virtual_device = Device.objects.create(
+                        tenant=tenant,
+                        site=site,
+                        device_type=device_type,
+                        name=device_name,
+                        serial_number=serial,
+                        status=Device.Status.ACTIVE,
+                    )
 
-                # Create DataSourceDevice
-                dsd = DataSourceDevice.objects.create(
+                # Reactivate existing DataSourceDevice if previously disconnected,
+                # otherwise create fresh.
+                dsd, _ = DataSourceDevice.objects.update_or_create(
                     datasource=ds,
                     external_device_id=ext_id,
-                    external_device_name=ext_name or None,
-                    virtual_device=virtual_device,
-                    active_stream_keys=v['active_stream_keys'],
+                    defaults={
+                        'external_device_name': ext_name or None,
+                        'virtual_device': virtual_device,
+                        'active_stream_keys': v['active_stream_keys'],
+                        'is_active': True,
+                        'consecutive_poll_failures': 0,
+                        'last_poll_status': None,
+                        'last_poll_error': None,
+                    },
                 )
 
-                # Create Stream records for activated stream keys
+                # Ensure Stream records exist for all activated stream keys.
+                # Uses get_or_create so re-connection doesn't duplicate streams.
                 for stream_key in v['active_stream_keys']:
                     stream_def = streams_by_key.get(stream_key, {})
                     override = overrides.get(stream_key, {})
-                    Stream.objects.create(
+                    Stream.objects.get_or_create(
                         device=virtual_device,
                         key=stream_key,
-                        label=override.get('label') or stream_def.get('label', stream_key),
-                        unit=override.get('unit') or stream_def.get('unit', ''),
-                        data_type=stream_def.get('data_type', 'numeric'),
-                        display_enabled=True,
+                        defaults={
+                            'label': override.get('label') or stream_def.get('label', stream_key),
+                            'unit': override.get('unit') or stream_def.get('unit', ''),
+                            'data_type': stream_def.get('data_type', 'numeric'),
+                            'display_enabled': True,
+                        },
                     )
 
                 created.append(dsd)

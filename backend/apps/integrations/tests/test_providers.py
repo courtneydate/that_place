@@ -193,6 +193,65 @@ class TestProviderUpdate:
         assert p.name == 'Updated Name'
         assert p.default_poll_interval_seconds == 600
 
+    def test_poll_interval_below_minimum_rejected(self):
+        """Poll interval below 30 s must be rejected with 400."""
+        fm = make_fm_admin()
+        p = make_provider()
+        payload = {
+            'name': p.name,
+            'slug': p.slug,
+            'base_url': p.base_url,
+            'auth_type': p.auth_type,
+            'auth_param_schema': p.auth_param_schema,
+            'discovery_endpoint': p.discovery_endpoint,
+            'detail_endpoint': p.detail_endpoint,
+            'available_streams': p.available_streams,
+            'default_poll_interval_seconds': 10,
+        }
+        resp = auth_client(fm).put(f'{PROVIDERS_URL}{p.pk}/', payload, format='json')
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'default_poll_interval_seconds' in resp.data['error']['details']
+
+    def test_poll_interval_at_minimum_accepted(self):
+        """Poll interval of exactly 30 s must be accepted."""
+        fm = make_fm_admin()
+        p = make_provider()
+        payload = {
+            'name': p.name,
+            'slug': p.slug,
+            'base_url': p.base_url,
+            'auth_type': p.auth_type,
+            'auth_param_schema': p.auth_param_schema,
+            'discovery_endpoint': p.discovery_endpoint,
+            'detail_endpoint': p.detail_endpoint,
+            'available_streams': p.available_streams,
+            'default_poll_interval_seconds': 30,
+        }
+        resp = auth_client(fm).put(f'{PROVIDERS_URL}{p.pk}/', payload, format='json')
+        assert resp.status_code == status.HTTP_200_OK
+        p.refresh_from_db()
+        assert p.default_poll_interval_seconds == 30
+
+    def test_max_requests_per_second_saved(self):
+        """FM Admin can set max_requests_per_second on a provider."""
+        fm = make_fm_admin()
+        p = make_provider()
+        payload = {
+            'name': p.name,
+            'slug': p.slug,
+            'base_url': p.base_url,
+            'auth_type': p.auth_type,
+            'auth_param_schema': p.auth_param_schema,
+            'discovery_endpoint': p.discovery_endpoint,
+            'detail_endpoint': p.detail_endpoint,
+            'available_streams': p.available_streams,
+            'max_requests_per_second': 5,
+        }
+        resp = auth_client(fm).put(f'{PROVIDERS_URL}{p.pk}/', payload, format='json')
+        assert resp.status_code == status.HTTP_200_OK
+        p.refresh_from_db()
+        assert p.max_requests_per_second == 5
+
     def test_tenant_admin_cannot_update(self):
         tenant = make_tenant()
         user = make_tenant_user('ta@acme.com', tenant)

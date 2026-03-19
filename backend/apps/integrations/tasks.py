@@ -37,7 +37,12 @@ def poll_datasource_devices() -> None:
     A device is due when:
       - It has never been polled (last_polled_at is None), or
       - Time since last poll >= provider's default_poll_interval_seconds.
+
+    Dispatching is staggered per provider using Celery countdown to respect the
+    provider's max_requests_per_second rate limit and avoid thundering-herd 429s.
     """
+    from collections import defaultdict
+
     from .models import DataSourceDevice
 
     now = timezone.now()
@@ -49,15 +54,25 @@ def poll_datasource_devices() -> None:
         .select_related('datasource__provider')
     )
 
+    # Group due devices by provider so we can stagger per-provider rate limit.
+    due_by_provider = defaultdict(list)
     for dsd in devices:
-        interval = dsd.datasource.provider.default_poll_interval_seconds
+        provider = dsd.datasource.provider
+        interval = provider.default_poll_interval_seconds
         if dsd.last_polled_at is None:
             due = True
         else:
             due = (now - dsd.last_polled_at).total_seconds() >= interval
-
         if due:
-            poll_single_device.delay(dsd.pk)
+            due_by_provider[provider.pk].append((dsd, provider))
+
+    for provider_pk, items in due_by_provider.items():
+        rate = items[0][1].max_requests_per_second  # requests/second, or None
+        for i, (dsd, _) in enumerate(items):
+            # countdown (seconds) = how many full batches precede this device.
+            # With rate=5: devices 0-4 → countdown 0, devices 5-9 → countdown 1, etc.
+            countdown = (i // rate) if rate else 0
+            poll_single_device.apply_async(args=[dsd.pk], countdown=countdown)
             dispatched += 1
 
     if dispatched:

@@ -413,9 +413,12 @@ class TestDeactivateDevice:
                 'command_ack_timeout_seconds': 30,
             },
         )
+        from apps.integrations.models import DataSource
+        provider = DataSource.objects.get(pk=ds.pk).provider
+        serial = f'api-{provider.slug}-{tenant.pk}-DEV-001'[:255]
         virtual_dev = Device.objects.create(
             tenant=tenant, site=site, device_type=dt,
-            name='Scout', serial_number='api-soilscouts-1-DEV-001',
+            name='Scout', serial_number=serial,
             status=Device.Status.ACTIVE,
         )
         return DataSourceDevice.objects.create(
@@ -453,6 +456,32 @@ class TestDeactivateDevice:
 
         # Virtual device still exists
         assert Device.objects.filter(pk=virtual_device_pk).exists()
+
+    def test_reconnect_reactivates_existing_device(self):
+        """Re-connecting a previously deactivated device reactivates it instead of creating a duplicate."""
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider = make_provider()
+        ds = make_data_source(tenant, provider)
+        site = make_site(tenant)
+        dsd = self._make_connected_device(tenant, ds, site)
+        virtual_device_pk = dsd.virtual_device_id
+
+        # Deactivate
+        auth_client(user).delete(f'{DATA_SOURCES_URL}{ds.pk}/devices/{dsd.pk}/')
+        dsd.refresh_from_db()
+        assert not dsd.is_active
+
+        # Re-connect the same external device — must not 500 or create a duplicate Device
+        payload = [{'external_device_id': 'DEV-001', 'site_id': site.pk, 'active_stream_keys': ['soil_moisture']}]
+        resp = auth_client(user).post(f'{DATA_SOURCES_URL}{ds.pk}/devices/', payload, format='json')
+        assert resp.status_code == status.HTTP_201_CREATED
+
+        # Same virtual Device reused, not a new one
+        dsd.refresh_from_db()
+        assert dsd.is_active
+        assert dsd.virtual_device_id == virtual_device_pk
+        assert Device.objects.filter(tenant=tenant).count() == 1
 
 
 # ---------------------------------------------------------------------------

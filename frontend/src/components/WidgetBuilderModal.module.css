@@ -138,41 +138,66 @@
   gap: 0.75rem;
 }
 
-/* Line chart: list of stream rows */
+/* Line chart: list of stream row cards */
 .streamRowList {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.streamRow {
+/* Card wrapper for one stream row */
+.streamRowCard {
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  background: #F9FAFB;
+}
+
+/* Card header: "Stream N" label + × button */
+.streamRowHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.streamRowLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+/* Top row: site filter + device (2 columns) */
+.streamRowTop {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.375rem;
 }
 
-.streamRowSelects {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+/* Bottom row: stream (flex-grow) + optional axis toggle */
+.streamRowBottom {
+  display: flex;
   gap: 0.375rem;
+  align-items: center;
+}
+
+.streamRowBottom .select {
   flex: 1;
   min-width: 0;
-}
-
-/* When axis toggle is present, add a 4th column */
-.streamRowSelects:has(.selectNarrow) {
-  grid-template-columns: 1fr 1fr 1fr auto;
 }
 
 .selectNarrow {
   border: 1px solid #D1D5DB;
   border-radius: 6px;
-  padding: 0.5rem 0.375rem;
+  padding: 0.5rem 0.5rem;
   font-size: 0.8125rem;
   color: #111827;
   background: #FFFFFF;
   outline: none;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .selectNarrow:focus { border-color: #1A6B4A; }
@@ -181,11 +206,11 @@
   background: none;
   border: none;
   font-size: 1.125rem;
+  line-height: 1;
   color: #9CA3AF;
   cursor: pointer;
   padding: 0.125rem 0.375rem;
   border-radius: 4px;
-  flex-shrink: 0;
 }
 
 .rowRemoveBtn:hover { background: #FEE2E2; color: #EF4444; }

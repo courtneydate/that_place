@@ -75,6 +75,7 @@ class ThirdPartyAPIProviderAdminSerializer(serializers.ModelSerializer):
             'detail_endpoint',
             'available_streams',
             'default_poll_interval_seconds',
+            'max_requests_per_second',
             'is_active',
             'created_at',
         )

@@ -445,7 +445,8 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
   - Discovery endpoint (JSONB): path + method + JSONPath to extract device ID from each list item + optional JSONPath for device name
   - Detail endpoint (JSONB): path template (e.g. `/devices/{device_id}/`) + method
   - Available streams (JSONB array): each stream has key, label, unit, data_type, and a JSONPath expression to extract its value from the detail endpoint response
-  - Default poll interval (seconds)
+  - Default poll interval (seconds) — minimum 30 s, default 300 s (5 minutes)
+  - Max requests per second (optional) — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls are sent per second
 - [ ] Provider configs are visible to Tenant Admins (name + description only) — credential schemas and JSONPath internals are not exposed
 
 **Tenant-level (Tenant Admin) — connection wizard:**
