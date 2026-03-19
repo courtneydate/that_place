@@ -1,7 +1,7 @@
 # PROJECT SPEC — Fieldmouse
 
-> **Version:** 5.0
-> **Last Updated:** 2026-03-16
+> **Version:** 5.1
+> **Last Updated:** 2026-03-19
 > **Author:** Courtney
 > **Status:** Active — do not modify without discussion
 
@@ -39,6 +39,7 @@ B2B — sold to organisations on a subscription basis. Hardware (Fieldmouse Scou
 | MQTT Broker     | Mosquitto (local dev + self-hosted prod) or AWS IoT Core (AWS prod) |
 | Email           | Any SMTP provider — AWS SES (preferred), Mailgun, Postmark, or self-hosted |
 | Task Queue      | Celery + Redis                          |
+| Charting        | ApexCharts (`apexcharts` + `react-apexcharts`) |
 | CI/CD           | GitHub Actions                          |
 | Containers      | Docker + Docker Compose                 |
 
@@ -502,8 +503,8 @@ _Post-wizard:_
 - [ ] On tablet-width browsers (768–1024px), widgets reflow to a single column automatically
 
 **Widget types:**
-- [ ] **Line chart** — plots one or more streams over time; supports dual Y-axes, with multiple streams assignable to each axis; each stream rendered as a separate line; configurable time range (last hour / 24h / 7d / 30d / custom)
-- [ ] **Gauge** — displays current value of a single stream against a min/max range; configurable min, max, and threshold bands
+- [ ] **Line chart** — plots one or more streams over time; each stream rendered as a separate line; configurable time range (last hour / 24h / 7d / 30d / custom with plain date inputs). Dual Y-axis: all streams default to the left axis; any stream beyond the first can be individually toggled to the right axis. Implemented with ApexCharts.
+- [ ] **Gauge** — displays current value of a single stream against a min/max range; configurable min, max, and exactly 3 fixed threshold bands (normal / warning / danger) with configurable boundary values (`warning_threshold`, `danger_threshold`); band colours are green / yellow / red using semantic tokens. Implemented with ApexCharts.
 - [ ] **Value card** — displays latest reading for a single stream, a trend indicator (up / down / stable, derived from comparison to previous reading), and time since last update
 - [ ] **Status indicator** — displays a colour/label state derived from a stream's current value; state-to-colour/label mapping defined at device type configuration by Fieldmouse Admin
 - [ ] **Health/uptime chart** — plots a device's online/offline history over time, or battery/signal as a line chart
@@ -513,6 +514,41 @@ _Post-wizard:_
 - [ ] Cross-site widgets: a single widget can include streams from multiple devices across multiple sites
 - [ ] Live data refreshes automatically on a configurable polling interval (default: 30 seconds)
 - [ ] Widget config stored as JSONB — supports flexible per-widget settings without schema changes
+
+**Widget config schemas (JSONB):**
+
+`value_card`:
+```json
+{
+  "stream_id": 123,
+  "label_override": "Tank Level"
+}
+```
+
+`line_chart`:
+```json
+{
+  "streams": [
+    { "stream_id": 123, "axis": "left", "color": "#hex" },
+    { "stream_id": 456, "axis": "right", "color": "#hex" }
+  ],
+  "time_range": "24h"
+}
+```
+`time_range` values: `"1h"` / `"24h"` / `"7d"` / `"30d"` / `"custom"`. When `"custom"`, two additional fields are present: `"date_from": "YYYY-MM-DD"` and `"date_to": "YYYY-MM-DD"`.
+
+`gauge`:
+```json
+{
+  "stream_id": 123,
+  "min": 0,
+  "max": 100,
+  "warning_threshold": 60,
+  "danger_threshold": 80,
+  "label_override": "Pressure"
+}
+```
+Values below `warning_threshold` = normal (green); between `warning_threshold` and `danger_threshold` = warning (yellow); above `danger_threshold` = danger (red).
 
 ---
 
@@ -734,7 +770,7 @@ _Post-wizard:_
 | CommandLog | belongs to Device | id, device_id, sent_by (nullable FK → User — null if rule-triggered), triggered_by_rule_id (nullable FK → Rule), command_name, params_sent (JSONB), sent_at, ack_received_at (nullable), status (sent/acknowledged/timed_out) |
 | DataExport | belongs to Tenant + User | id, tenant_id, exported_by, stream_ids (array), date_from, date_to, exported_at |
 | Dashboard | belongs to Tenant | id, tenant_id, name, created_by, created_at |
-| DashboardWidget | belongs to Dashboard | id, dashboard_id, widget_type, stream_ids (array), config (JSONB), position (JSONB) |
+| DashboardWidget | belongs to Dashboard | id, dashboard_id, widget_type, config (JSONB — includes stream binding; see widget config schemas in Dashboards feature), position (JSONB) |
 
 ### Key Business Rules
 - Every queryset must be filtered by `tenant_id` — no cross-tenant data leakage

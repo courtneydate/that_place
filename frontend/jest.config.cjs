@@ -4,6 +4,7 @@ module.exports = {
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/src/__mocks__/fileMock.js',
+    '^react-apexcharts$': '<rootDir>/src/__mocks__/reactApexChartsMock.jsx',
   },
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',

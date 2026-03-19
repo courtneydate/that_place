@@ -4,7 +4,7 @@
  * Dashboards are shared across all tenant users.
  * Operators and Admins can create/edit/delete. View-Only can only read.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 
 // ---------------------------------------------------------------------------
@@ -116,5 +116,25 @@ export function useStreamReadings(streamId, params = {}, queryOptions = {}) {
         .then((r) => r.data),
     enabled: !!streamId,
     ...queryOptions,
+  });
+}
+
+/**
+ * Fetch readings for multiple streams in parallel.
+ *
+ * @param {Array<{stream_id: number}>} streamConfigs - Array of stream config objects.
+ * @param {object} params - Shared query params applied to all streams: { from, to, limit }
+ * @param {object} queryOptions - Additional React Query options (e.g. refetchInterval).
+ * @returns {Array} Array of query result objects, one per stream, in the same order.
+ */
+export function useMultipleStreamReadings(streamConfigs = [], params = {}, queryOptions = {}) {
+  return useQueries({
+    queries: streamConfigs.map(({ stream_id }) => ({
+      queryKey: ['stream-readings', stream_id, params],
+      queryFn: () =>
+        api.get(`/api/v1/streams/${stream_id}/readings/`, { params }).then((r) => r.data),
+      enabled: !!stream_id,
+      ...queryOptions,
+    })),
   });
 }

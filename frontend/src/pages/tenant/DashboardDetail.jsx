@@ -2,7 +2,7 @@
  * DashboardDetail — canvas page for a single dashboard.
  *
  * Renders widgets in a fixed grid (1/2/3 columns) ordered by position.order.
- * Only value_card widgets are rendered in Sprint 11; other types show a placeholder.
+ * Supports value_card, line_chart, and gauge widget types.
  * Auto-refreshes widget data every 30 seconds via React Query refetchInterval.
  */
 import { useState } from 'react';
@@ -14,6 +14,8 @@ import {
   useCreateWidget,
   useDeleteWidget,
 } from '../../hooks/useDashboards';
+import GaugeWidget from '../../components/GaugeWidget';
+import LineChartWidget from '../../components/LineChartWidget';
 import ValueCard from '../../components/ValueCard';
 import WidgetBuilderModal from '../../components/WidgetBuilderModal';
 import styles from './DashboardDetail.module.css';
@@ -35,7 +37,7 @@ function WidgetPlaceholder({ widgetType }) {
   return (
     <div className={styles.placeholderCard}>
       <span className={styles.placeholderLabel}>{widgetType.replace(/_/g, ' ')}</span>
-      <span className={styles.placeholderNote}>Available in a future sprint</span>
+      <span className={styles.placeholderNote}>Coming in a future sprint</span>
     </div>
   );
 }
@@ -148,6 +150,12 @@ function DashboardDetail() {
           style={{ '--columns': dashboard.columns }}
         >
           {widgets.map((widget) => {
+            const sharedProps = {
+              config: widget.config,
+              refetchInterval: REFETCH_INTERVAL,
+              canEdit,
+              onRemove: () => handleRemoveWidget(widget.id),
+            };
             if (widget.widget_type === 'value_card') {
               return (
                 <ValueCard
@@ -159,6 +167,12 @@ function DashboardDetail() {
                   onRemove={() => handleRemoveWidget(widget.id)}
                 />
               );
+            }
+            if (widget.widget_type === 'line_chart') {
+              return <LineChartWidget key={widget.id} {...sharedProps} />;
+            }
+            if (widget.widget_type === 'gauge') {
+              return <GaugeWidget key={widget.id} {...sharedProps} />;
             }
             return <WidgetPlaceholder key={widget.id} widgetType={widget.widget_type} />;
           })}

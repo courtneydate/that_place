@@ -1,0 +1,71 @@
+.card {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  background: none;
+  border: none;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.removeBtn:hover {
+  background: #FEE2E2;
+  color: #EF4444;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+  margin: 0;
+  text-align: center;
+}
+
+.statusMsg {
+  font-size: 0.875rem;
+  color: #6B7280;
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.range {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 0.75rem;
+  color: #9CA3AF;
+  padding: 0 0.25rem;
+  margin-top: -0.5rem;
+}
+
+.bands {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.6875rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bandNormal  { color: #22C55E; }
+.bandWarning { color: #F59E0B; }
+.bandDanger  { color: #EF4444; }
