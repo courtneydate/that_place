@@ -321,12 +321,14 @@
 - [ ] Frontend: Health/uptime chart widget — online/offline history, battery and signal as line charts
 - [ ] Frontend: Widget drag-to-reorder within grid
 - [ ] Frontend: Responsive reflow — single column below 1024px
+- [ ] Frontend: Edit widget — each widget has an edit action (e.g. gear/pencil icon) that re-opens the widget builder modal pre-populated with the widget's current config; saving calls the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint and updates the widget in place without deleting and recreating it
 
 **Definition of Done:**
 - All 5 widget types working: line chart, gauge, value card, status indicator, health/uptime chart
 - Status indicator correctly maps stream values to colours/labels as configured on device type
 - Widgets can be reordered by drag
 - Layout reflows correctly on a 768px-wide browser window
+- Clicking edit on an existing widget opens the builder modal with current config pre-filled; saving updates the widget without page reload
 
 ---
 

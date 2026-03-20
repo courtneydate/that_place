@@ -475,7 +475,7 @@ _Post-wizard:_
 - [ ] Celery beat task polls the detail endpoint for each active `DataSourceDevice` on the provider's poll interval
 - [ ] Response values extracted via each active stream's JSONPath expression and stored as StreamReadings on the virtual device
 - [ ] For `oauth2_password` and `oauth2_client_credentials` auth: platform handles token refresh automatically — tenant never re-enters credentials unless they change
-- [ ] Failed polls retried with exponential backoff; consecutive failures incremented on `DataSourceDevice.consecutive_poll_failures`; after threshold → device health warning surfaced
+- [ ] On 401 (server-side token revocation), platform clears the token cache and re-authenticates up to 3 times (`MAX_AUTH_RETRIES`) before recording `AUTH_FAILURE`. Non-auth failures (network errors, 5xx) are recorded immediately with no retry. Consecutive failures incremented on `DataSourceDevice.consecutive_poll_failures`; after threshold → device health warning surfaced
 - [ ] **Re-discover devices on an existing DataSource** — Tenant Admin can click "Add devices" on any connected DataSource to re-run discovery against the saved account credentials without re-entering them. The discovery result shows all devices on the account; already-connected (active) devices are shown as greyed-out and non-selectable. The user selects new devices, assigns sites, and configures streams — following the same Phase A → B flow as the initial connection wizard but skipping Step 1 (credential entry). New devices start polling immediately on completion. No backend changes required — the existing `POST /api/v1/data-sources/:id/discover/` and `POST /api/v1/data-sources/:id/devices/` endpoints support this natively.
 - [ ] Removing a device **deactivates** it (`DataSourceDevice.is_active = False`, polling stops) — the virtual Device record and all StreamReadings are retained. Hard delete is available from the device detail page.
 - [ ] Virtual device streams are identical `Stream` records to MQTT device streams — label, unit, and display_enabled are all configurable via the existing Streams tab after connection
@@ -496,6 +496,7 @@ _Post-wizard:_
 - [ ] Tenant Admin and Operator can create, edit, and delete dashboards
 - [ ] Dashboards are shared across the whole tenant — all users see the same dashboards
 - [ ] Dashboards are visible to all users including View-Only (read-only for them)
+- [ ] Tenant Admin and Operator can edit an existing widget's configuration (stream binding, label, thresholds, time range, etc.) without deleting and recreating it — the widget builder modal re-opens pre-populated with the current config and saves via the existing PUT endpoint
 - [ ] Per-user personal dashboards — Phase 2
 
 **Layout:**
@@ -755,7 +756,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
 | Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
 | StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
-| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), detail_endpoint (JSONB: path template with {device_id}, method), available_streams (JSONB array: key/label/unit/data_type/jsonpath), default_poll_interval_seconds, is_active, created_at |
+| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), detail_endpoint (JSONB: path template with {device_id}, method), available_streams (JSONB array: key/label/unit/data_type/jsonpath), default_poll_interval_seconds (min 30, default 300), max_requests_per_second (nullable int — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls fire per second), is_active, created_at |
 | DataSource | belongs to Tenant | id, tenant_id, provider_id (FK → ThirdPartyAPIProvider), name, credentials (encrypted JSONB — filled from provider's auth_param_schema), auth_token_cache (encrypted JSONB — stores access/refresh tokens for oauth2 types), is_active, created_at |
 | DataSourceDevice | belongs to DataSource | id, datasource_id, external_device_id (device ID as returned by provider's discovery endpoint), external_device_name (nullable), virtual_device_id (FK → Device), active_stream_keys (array — subset of provider's available_streams the tenant has activated), last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text), consecutive_poll_failures (int, default 0), is_active |
 | NotificationGroup | belongs to Tenant | id, tenant_id, name, is_system (bool — for pre-defined groups), created_at |
@@ -793,6 +794,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - Virtual devices (created from 3rd-party API connection) are created with `status=active` — no FM Admin approval required (the provider itself is pre-approved)
 - Virtual device `serial_number` is generated as `api-{provider_slug}-{tenant_id}-{external_device_id}` — guaranteed unique across all tenants
 - Removing a device from a DataSource deactivates it (`DataSourceDevice.is_active=False`) — the virtual Device record and all StreamReadings are retained; hard delete is available from the device detail page
+- Re-connecting a previously deactivated device reactivates the existing virtual Device and DataSourceDevice records rather than creating duplicates — poll failure counters are reset, historical StreamReadings and Stream records are preserved
 
 ---
 
@@ -926,7 +928,7 @@ PUT    /api/v1/data-sources/:id/
 DELETE /api/v1/data-sources/:id/
 POST   /api/v1/data-sources/:id/discover/            # trigger device discovery, returns device list
 GET    /api/v1/data-sources/:id/devices/             # list connected DataSourceDevices
-POST   /api/v1/data-sources/:id/devices/             # connect a discovered device (creates virtual Device + streams)
+POST   /api/v1/data-sources/:id/devices/             # connect a discovered device (creates or reactivates virtual Device + streams)
 PATCH  /api/v1/data-sources/:id/devices/:did/        # update active_stream_keys for a connected device
 DELETE /api/v1/data-sources/:id/devices/:did/        # deactivate a device (keeps virtual Device + history)
 
