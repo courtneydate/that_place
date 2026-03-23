@@ -4,6 +4,7 @@
  *
  * Auto-refreshes on the interval supplied by the parent dashboard canvas.
  */
+import PropTypes from 'prop-types';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import styles from './ValueCard.module.css';
@@ -91,5 +92,14 @@ function ValueCard({ streamId, config = {}, refetchInterval = 30000, onRemove, o
     </div>
   );
 }
+
+ValueCard.propTypes = {
+  streamId: PropTypes.number,
+  config: PropTypes.object,
+  refetchInterval: PropTypes.number,
+  onRemove: PropTypes.func,
+  onEdit: PropTypes.func,
+  canEdit: PropTypes.bool,
+};
 
 export default ValueCard;

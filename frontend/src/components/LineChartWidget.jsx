@@ -8,6 +8,7 @@
  *
  * Implemented with ApexCharts — see SPEC.md § Dashboards & Visualisation.
  */
+import PropTypes from 'prop-types';
 import { useMemo, useState } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import { useMultipleStreamReadings } from '../hooks/useDashboards';
@@ -158,5 +159,13 @@ function LineChartWidget({ config = {}, refetchInterval, canEdit, onRemove, onEd
     </div>
   );
 }
+
+LineChartWidget.propTypes = {
+  config: PropTypes.object.isRequired,
+  refetchInterval: PropTypes.number,
+  canEdit: PropTypes.bool,
+  onRemove: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+};
 
 export default LineChartWidget;

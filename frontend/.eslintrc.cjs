@@ -15,4 +15,10 @@ module.exports = {
   settings: {
     react: { version: 'detect' },
   },
+  overrides: [
+    {
+      files: ['**/*.test.jsx', '**/*.test.js'],
+      env: { jest: true },
+    },
+  ],
 };

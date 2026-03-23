@@ -11,6 +11,7 @@
  * Edit mode: pass an `editingWidget` prop to pre-populate all fields.
  * The widget type selector is locked in edit mode — type cannot be changed.
  */
+import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
@@ -99,7 +100,7 @@ function useAllDeviceTypes() {
  * @param {function} [props.onRemove]    - Called when the row remove button is clicked.
  */
 function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
-  const { data: streams = [], isLoading: streamsLoading } = useDeviceStreamList(
+  const { data: streams = [] } = useDeviceStreamList(
     row.deviceId || null,
   );
 
@@ -175,6 +176,15 @@ function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
     </div>
   );
 }
+
+StreamRow.propTypes = {
+  row: PropTypes.object.isRequired,
+  index: PropTypes.number.isRequired,
+  allDevices: PropTypes.array.isRequired,
+  sites: PropTypes.array.isRequired,
+  onChange: PropTypes.func.isRequired,
+  onRemove: PropTypes.func,
+};
 
 // ---------------------------------------------------------------------------
 // Main modal
@@ -708,5 +718,12 @@ function WidgetBuilderModal({ nextOrder = 0, editingWidget = null, onSubmit, onC
     </div>
   );
 }
+
+WidgetBuilderModal.propTypes = {
+  nextOrder: PropTypes.number,
+  editingWidget: PropTypes.object,
+  onSubmit: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
 export default WidgetBuilderModal;

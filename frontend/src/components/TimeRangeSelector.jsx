@@ -5,6 +5,7 @@
  * `from` and `to` are ISO strings, or null when custom is selected but dates
  * are not yet complete.
  */
+import PropTypes from 'prop-types';
 import styles from './TimeRangeSelector.module.css';
 
 export const TIME_RANGE_PRESETS = [
@@ -104,5 +105,12 @@ function TimeRangeSelector({ preset, dateFrom, dateTo, onChange }) {
     </div>
   );
 }
+
+TimeRangeSelector.propTypes = {
+  preset: PropTypes.string.isRequired,
+  dateFrom: PropTypes.string,
+  dateTo: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
 
 export default TimeRangeSelector;

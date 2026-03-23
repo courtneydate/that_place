@@ -5,6 +5,7 @@
  * Config: { stream_id, device_type_id }
  * Ref: SPEC.md § Feature: Dashboards & Visualisation — Status Indicator widget
  */
+import PropTypes from 'prop-types';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import styles from './StatusIndicatorWidget.module.css';
@@ -98,5 +99,13 @@ function StatusIndicatorWidget({ config = {}, refetchInterval, canEdit, onRemove
     </div>
   );
 }
+
+StatusIndicatorWidget.propTypes = {
+  config: PropTypes.object.isRequired,
+  refetchInterval: PropTypes.number,
+  canEdit: PropTypes.bool,
+  onRemove: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+};
 
 export default StatusIndicatorWidget;

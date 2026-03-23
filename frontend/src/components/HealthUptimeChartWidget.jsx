@@ -9,6 +9,7 @@
  * Config: { device_id, device_name, chart_type, time_range }
  * Ref: SPEC.md § Feature: Dashboards & Visualisation — Health/Uptime Chart widget
  */
+import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ReactApexChart from 'react-apexcharts';
@@ -203,5 +204,13 @@ function HealthUptimeChartWidget({ config = {}, refetchInterval, canEdit, onRemo
     </div>
   );
 }
+
+HealthUptimeChartWidget.propTypes = {
+  config: PropTypes.object.isRequired,
+  refetchInterval: PropTypes.number,
+  canEdit: PropTypes.bool,
+  onRemove: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+};
 
 export default HealthUptimeChartWidget;

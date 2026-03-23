@@ -7,6 +7,7 @@
  *
  * Implemented with ApexCharts radialBar — see SPEC.md § Dashboards & Visualisation.
  */
+import PropTypes from 'prop-types';
 import { useQuery } from '@tanstack/react-query';
 import ReactApexChart from 'react-apexcharts';
 import api from '../services/api';
@@ -135,5 +136,13 @@ function GaugeWidget({ config = {}, refetchInterval, canEdit, onRemove, onEdit }
     </div>
   );
 }
+
+GaugeWidget.propTypes = {
+  config: PropTypes.object.isRequired,
+  refetchInterval: PropTypes.number,
+  canEdit: PropTypes.bool,
+  onRemove: PropTypes.func.isRequired,
+  onEdit: PropTypes.func,
+};
 
 export default GaugeWidget;

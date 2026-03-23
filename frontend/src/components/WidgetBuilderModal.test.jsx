@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithQuery } from '../test-utils';
 import WidgetBuilderModal from './WidgetBuilderModal';
 

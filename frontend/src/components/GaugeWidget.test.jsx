@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithQuery } from '../test-utils';
 import GaugeWidget from './GaugeWidget';
 
