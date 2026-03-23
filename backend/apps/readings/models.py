@@ -84,9 +84,6 @@ class RuleStreamIndex(models.Model):
     On each new StreamReading, only the rules indexed against that stream are
     evaluated — not all rules in the tenant.
 
-    rule_id is stored as a plain integer until the rules app is implemented
-    in Phase 4. At that point this should be converted to a FK to rules.Rule.
-
     Ref: SPEC.md § Data Model — RuleStreamIndex
     """
 
@@ -95,10 +92,14 @@ class RuleStreamIndex(models.Model):
         on_delete=models.CASCADE,
         related_name='rule_index_entries',
     )
-    rule_id = models.PositiveIntegerField(db_index=True)
+    rule = models.ForeignKey(
+        'rules.Rule',
+        on_delete=models.CASCADE,
+        related_name='stream_index_entries',
+    )
 
     class Meta:
-        unique_together = [('stream', 'rule_id')]
+        unique_together = [('stream', 'rule')]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'Stream {self.stream_id} → Rule {self.rule_id}'
