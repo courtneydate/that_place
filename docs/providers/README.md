@@ -1,8 +1,8 @@
 # 3rd Party API Provider Registration Guide
 
-This guide is for **Fieldmouse Admins** adding a new data provider to the platform library.
+This guide is for **That Place Admins** adding a new data provider to the platform library.
 Once a provider is registered, any Tenant Admin can connect their account and start pulling
-device data without further involvement from Fieldmouse Admin.
+device data without further involvement from That Place Admin.
 
 For the technical specification see `SPEC.md § Feature: Data Ingestion — 3rd Party APIs`.
 

@@ -1,11 +1,11 @@
 /**
  * Root application component.
- * Routes are split by user type: Fieldmouse Admin vs tenant user.
+ * Routes are split by user type: That Place Admin vs tenant user.
  */
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import FieldmouseAdminLayout from './layouts/FieldmouseAdminLayout';
+import ThatPlaceAdminLayout from './layouts/ThatPlaceAdminLayout';
 import TenantLayout from './layouts/TenantLayout';
 import Login from './pages/Login';
 import AcceptInvite from './pages/AcceptInvite';
@@ -34,12 +34,12 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/accept-invite/:token" element={<AcceptInvite />} />
 
-      {/* Fieldmouse Admin routes */}
+      {/* That Place Admin routes */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute>
-            <FieldmouseAdminLayout />
+            <ThatPlaceAdminLayout />
           </ProtectedRoute>
         }
       >
@@ -80,7 +80,7 @@ function App() {
           <ProtectedRoute>
             {user === null
               ? null /* wait for user profile to load */
-              : user.is_fieldmouse_admin
+              : user.is_that_place_admin
                 ? <Navigate to="/admin/tenants" replace />
                 : <Navigate to="/app/users" replace />
             }

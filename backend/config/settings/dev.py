@@ -1,4 +1,4 @@
-"""Development settings for Fieldmouse.
+"""Development settings for That Place.
 
 Overrides base settings for local development.
 All services run via docker-compose.

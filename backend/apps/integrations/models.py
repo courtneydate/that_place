@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ThirdPartyAPIProvider(models.Model):
     """Platform-level 3rd party API provider configuration.
 
-    Managed by Fieldmouse Admin. Defines how the platform connects to a
+    Managed by That Place Admin. Defines how the platform connects to a
     provider's API including authentication, device discovery, and data polling.
     Tenant Admins see name/description only — internal schemas are hidden.
 
@@ -156,7 +156,7 @@ class DataSourceDevice(models.Model):
     """A single device connected via a DataSource.
 
     Links an external device ID (from the provider's discovery endpoint) to a
-    virtual Device record in Fieldmouse. Tracks polling state and failure count.
+    virtual Device record in That Place. Tracks polling state and failure count.
 
     Removing a device sets is_active=False (polling stops; virtual Device record
     and all StreamReadings are retained for history).

@@ -1,5 +1,5 @@
 /**
- * Tenant detail / edit page — Fieldmouse Admin.
+ * Tenant detail / edit page — That Place Admin.
  * Allows editing name/timezone, deactivating the tenant, and sending an invite.
  */
 import { useState, useEffect } from 'react';

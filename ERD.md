@@ -1,4 +1,4 @@
-# Fieldmouse — Entity Relationship Diagram
+# That Place — Entity Relationship Diagram
 
 > Reflects SPEC.md v4.8. Update this file whenever the data model changes.
 
@@ -8,7 +8,7 @@ erDiagram
         int id PK
         string email
         string password_hash
-        bool is_fieldmouse_admin
+        bool is_that_place_admin
         datetime created_at
     }
     Tenant {

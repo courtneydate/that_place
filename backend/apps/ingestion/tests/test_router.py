@@ -111,68 +111,68 @@ class TestLegacyV1ABB:
 
 
 # ---------------------------------------------------------------------------
-# Fieldmouse v2 — Scout own telemetry
-# fieldmouse/scout/{scout_serial}/telemetry
+# That Place v1 — Scout own telemetry
+# that-place/scout/{scout_serial}/telemetry
 # ---------------------------------------------------------------------------
 
-class TestFieldmouseV2ScoutTelemetry:
+class TestThatPlaceV1ScoutTelemetry:
 
     def test_matches_scout_telemetry_topic(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/telemetry')
         assert result is not None
-        assert result.pattern_name == 'fieldmouse_v2_scout_telemetry'
+        assert result.pattern_name == 'that_place_v1_scout_telemetry'
 
     def test_extracts_scout_serial(self):
-        result = router.route('fieldmouse/scout/FM-SCOUT-42/telemetry')
+        result = router.route('that-place/scout/FM-SCOUT-42/telemetry')
         assert result.scout_serial == 'FM-SCOUT-42'
 
     def test_scout_serial_equals_device_serial(self):
         """Scout own telemetry — the Scout IS the device being looked up."""
-        result = router.route('fieldmouse/scout/SCOUT-001/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/telemetry')
         assert result.scout_serial == result.device_serial
 
-    def test_topic_format_is_fieldmouse_v2(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/telemetry')
-        assert result.topic_format == 'fieldmouse_v2'
+    def test_topic_format_is_that_place_v1(self):
+        result = router.route('that-place/scout/SCOUT-001/telemetry')
+        assert result.topic_format == 'that_place_v1'
 
     def test_message_type_is_scout_telemetry(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/telemetry')
         assert result.message_type == 'scout_telemetry'
 
 
 # ---------------------------------------------------------------------------
-# Fieldmouse v2 — device telemetry bridged through Scout
-# fieldmouse/scout/{scout_serial}/{device_serial}/telemetry
+# That Place v1 — device telemetry bridged through Scout
+# that-place/scout/{scout_serial}/{device_serial}/telemetry
 # ---------------------------------------------------------------------------
 
-class TestFieldmouseV2DeviceTelemetry:
+class TestThatPlaceV1DeviceTelemetry:
 
     def test_matches_device_telemetry_topic(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/SENSOR-007/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/SENSOR-007/telemetry')
         assert result is not None
-        assert result.pattern_name == 'fieldmouse_v2_device_telemetry'
+        assert result.pattern_name == 'that_place_v1_device_telemetry'
 
     def test_extracts_both_serials(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/SENSOR-007/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/SENSOR-007/telemetry')
         assert result.scout_serial == 'SCOUT-001'
         assert result.device_serial == 'SENSOR-007'
 
     def test_scout_and_device_serials_are_different(self):
-        result = router.route('fieldmouse/scout/GW-100/DEV-200/telemetry')
+        result = router.route('that-place/scout/GW-100/DEV-200/telemetry')
         assert result.scout_serial != result.device_serial
 
-    def test_topic_format_is_fieldmouse_v2(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/SENSOR-007/telemetry')
-        assert result.topic_format == 'fieldmouse_v2'
+    def test_topic_format_is_that_place_v1(self):
+        result = router.route('that-place/scout/SCOUT-001/SENSOR-007/telemetry')
+        assert result.topic_format == 'that_place_v1'
 
     def test_message_type_is_telemetry(self):
-        result = router.route('fieldmouse/scout/SCOUT-001/SENSOR-007/telemetry')
+        result = router.route('that-place/scout/SCOUT-001/SENSOR-007/telemetry')
         assert result.message_type == 'telemetry'
 
     def test_does_not_match_scout_only_topic(self):
-        """3-segment v2 topic must not match the 4-segment device pattern."""
-        result = router.route('fieldmouse/scout/SCOUT-001/telemetry')
-        assert result.pattern_name == 'fieldmouse_v2_scout_telemetry'
+        """3-segment v1 topic must not match the 4-segment device pattern."""
+        result = router.route('that-place/scout/SCOUT-001/telemetry')
+        assert result.pattern_name == 'that_place_v1_scout_telemetry'
         assert result.device_serial == 'SCOUT-001'
 
 
@@ -200,7 +200,7 @@ class TestUnknownAndOutboundTopics:
         assert router.route('fm/mm/UNIT123') is None
 
     def test_partial_v2_topic_returns_none(self):
-        assert router.route('fieldmouse/scout/SCOUT-001') is None
+        assert router.route('that-place/scout/SCOUT-001') is None
 
     def test_unknown_message_type_not_matched(self):
         assert router.route('fm/mm/UNIT123/unknowntype') is None
@@ -224,15 +224,15 @@ class TestTopicFormatDetection:
             assert result is not None, f'Expected match for {topic}'
             assert result.topic_format == 'legacy_v1', f'Wrong format for {topic}'
 
-    def test_all_v2_patterns_report_fieldmouse_v2_format(self):
+    def test_all_v1_patterns_report_that_place_v1_format(self):
         topics = [
-            'fieldmouse/scout/S1/telemetry',
-            'fieldmouse/scout/S1/D1/telemetry',
+            'that-place/scout/S1/telemetry',
+            'that-place/scout/S1/D1/telemetry',
         ]
         for topic in topics:
             result = router.route(topic)
             assert result is not None, f'Expected match for {topic}'
-            assert result.topic_format == 'fieldmouse_v2', f'Wrong format for {topic}'
+            assert result.topic_format == 'that_place_v1', f'Wrong format for {topic}'
 
     def test_parsed_topic_is_frozen(self):
         """ParsedTopic must be immutable — prevents accidental mutation."""

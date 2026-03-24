@@ -2,7 +2,7 @@
  * AuthContext — manages JWT tokens, authentication state, and current user profile.
  *
  * After login, fetches /api/v1/auth/me/ to populate user info (including
- * is_fieldmouse_admin) so the app can render the correct layout.
+ * is_that_place_admin flag) so the app can render the correct layout.
  */
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';

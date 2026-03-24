@@ -1,5 +1,5 @@
 /**
- * Provider Library — Fieldmouse Admin page.
+ * Provider Library — That Place Admin page.
  *
  * Lists all 3rd party API providers. FM Admin can create, edit, and delete
  * provider configs including auth schema, endpoints, and available streams.

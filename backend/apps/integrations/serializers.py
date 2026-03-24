@@ -36,7 +36,7 @@ class MultipartJSONField(serializers.JSONField):
 
 
 class ThirdPartyAPIProviderAdminSerializer(serializers.ModelSerializer):
-    """Full provider serializer for Fieldmouse Admin.
+    """Full provider serializer for That Place Admin.
 
     Includes internal fields (auth_param_schema, discovery_endpoint,
     detail_endpoint, available_streams with JSONPath expressions).

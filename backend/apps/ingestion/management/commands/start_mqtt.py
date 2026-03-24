@@ -20,19 +20,19 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """Start the Fieldmouse MQTT subscriber worker."""
+    """Start the That Place MQTT subscriber worker."""
 
     help = 'Start the MQTT subscriber. Blocks until interrupted.'
 
     def handle(self, *args, **options) -> None:
         """Connect to the MQTT broker and run the event loop."""
-        self.stdout.write('Starting Fieldmouse MQTT subscriber…')
+        self.stdout.write('Starting That Place MQTT subscriber…')
         logger.info('MQTT subscriber starting')
 
         # Import here so Django is fully initialised before paho loads
-        from apps.ingestion.mqtt_client import FieldmouseMQTTClient
+        from apps.ingestion.mqtt_client import ThatPlaceMQTTClient
 
-        client = FieldmouseMQTTClient()
+        client = ThatPlaceMQTTClient()
         try:
             client.start()
         except KeyboardInterrupt:

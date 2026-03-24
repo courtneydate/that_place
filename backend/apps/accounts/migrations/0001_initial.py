@@ -47,9 +47,9 @@ class Migration(migrations.Migration):
                     verbose_name='active',
                 )),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('is_fieldmouse_admin', models.BooleanField(
+                ('is_that_place_admin', models.BooleanField(
                     default=False,
-                    help_text='Designates whether this user is a Fieldmouse platform admin with access to all tenants.',
+                    help_text='Designates whether this user is a That Place platform admin with access to all tenants.',
                 )),
                 ('groups', models.ManyToManyField(
                     blank=True,

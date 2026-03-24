@@ -28,8 +28,8 @@ def make_tenant_user(email, tenant, role=TenantUser.Role.ADMIN, password='testpa
     return user
 
 
-def make_fm_admin(email='fm@fieldmouse.io', password='testpass123'):
-    return User.objects.create_user(email=email, password=password, is_fieldmouse_admin=True)
+def make_fm_admin(email='fm@that-place.io', password='testpass123'):
+    return User.objects.create_user(email=email, password=password, is_that_place_admin=True)
 
 
 def auth_client(user, password='testpass123'):
@@ -173,7 +173,7 @@ class TestStatusIndicatorMappings:
         self.fm_client = auth_client(self.fm_admin)
 
     def test_fm_admin_can_set_mappings(self):
-        """Fieldmouse Admin can create a device type with status_indicator_mappings."""
+        """That Place Admin can create a device type with status_indicator_mappings."""
         mappings = {
             'motor_status': [
                 {'value': 'running', 'color': '#22C55E', 'label': 'Running'},

@@ -22,9 +22,9 @@ def make_tenant_user(email, tenant, role=TenantUser.Role.ADMIN, password='testpa
     return user
 
 
-def make_fm_admin(email='fm@fieldmouse.io', password='testpass123'):
+def make_fm_admin(email='fm@that-place.io', password='testpass123'):
     return User.objects.create_user(
-        email=email, password=password, is_fieldmouse_admin=True
+        email=email, password=password, is_that_place_admin=True
     )
 
 

@@ -1,5 +1,5 @@
 /**
- * React Query hooks for Tenant management (Fieldmouse Admin).
+ * React Query hooks for Tenant management (That Place Admin).
  *
  * Provides: useTenants, useTenant, useCreateTenant, useUpdateTenant, useSendInvite
  */

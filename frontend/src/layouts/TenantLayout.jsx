@@ -20,7 +20,7 @@ function TenantLayout() {
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
-        <span className={styles.brand}>Fieldmouse</span>
+        <span className={styles.brand}>That Place</span>
         <nav className={styles.nav}>
           <NavLink
             to="/app/dashboards"

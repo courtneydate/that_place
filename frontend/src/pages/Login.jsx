@@ -41,7 +41,7 @@ function Login() {
     try {
       const userData = await login(email, password);
       // Redirect based on user type — ignore `from` if it crosses the admin/tenant boundary
-      if (userData.is_fieldmouse_admin) {
+      if (userData.is_that_place_admin) {
         const dest = from.startsWith('/admin') ? from : '/admin/tenants';
         navigate(dest, { replace: true });
       } else {
@@ -61,7 +61,7 @@ function Login() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Fieldmouse</h1>
+        <h1 className={styles.title}>That Place</h1>
         <p className={styles.subtitle}>Sign in to your account</p>
 
         <form onSubmit={handleSubmit} noValidate className={styles.form}>

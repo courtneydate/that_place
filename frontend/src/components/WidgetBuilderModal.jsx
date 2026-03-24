@@ -604,7 +604,7 @@ function WidgetBuilderModal({ nextOrder = 0, editingWidget = null, onSubmit, onC
             <div className={styles.infoBox}>
               <p className={styles.infoBoxTitle}>
                 No status mappings configured for this stream on the device type.
-                A Fieldmouse Admin can add them in the Device Type Library.
+                A That Place Admin can add them in the Device Type Library.
               </p>
             </div>
           )}

@@ -2,7 +2,7 @@
  * React Query hooks for device type management.
  *
  * DeviceType reads are available to all authenticated users.
- * DeviceType writes are restricted to Fieldmouse Admins (enforced on backend).
+ * DeviceType writes are restricted to That Place Admins (enforced on backend).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';

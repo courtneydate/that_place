@@ -162,7 +162,7 @@ SoilScout does not use the standard OAuth2 token endpoint format:
 | Response field: `refresh_token` | Returns `refresh` |
 | Single token endpoint for auth + refresh | Separate endpoints: `/auth/login/` and `/auth/token/refresh/` |
 
-The Fieldmouse platform handles all of these differences automatically. No special
+The That Place platform handles all of these differences automatically. No special
 configuration is needed beyond setting the Token URL and Refresh URL as shown above.
 
 ---

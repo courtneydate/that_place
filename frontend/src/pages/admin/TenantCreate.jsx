@@ -1,5 +1,5 @@
 /**
- * Create tenant form — Fieldmouse Admin.
+ * Create tenant form — That Place Admin.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

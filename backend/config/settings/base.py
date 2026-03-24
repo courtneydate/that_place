@@ -1,4 +1,4 @@
-"""Base Django settings for Fieldmouse.
+"""Base Django settings for That Place.
 
 All environment-specific settings files (dev, prod, test) import from here.
 Configuration is loaded from environment variables via django-environ.
@@ -157,7 +157,7 @@ REST_FRAMEWORK = {
     # Error responses use the standard format:
     # { "error": { "code": "...", "message": "..." } }
     # Custom exception handler is wired up in Sprint 1.
-    'EXCEPTION_HANDLER': 'config.exceptions.fieldmouse_exception_handler',
+    'EXCEPTION_HANDLER': 'config.exceptions.that_place_exception_handler',
 }
 
 # ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@fieldmouse.io')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@that-place.io')
 
 # ---------------------------------------------------------------------------
 # MQTT
@@ -250,7 +250,7 @@ MQTT_BROKER_HOST = env('MQTT_BROKER_HOST', default='localhost')
 MQTT_BROKER_PORT = env.int('MQTT_BROKER_PORT', default=1883)
 MQTT_USERNAME = env('MQTT_USERNAME', default='')
 MQTT_PASSWORD = env('MQTT_PASSWORD', default='')
-MQTT_CLIENT_ID = env('MQTT_CLIENT_ID', default='fieldmouse-backend')
+MQTT_CLIENT_ID = env('MQTT_CLIENT_ID', default='that-place-backend')
 
 # ---------------------------------------------------------------------------
 # Encryption (for DataSource credentials)

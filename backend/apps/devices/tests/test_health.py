@@ -50,7 +50,7 @@ def make_device(tenant, serial, status=Device.Status.ACTIVE,
     return Device.objects.create(
         tenant=tenant, site=site, device_type=dt,
         name='Test Device', serial_number=serial,
-        status=status, topic_format='fieldmouse_v2',
+        status=status, topic_format='that_place_v1',
         offline_threshold_override_minutes=threshold_override,
     )
 
@@ -352,7 +352,7 @@ class TestIngestionHealthUpdates:
         device = make_device(tenant, 'HI-001')
 
         process_mqtt_message(
-            'fieldmouse/scout/HI-001/telemetry',
+            'that-place/scout/HI-001/telemetry',
             json.dumps({'Relay_1': 1}),
         )
 
@@ -363,7 +363,7 @@ class TestIngestionHealthUpdates:
         device = make_device(tenant, 'BSI-001')
 
         process_mqtt_message(
-            'fieldmouse/scout/BSI-001/telemetry',
+            'that-place/scout/BSI-001/telemetry',
             json.dumps({'Relay_1': 0, '_battery': 75, '_signal': -65}),
         )
 

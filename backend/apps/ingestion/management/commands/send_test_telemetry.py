@@ -2,7 +2,7 @@
 
 End-to-end smoke test for the ingestion pipeline. Creates test devices
 (if they don't already exist), then continuously publishes MQTT telemetry
-for both a legacy v1 Scout and a Fieldmouse v2 Scout (with battery/signal)
+for both a legacy v1 Scout and a That Place v1 Scout (with battery/signal)
 so the health monitoring pipeline can be observed in real time.
 
 Usage::
@@ -36,7 +36,7 @@ from apps.readings.models import Stream, StreamReading
 
 logger = logging.getLogger(__name__)
 
-TEST_TENANT_NAME = 'Fieldmouse Test Tenant'
+TEST_TENANT_NAME = 'That Place Test Tenant'
 TEST_SITE_NAME = 'Test Site'
 TEST_DEVICE_TYPE_NAME = 'Test Scout'
 
@@ -86,7 +86,7 @@ class Command(BaseCommand):
         total_rounds = duration // interval
 
         self.stdout.write(self.style.MIGRATE_HEADING(
-            '\n=== Fieldmouse Ingestion + Health Smoke Test ===\n'
+            '\n=== That Place Ingestion + Health Smoke Test ===\n'
         ))
         self.stdout.write(
             f'   Duration : {duration}s   Interval : {interval}s   '
@@ -112,7 +112,7 @@ class Command(BaseCommand):
         v2_before = StreamReading.objects.filter(stream__device=v2_device).count()
 
         legacy_topic = f'fm/mm/{legacy_serial}/telemetry'
-        v2_topic = f'fieldmouse/scout/{v2_serial}/telemetry'
+        v2_topic = f'that-place/scout/{v2_serial}/telemetry'
 
         # ------------------------------------------------------------------
         # Step 3: Publish loop
@@ -236,7 +236,7 @@ class Command(BaseCommand):
                 'device_type': device_type,
                 'name': f'Test v2 Scout ({v2_serial})',
                 'status': Device.Status.ACTIVE,
-                'topic_format': 'fieldmouse_v2',
+                'topic_format': 'that_place_v1',
             },
         )
         if v2_device.status != Device.Status.ACTIVE:
@@ -247,7 +247,7 @@ class Command(BaseCommand):
 
     def _publish(self, host: str, port: int, messages: list[tuple[str, str]]) -> None:
         """Connect to the MQTT broker and publish a list of (topic, payload) pairs."""
-        client = mqtt.Client(CallbackAPIVersion.VERSION2, client_id='fieldmouse-test-publisher')
+        client = mqtt.Client(CallbackAPIVersion.VERSION2, client_id='that-place-test-publisher')
         client.connect(host, port, keepalive=10)
         client.loop_start()
         for topic, payload in messages:

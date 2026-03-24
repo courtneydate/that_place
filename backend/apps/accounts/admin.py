@@ -9,8 +9,8 @@ from .models import User
 class UserAdmin(BaseUserAdmin):
     """Admin configuration for the custom User model."""
 
-    list_display = ('email', 'first_name', 'last_name', 'is_fieldmouse_admin', 'is_active')
-    list_filter = ('is_fieldmouse_admin', 'is_staff', 'is_active')
+    list_display = ('email', 'first_name', 'last_name', 'is_that_place_admin', 'is_active')
+    list_filter = ('is_that_place_admin', 'is_staff', 'is_active')
     search_fields = ('email', 'first_name', 'last_name')
     ordering = ('email',)
 
@@ -18,11 +18,11 @@ class UserAdmin(BaseUserAdmin):
         (None, {'fields': ('email', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name')}),
         ('Permissions', {'fields': (
-            'is_active', 'is_staff', 'is_superuser', 'is_fieldmouse_admin',
+            'is_active', 'is_staff', 'is_superuser', 'is_that_place_admin',
             'groups', 'user_permissions',
         )}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
-        (None, {'classes': ('wide',), 'fields': ('email', 'password1', 'password2', 'is_fieldmouse_admin')}),
+        (None, {'classes': ('wide',), 'fields': ('email', 'password1', 'password2', 'is_that_place_admin')}),
     )

@@ -38,7 +38,7 @@ def make_device_type(name='Scout', stream_defs=None):
 
 
 def make_device(tenant, serial, status=Device.Status.ACTIVE, device_type=None,
-                topic_format='fieldmouse_v2'):
+                topic_format='that_place_v1'):
     site = Site.objects.create(tenant=tenant, name='Test Site')
     dt = device_type or make_device_type()
     return Device.objects.create(
@@ -134,19 +134,19 @@ class TestIngestionHappyPath:
 
     def test_v2_json_creates_stream_readings(self):
         tenant = make_tenant()
-        device = make_device(tenant, 'SCOUT-001', topic_format='fieldmouse_v2')
+        device = make_device(tenant, 'SCOUT-001', topic_format='that_place_v1')
         payload = json.dumps({'temperature': 23.4, 'humidity': 60.0})
 
-        process_mqtt_message('fieldmouse/scout/SCOUT-001/telemetry', payload)
+        process_mqtt_message('that-place/scout/SCOUT-001/telemetry', payload)
 
         assert StreamReading.objects.filter(stream__device=device).count() == 2
 
     def test_v2_json_correct_values_stored(self):
         tenant = make_tenant(name='Beta')
-        device = make_device(tenant, 'SCOUT-002', topic_format='fieldmouse_v2')
+        device = make_device(tenant, 'SCOUT-002', topic_format='that_place_v1')
         payload = json.dumps({'temperature': 23.4})
 
-        process_mqtt_message('fieldmouse/scout/SCOUT-002/telemetry', payload)
+        process_mqtt_message('that-place/scout/SCOUT-002/telemetry', payload)
 
         reading = StreamReading.objects.get(stream__device=device, stream__key='temperature')
         assert reading.value == 23.4
@@ -170,10 +170,10 @@ class TestIngestionHappyPath:
 
     def test_bridged_device_v2_creates_readings(self):
         tenant = make_tenant(name='Bridge Co')
-        device = make_device(tenant, 'SENSOR-007', topic_format='fieldmouse_v2')
+        device = make_device(tenant, 'SENSOR-007', topic_format='that_place_v1')
         payload = json.dumps({'pressure': 1013.2, 'flow': 4.5})
 
-        process_mqtt_message('fieldmouse/scout/SCOUT-001/SENSOR-007/telemetry', payload)
+        process_mqtt_message('that-place/scout/SCOUT-001/SENSOR-007/telemetry', payload)
 
         assert StreamReading.objects.filter(stream__device=device).count() == 2
 
@@ -191,7 +191,7 @@ class TestStreamAutoDiscovery:
         device = make_device(tenant, 'DISC-001')
         payload = json.dumps({'new_sensor': 42.0})
 
-        process_mqtt_message('fieldmouse/scout/DISC-001/telemetry', payload)
+        process_mqtt_message('that-place/scout/DISC-001/telemetry', payload)
 
         assert Stream.objects.filter(device=device, key='new_sensor').exists()
 
@@ -200,7 +200,7 @@ class TestStreamAutoDiscovery:
         device = make_device(tenant, 'DISC-002')
         payload = json.dumps({'unknown_key': 99.9})
 
-        process_mqtt_message('fieldmouse/scout/DISC-002/telemetry', payload)
+        process_mqtt_message('that-place/scout/DISC-002/telemetry', payload)
 
         stream = Stream.objects.get(device=device, key='unknown_key')
         assert stream.data_type == Stream.DataType.NUMERIC
@@ -210,8 +210,8 @@ class TestStreamAutoDiscovery:
         device = make_device(tenant, 'DISC-003')
         payload = json.dumps({'temp': 20.0})
 
-        process_mqtt_message('fieldmouse/scout/DISC-003/telemetry', payload)
-        process_mqtt_message('fieldmouse/scout/DISC-003/telemetry', payload)
+        process_mqtt_message('that-place/scout/DISC-003/telemetry', payload)
+        process_mqtt_message('that-place/scout/DISC-003/telemetry', payload)
 
         assert Stream.objects.filter(device=device, key='temp').count() == 1
         assert StreamReading.objects.filter(stream__device=device).count() == 2
@@ -225,7 +225,7 @@ class TestStreamAutoDiscovery:
         device = make_device(tenant, 'TYPED-001', device_type=dt)
         payload = json.dumps({'Relay_1': 1})
 
-        process_mqtt_message('fieldmouse/scout/TYPED-001/telemetry', payload)
+        process_mqtt_message('that-place/scout/TYPED-001/telemetry', payload)
 
         stream = Stream.objects.get(device=device, key='Relay_1')
         assert stream.data_type == Stream.DataType.BOOLEAN
@@ -239,7 +239,7 @@ class TestStreamAutoDiscovery:
         device = make_device(tenant, 'LABEL-001', device_type=dt)
         payload = json.dumps({'temperature': 22.5})
 
-        process_mqtt_message('fieldmouse/scout/LABEL-001/telemetry', payload)
+        process_mqtt_message('that-place/scout/LABEL-001/telemetry', payload)
 
         stream = Stream.objects.get(device=device, key='temperature')
         assert stream.label == 'Air Temperature'
@@ -268,14 +268,14 @@ class TestStreamAutoDiscovery:
 class TestIngestionRejection:
 
     def test_unknown_device_creates_no_readings(self):
-        process_mqtt_message('fieldmouse/scout/UNKNOWN-999/telemetry', '{"temp": 1}')
+        process_mqtt_message('that-place/scout/UNKNOWN-999/telemetry', '{"temp": 1}')
         assert StreamReading.objects.count() == 0
 
     def test_pending_device_creates_no_readings(self):
         tenant = make_tenant(name='Pending Co')
         device = make_device(tenant, 'PEND-001', status=Device.Status.PENDING)
 
-        process_mqtt_message('fieldmouse/scout/PEND-001/telemetry', '{"temp": 1}')
+        process_mqtt_message('that-place/scout/PEND-001/telemetry', '{"temp": 1}')
 
         assert StreamReading.objects.filter(stream__device=device).count() == 0
 
@@ -283,7 +283,7 @@ class TestIngestionRejection:
         tenant = make_tenant(name='Deactivated Co')
         device = make_device(tenant, 'DEACT-001', status=Device.Status.DEACTIVATED)
 
-        process_mqtt_message('fieldmouse/scout/DEACT-001/telemetry', '{"temp": 1}')
+        process_mqtt_message('that-place/scout/DEACT-001/telemetry', '{"temp": 1}')
 
         assert StreamReading.objects.filter(stream__device=device).count() == 0
 
@@ -291,7 +291,7 @@ class TestIngestionRejection:
         tenant = make_tenant(name='Bad Payload Co')
         device = make_device(tenant, 'BAD-001')
 
-        process_mqtt_message('fieldmouse/scout/BAD-001/telemetry', 'not valid json')
+        process_mqtt_message('that-place/scout/BAD-001/telemetry', 'not valid json')
 
         assert StreamReading.objects.filter(stream__device=device).count() == 0
 

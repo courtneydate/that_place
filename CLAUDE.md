@@ -1,4 +1,4 @@
-# CLAUDE.md — Fieldmouse Instructions for Claude Code
+# CLAUDE.md — That Place Instructions for Claude Code
 
 > This file is automatically read by Claude Code when working in this repository.
 
@@ -10,7 +10,7 @@
 including architecture decisions, features with acceptance criteria, the data model,
 API patterns, and development rules.
 
-Fieldmouse is a B2B IoT monitoring, control, and automation platform. Django + DRF backend,
+That Place is a B2B IoT monitoring, control, and automation platform. Django + DRF backend,
 React (Vite) web frontend (primary), React Native mobile app (Phase 6 only), PostgreSQL database.
 Deployable on AWS (EC2 + S3 + SES, preferred) or any Linux server (MinIO + SMTP, self-hosted).
 
@@ -132,7 +132,7 @@ filtered by the requesting user's tenant. Specifically:
 
 - Resolve tenant from `request.user` via their `TenantUser` record
 - Filter all querysets: `queryset.filter(tenant_id=request.user.tenantuser.tenant_id)`
-- Fieldmouse Admin accounts bypass tenant filtering but must never mix tenant data in responses
+- That Place Admin accounts bypass tenant filtering but must never mix tenant data in responses
 - Write a cross-tenant permission test for every endpoint that modifies data
 
 ---

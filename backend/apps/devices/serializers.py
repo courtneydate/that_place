@@ -16,7 +16,7 @@ class SiteSerializer(serializers.ModelSerializer):
 class DeviceTypeSerializer(serializers.ModelSerializer):
     """Serializer for DeviceType CRUD.
 
-    Write operations are restricted to Fieldmouse Admins (enforced in the view).
+    Write operations are restricted to That Place Admins (enforced in the view).
     All authenticated users may read.
     """
 
@@ -89,7 +89,7 @@ class DeviceSerializer(serializers.ModelSerializer):
     def validate_site(self, site):
         """Ensure the site belongs to the registering tenant."""
         request = self.context.get('request')
-        if request and not request.user.is_fieldmouse_admin:
+        if request and not request.user.is_that_place_admin:
             tenant = request.user.tenantuser.tenant
             if site.tenant_id != tenant.id:
                 raise serializers.ValidationError(
@@ -102,7 +102,7 @@ class DeviceSerializer(serializers.ModelSerializer):
         if gateway_device is None:
             return gateway_device
         request = self.context.get('request')
-        if request and not request.user.is_fieldmouse_admin:
+        if request and not request.user.is_that_place_admin:
             tenant = request.user.tenantuser.tenant
             if gateway_device.tenant_id != tenant.id:
                 raise serializers.ValidationError(

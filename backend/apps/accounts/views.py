@@ -1,7 +1,7 @@
 """Views for the accounts app.
 
 Auth endpoints (login, refresh, logout, me, accept-invite) and management
-endpoints for Fieldmouse Admin (tenants) and Tenant Admin (users).
+endpoints for That Place Admin (tenants) and Tenant Admin (users).
 """
 import logging
 
@@ -22,7 +22,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
 from .models import NotificationGroup, NotificationGroupMember, Tenant, TenantUser
-from .permissions import IsFieldmouseAdmin, IsTenantAdmin, IsViewOnly
+from .permissions import IsThatPlaceAdmin, IsTenantAdmin, IsViewOnly
 from .serializers import (
     AcceptInviteSerializer,
     AddMemberSerializer,
@@ -44,7 +44,7 @@ User = get_user_model()
 # Auth views
 # ---------------------------------------------------------------------------
 
-class FieldmouseTokenObtainPairSerializer(TokenObtainPairSerializer):
+class ThatPlaceTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Extends the default serializer to block login for deactivated tenant users."""
 
     def validate(self, attrs):
@@ -54,7 +54,7 @@ class FieldmouseTokenObtainPairSerializer(TokenObtainPairSerializer):
         tenant_user = getattr(user, 'tenantuser', None)
         if tenant_user is not None and not tenant_user.tenant.is_active:
             raise AuthenticationFailed(
-                'Your organisation account has been deactivated. Contact Fieldmouse support.'
+                'Your organisation account has been deactivated. Contact That Place support.'
             )
         return data
 
@@ -62,7 +62,7 @@ class FieldmouseTokenObtainPairSerializer(TokenObtainPairSerializer):
 class LoginView(TokenObtainPairView):
     """POST /api/v1/auth/login/ — obtain JWT token pair."""
 
-    serializer_class = FieldmouseTokenObtainPairSerializer
+    serializer_class = ThatPlaceTokenObtainPairSerializer
 
 
 RefreshView = TokenRefreshView
@@ -104,7 +104,7 @@ class AcceptInviteView(APIView):
 
 
 # ---------------------------------------------------------------------------
-# Tenant management (Fieldmouse Admin only)
+# Tenant management (That Place Admin only)
 # ---------------------------------------------------------------------------
 
 class TenantCursorPagination(CursorPagination):
@@ -116,14 +116,14 @@ class TenantCursorPagination(CursorPagination):
 class TenantViewSet(viewsets.ModelViewSet):
     """CRUD for Tenant records.
 
-    All actions restricted to Fieldmouse Admin users.
+    All actions restricted to That Place Admin users.
     Supports: list, create, retrieve, partial_update, and a custom invite action.
     Destroy is intentionally disabled — tenants are deactivated, not deleted.
     """
 
     queryset = Tenant.objects.all().order_by('created_at')
     serializer_class = TenantSerializer
-    permission_classes = [IsAuthenticated, IsFieldmouseAdmin]
+    permission_classes = [IsAuthenticated, IsThatPlaceAdmin]
     pagination_class = TenantCursorPagination
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
@@ -143,21 +143,21 @@ class TenantViewSet(viewsets.ModelViewSet):
 
         token = signing.dumps(
             {'email': email, 'tenant_id': tenant.id, 'role': role},
-            salt='fieldmouse-invite',
+            salt='that-place-invite',
         )
 
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
         invite_url = f'{frontend_url}/accept-invite/{token}/'
 
         send_mail(
-            subject=f'You have been invited to {tenant.name} on Fieldmouse',
+            subject=f'You have been invited to {tenant.name} on That Place',
             message=(
                 f'Hello,\n\n'
-                f'You have been invited to join {tenant.name} on Fieldmouse as {role}.\n\n'
+                f'You have been invited to join {tenant.name} on That Place as {role}.\n\n'
                 f'Click the link below to set your password and activate your account:\n'
                 f'{invite_url}\n\n'
                 f'This invite link expires in 7 days.\n\n'
-                f'— The Fieldmouse Team'
+                f'— The That Place Team'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
@@ -265,21 +265,21 @@ class UserViewSet(viewsets.GenericViewSet):
 
         token = signing.dumps(
             {'email': email, 'tenant_id': tenant.id, 'role': role},
-            salt='fieldmouse-invite',
+            salt='that-place-invite',
         )
 
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
         invite_url = f'{frontend_url}/accept-invite/{token}/'
 
         send_mail(
-            subject=f'You have been invited to {tenant.name} on Fieldmouse',
+            subject=f'You have been invited to {tenant.name} on That Place',
             message=(
                 f'Hello,\n\n'
-                f'You have been invited to join {tenant.name} on Fieldmouse as {role}.\n\n'
+                f'You have been invited to join {tenant.name} on That Place as {role}.\n\n'
                 f'Click the link below to set your password and activate your account:\n'
                 f'{invite_url}\n\n'
                 f'This invite link expires in 7 days.\n\n'
-                f'— The Fieldmouse Team'
+                f'— The That Place Team'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],

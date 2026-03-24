@@ -1,6 +1,6 @@
 """Custom DRF exception handler.
 
-Transforms all API error responses into the standard Fieldmouse format:
+Transforms all API error responses into the standard That Place format:
     { "error": { "code": "ERROR_CODE", "message": "Human readable message", "details": {} } }
 """
 import logging
@@ -12,7 +12,7 @@ from rest_framework.views import exception_handler
 logger = logging.getLogger(__name__)
 
 
-def fieldmouse_exception_handler(exc, context):
+def that_place_exception_handler(exc, context):
     """Handle all DRF exceptions and return a standardised error envelope."""
     response = exception_handler(exc, context)
 

@@ -1,4 +1,4 @@
-"""Test settings for Fieldmouse.
+"""Test settings for That Place.
 
 Used by pytest-django via pytest.ini DJANGO_SETTINGS_MODULE.
 Optimised for speed: faster password hashing, eager Celery tasks, in-memory email.
@@ -16,9 +16,9 @@ DEBUG = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'fieldmouse_test',
-        'USER': 'fieldmouse',
-        'PASSWORD': 'fieldmouse',
+        'NAME': 'that_place_test',
+        'USER': 'that_place',
+        'PASSWORD': 'that_place',
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': '5432',
     }

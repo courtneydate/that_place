@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: fieldmouse
-      POSTGRES_USER: fieldmouse
-      POSTGRES_PASSWORD: fieldmouse
+      POSTGRES_DB: that_place
+      POSTGRES_USER: that_place
+      POSTGRES_PASSWORD: that_place
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U fieldmouse -d fieldmouse']
+      test: ['CMD-SHELL', 'pg_isready -U that_place -d that_place']
       interval: 5s
       timeout: 5s
       retries: 10

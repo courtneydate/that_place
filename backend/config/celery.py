@@ -1,10 +1,10 @@
-"""Celery application configuration for Fieldmouse."""
+"""Celery application configuration for That Place."""
 import os
 
 from celery import Celery
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.dev')
 
-app = Celery('fieldmouse')
+app = Celery('that-place')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()

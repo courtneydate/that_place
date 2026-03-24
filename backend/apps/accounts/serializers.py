@@ -27,16 +27,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'is_fieldmouse_admin', 'tenant_role', 'tenant_name')
+        fields = ('id', 'email', 'first_name', 'last_name', 'is_that_place_admin', 'tenant_role', 'tenant_name')
         read_only_fields = fields
 
     def get_tenant_role(self, obj):
-        """Return the user's role in their tenant, or None for FM Admins."""
+        """Return the user's role in their tenant, or None for That Place Admins."""
         tu = getattr(obj, 'tenantuser', None)
         return tu.role if tu is not None else None
 
     def get_tenant_name(self, obj):
-        """Return the name of the user's tenant, or None for FM Admins."""
+        """Return the name of the user's tenant, or None for That Place Admins."""
         tu = getattr(obj, 'tenantuser', None)
         return tu.tenant.name if tu is not None else None
 
@@ -69,7 +69,7 @@ class TenantSerializer(serializers.ModelSerializer):
 
 
 class InviteSerializer(serializers.Serializer):
-    """Serializer for invite endpoint payloads (FM Admin and Tenant Admin)."""
+    """Serializer for invite endpoint payloads (That Place Admin and Tenant Admin)."""
 
     email = serializers.EmailField()
     role = serializers.ChoiceField(choices=TenantUser.Role.choices, default=TenantUser.Role.ADMIN)
@@ -90,7 +90,7 @@ class AcceptInviteSerializer(serializers.Serializer):
     def validate_token(self, value):
         """Decode and validate the signed invite token (max age: 7 days)."""
         try:
-            data = signing.loads(value, salt='fieldmouse-invite', max_age=604800)
+            data = signing.loads(value, salt='that-place-invite', max_age=604800)
         except signing.SignatureExpired:
             raise serializers.ValidationError('Invite link has expired.')
         except signing.BadSignature:

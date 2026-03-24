@@ -1,7 +1,7 @@
 """Tenant context middleware.
 
 Attaches `request.tenant` (the Tenant instance for the authenticated user)
-to every request. Fieldmouse Admins and unauthenticated requests get
+to every request. That Place Admins and unauthenticated requests get
 `request.tenant = None`.
 """
 from django.utils.functional import SimpleLazyObject

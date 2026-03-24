@@ -158,7 +158,7 @@ def _parse_telemetry(topic_format: str, payload: str) -> dict[str, tuple[Any, st
     """Parse a raw telemetry payload into a stream key → (value, data_type) mapping.
 
     Args:
-        topic_format: ``'legacy_v1'`` or ``'fieldmouse_v2'``.
+        topic_format: ``'legacy_v1'`` or ``'that_place_v1'``.
         payload:      Raw payload string from the MQTT message.
 
     Returns:
@@ -168,7 +168,7 @@ def _parse_telemetry(topic_format: str, payload: str) -> dict[str, tuple[Any, st
     if topic_format == 'legacy_v1':
         return parse_legacy_v1_telemetry(payload)
 
-    # Fieldmouse v2 — JSON key-value; data_type inferred downstream
+    # That Place v1 — JSON key-value; data_type inferred downstream
     raw_json = parse_json_telemetry(payload)
     return {key: (value, None) for key, value in raw_json.items()}
 

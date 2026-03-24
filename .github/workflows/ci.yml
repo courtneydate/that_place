@@ -34,9 +34,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: fieldmouse_test
-          POSTGRES_USER: fieldmouse
-          POSTGRES_PASSWORD: fieldmouse
+          POSTGRES_DB: that_place_test
+          POSTGRES_USER: that_place
+          POSTGRES_PASSWORD: that_place
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -51,7 +51,7 @@ jobs:
     env:
       DJANGO_SECRET_KEY: ci-test-secret-key
       DJANGO_SETTINGS_MODULE: config.settings.test
-      DATABASE_URL: postgres://fieldmouse:fieldmouse@localhost:5432/fieldmouse_test
+      DATABASE_URL: postgres://that_place:that_place@localhost:5432/that_place_test
       REDIS_URL: redis://localhost:6379/0
       JWT_SECRET_KEY: ci-test-jwt-secret
       FIELD_ENCRYPTION_KEY: pUGVWTlYu9EqyIaT7EjM4zUdA38mdLNPlpbu60uNKZU=

@@ -2,7 +2,7 @@
  * React Query hooks for device management.
  *
  * Device reads are tenant-scoped on the backend.
- * Fieldmouse Admins see all devices (used for the pending approval queue).
+ * That Place Admins see all devices (used for the pending approval queue).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';

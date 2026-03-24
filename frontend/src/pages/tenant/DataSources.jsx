@@ -720,7 +720,7 @@ function DataSources() {
 
       {providers.length === 0 && !isLoading && (
         <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          No API providers are configured yet. Ask your Fieldmouse Admin to add a provider.
+          No API providers are configured yet. Ask your That Place Admin to add a provider.
         </p>
       )}
 

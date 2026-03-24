@@ -7,7 +7,7 @@ Auth:
     GET    /api/v1/auth/me/               — current user profile
     POST   /api/v1/auth/accept-invite/    — accept invite & create account
 
-Tenant management (Fieldmouse Admin only):
+Tenant management (That Place Admin only):
     GET    /api/v1/tenants/              — list tenants
     POST   /api/v1/tenants/              — create tenant
     GET    /api/v1/tenants/{id}/         — tenant detail

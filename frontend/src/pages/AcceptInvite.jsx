@@ -56,7 +56,7 @@ function AcceptInvite() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Fieldmouse</h1>
+        <h1 className={styles.title}>That Place</h1>
         <p className={styles.subtitle}>Set your password to activate your account</p>
 
         <form onSubmit={handleSubmit} noValidate className={styles.form}>

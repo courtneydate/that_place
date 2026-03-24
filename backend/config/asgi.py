@@ -1,4 +1,4 @@
-"""ASGI config for Fieldmouse project.
+"""ASGI config for That Place project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 """

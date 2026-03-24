@@ -1,4 +1,4 @@
-"""Root pytest configuration and shared fixtures for Fieldmouse tests."""
+"""Root pytest configuration and shared fixtures for That Place tests."""
 import pytest
 from rest_framework.test import APIClient
 

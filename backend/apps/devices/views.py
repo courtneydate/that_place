@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsFieldmouseAdmin, IsTenantAdmin, IsViewOnly
+from apps.accounts.permissions import IsThatPlaceAdmin, IsTenantAdmin, IsViewOnly
 
 from .models import Device, DeviceHealth, DeviceType, Site
 from .serializers import DeviceHealthSerializer, DeviceSerializer, DeviceTypeSerializer, SiteSerializer
@@ -72,16 +72,16 @@ class DeviceTypeViewSet(viewsets.GenericViewSet):
     """Device type library.
 
     Reads are open to all authenticated users (tenant users and FM Admins).
-    Writes (create/update) are restricted to Fieldmouse Admins.
+    Writes (create/update) are restricted to That Place Admins.
     Ref: SPEC.md § Feature: Device Type Library
     """
 
     serializer_class = DeviceTypeSerializer
 
     def get_permissions(self):
-        """Restrict write actions to Fieldmouse Admins."""
+        """Restrict write actions to That Place Admins."""
         if self.action in ('create', 'update'):
-            return [IsAuthenticated(), IsFieldmouseAdmin()]
+            return [IsAuthenticated(), IsThatPlaceAdmin()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -99,7 +99,7 @@ class DeviceTypeViewSet(viewsets.GenericViewSet):
         return Response(DeviceTypeSerializer(device_type).data)
 
     def create(self, request):
-        """POST /api/v1/device-types/ — create a device type. Fieldmouse Admin only."""
+        """POST /api/v1/device-types/ — create a device type. That Place Admin only."""
         serializer = DeviceTypeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -107,7 +107,7 @@ class DeviceTypeViewSet(viewsets.GenericViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
-        """PUT /api/v1/device-types/:id/ — update a device type. Fieldmouse Admin only."""
+        """PUT /api/v1/device-types/:id/ — update a device type. That Place Admin only."""
         device_type = get_object_or_404(self.get_queryset(), pk=pk)
         serializer = DeviceTypeSerializer(device_type, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -119,7 +119,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
     """Tenant-scoped Device CRUD with registration and approval flow.
 
     Tenant users see only their own tenant's devices.
-    Fieldmouse Admins see all devices (needed for the approval queue).
+    That Place Admins see all devices (needed for the approval queue).
     Registration creates a device with status=pending; approval is FM Admin only.
     Ref: SPEC.md § Feature: Device Registration & Approval
     """
@@ -129,7 +129,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
     def get_permissions(self):
         """Permission matrix per action."""
         if self.action in ('approve', 'reject'):
-            return [IsAuthenticated(), IsFieldmouseAdmin()]
+            return [IsAuthenticated(), IsThatPlaceAdmin()]
         if self.action in ('create', 'update', 'destroy'):
             return [IsAuthenticated(), IsTenantAdmin()]
         return [IsAuthenticated()]
@@ -137,10 +137,10 @@ class DeviceViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         """Return devices scoped to the requesting user's tenant.
 
-        Fieldmouse Admins bypass tenant scoping so they can access any device
+        That Place Admins bypass tenant scoping so they can access any device
         for the approval queue and cross-tenant operations.
         """
-        if self.request.user.is_fieldmouse_admin:
+        if self.request.user.is_that_place_admin:
             qs = Device.objects.select_related('tenant', 'site', 'device_type', 'devicehealth').all()
         else:
             tenant = self.request.user.tenantuser.tenant
@@ -175,7 +175,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
         """POST /api/v1/devices/ — register a new device. Tenant Admin only.
 
         Device is created with status=pending and must be approved by a
-        Fieldmouse Admin before it can submit data.
+        That Place Admin before it can submit data.
         """
         tenant = request.user.tenantuser.tenant
         serializer = DeviceSerializer(data=request.data, context={'request': request})
@@ -208,7 +208,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
     def approve(self, request, pk=None):
         """POST /api/v1/devices/:id/approve/ — approve a pending device.
 
-        Sets status to active. Fieldmouse Admin only.
+        Sets status to active. That Place Admin only.
         """
         device = get_object_or_404(Device, pk=pk)
         if device.status != Device.Status.PENDING:
@@ -225,7 +225,7 @@ class DeviceViewSet(viewsets.GenericViewSet):
     def reject(self, request, pk=None):
         """POST /api/v1/devices/:id/reject/ — reject a pending device.
 
-        Sets status to rejected. Fieldmouse Admin only.
+        Sets status to rejected. That Place Admin only.
         """
         device = get_object_or_404(Device, pk=pk)
         if device.status != Device.Status.PENDING:

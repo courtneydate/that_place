@@ -1,13 +1,13 @@
-"""MQTT client for the Fieldmouse ingestion pipeline.
+"""MQTT client for the That Place ingestion pipeline.
 
 Connects to the configured broker, subscribes to the two wildcard topics that
-cover both legacy v1 and Fieldmouse v2 traffic, and dispatches a Celery task
+cover both legacy v1 and That Place v2 traffic, and dispatches a Celery task
 for every inbound message.
 
 Wildcard subscriptions
 ----------------------
 ``fm/mm/+/#``           — all legacy v1 inbound topics
-``fieldmouse/scout/+/#`` — all Fieldmouse v2 topics (Scout + device)
+``that-place/scout/+/#`` — all That Place v2 topics (Scout + device)
 
 The router inside the Celery task handles filtering of outbound/unknown topics
 (e.g. fm/mm/{serial}/relays) so we subscribe broadly and let the pattern
@@ -25,12 +25,12 @@ logger = logging.getLogger(__name__)
 # Topics the subscriber listens on (QoS 1 — at least once delivery)
 SUBSCRIPTIONS = [
     ('fm/mm/+/#', 1),
-    ('fieldmouse/scout/+/#', 1),
+    ('that-place/scout/+/#', 1),
 ]
 
 
-class FieldmouseMQTTClient:
-    """Wrapper around the paho-mqtt client for the Fieldmouse subscriber.
+class ThatPlaceMQTTClient:
+    """Wrapper around the paho-mqtt client for the That Place subscriber.
 
     Connects to the broker using settings from ``django.conf.settings``,
     subscribes to the wildcard topics, and dispatches
@@ -41,7 +41,7 @@ class FieldmouseMQTTClient:
         """Initialise the paho client and bind callbacks."""
         self._client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id=getattr(settings, 'MQTT_CLIENT_ID', 'fieldmouse-backend'),
+            client_id=getattr(settings, 'MQTT_CLIENT_ID', 'that-place-backend'),
         )
 
         username = getattr(settings, 'MQTT_USERNAME', '')

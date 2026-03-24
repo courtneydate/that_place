@@ -1,6 +1,6 @@
-# Fieldmouse — Contributing Guide
+# That Place — Contributing Guide
 
-> Development workflow, standards, and process for the Fieldmouse platform.
+> Development workflow, standards, and process for the That Place platform.
 > Read this before writing any code.
 
 ---
@@ -23,8 +23,8 @@ Before setting up the project, ensure you have:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/fieldmouse.git
-cd fieldmouse
+git clone https://github.com/your-org/that-place.git
+cd that-place
 
 # 2. Copy and fill in environment variables
 cp .env.example .env
@@ -36,7 +36,7 @@ docker-compose up -d
 # 4. Run database migrations
 docker-compose exec backend python manage.py migrate
 
-# 5. Create a Fieldmouse Admin user for local development
+# 5. Create a That Place Admin user for local development
 docker-compose exec backend python manage.py createsuperuser
 
 # 6. Start the React frontend dev server
@@ -67,7 +67,7 @@ docker-compose logs -f celery_beat
 ## Project Structure
 
 ```
-fieldmouse/
+that_place/
 ├── backend/
 │   ├── apps/
 │   │   ├── accounts/        # Auth, tenants, users, notification groups

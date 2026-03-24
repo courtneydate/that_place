@@ -1,4 +1,4 @@
-"""MQTT topic router for the Fieldmouse ingestion pipeline.
+"""MQTT topic router for the That Place ingestion pipeline.
 
 Implements a registered-pattern system that parses incoming MQTT topics into
 structured ParsedTopic objects. Patterns are registered at module load time
@@ -10,10 +10,10 @@ Supported formats
 Legacy v1  — ``fm/mm/{unit_serial}/{message_type}``
              unit_serial == device_serial (the Scout IS the device in v1)
 
-Fieldmouse v2 Scout telemetry — ``fieldmouse/scout/{scout_serial}/telemetry``
+That Place v1 Scout telemetry — ``that-place/scout/{scout_serial}/telemetry``
              Scout's own health/status telemetry; scout_serial == device_serial
 
-Fieldmouse v2 device telemetry — ``fieldmouse/scout/{scout_serial}/{device_serial}/telemetry``
+That Place v1 device telemetry — ``that-place/scout/{scout_serial}/{device_serial}/telemetry``
              Telemetry from a device bridged through a Scout.
 
 Ref: SPEC.md § Feature: MQTT Topic Router
@@ -37,7 +37,7 @@ class ParsedTopic:
     device_serial: Serial number of the target device.
                    Equals scout_serial for v1 topics and v2 Scout-only telemetry.
     message_type:  What kind of payload this is (e.g. 'telemetry', 'weatherstation').
-    topic_format:  'legacy_v1' or 'fieldmouse_v2' — used to update Device.topic_format.
+    topic_format:  'legacy_v1' or 'that_place_v1' — used to update Device.topic_format (DB enum value).
     """
 
     pattern_name: str
@@ -127,23 +127,23 @@ class TopicRouter:
 
 router = TopicRouter()
 
-# --- Fieldmouse v2: Scout own telemetry (more specific — registered first) ---
-# Topic: fieldmouse/scout/{scout_serial}/telemetry
+# --- That Place v1: Scout own telemetry (more specific — registered first) ---
+# Topic: that-place/scout/{scout_serial}/telemetry
 # The Scout publishes its own 12-variable CSV telemetry on this topic.
 router.register(TopicPattern(
-    name='fieldmouse_v2_scout_telemetry',
-    regex=re.compile(r'^fieldmouse/scout/(?P<scout>[^/]+)/telemetry$'),
-    topic_format='fieldmouse_v2',
+    name='that_place_v1_scout_telemetry',
+    regex=re.compile(r'^that-place/scout/(?P<scout>[^/]+)/telemetry$'),
+    topic_format='that_place_v1',
     message_type='scout_telemetry',
     has_device=False,
 ))
 
-# --- Fieldmouse v2: device telemetry bridged through Scout ---
-# Topic: fieldmouse/scout/{scout_serial}/{device_serial}/telemetry
+# --- That Place v1: device telemetry bridged through Scout ---
+# Topic: that-place/scout/{scout_serial}/{device_serial}/telemetry
 router.register(TopicPattern(
-    name='fieldmouse_v2_device_telemetry',
-    regex=re.compile(r'^fieldmouse/scout/(?P<scout>[^/]+)/(?P<device>[^/]+)/telemetry$'),
-    topic_format='fieldmouse_v2',
+    name='that_place_v1_device_telemetry',
+    regex=re.compile(r'^that-place/scout/(?P<scout>[^/]+)/(?P<device>[^/]+)/telemetry$'),
+    topic_format='that_place_v1',
     message_type='telemetry',
     has_device=True,
 ))

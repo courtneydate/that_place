@@ -4,7 +4,7 @@ Two formats are supported:
 
 - Legacy v1: 12-value CSV string — fixed field order
   (4 relays, 4 analog inputs, 4 digital inputs)
-- Fieldmouse v2: JSON object — arbitrary key-value pairs
+- That Place v2: JSON object — arbitrary key-value pairs
 
 Ref: SPEC.md § MQTT Topic Structure — Telemetry payloads
 """
@@ -66,7 +66,7 @@ def parse_legacy_v1_telemetry(payload: str) -> dict[str, tuple[Any, str]]:
 
 
 def parse_json_telemetry(payload: str) -> dict[str, Any]:
-    """Parse a Fieldmouse v2 JSON key-value telemetry payload.
+    """Parse a That Place v2 JSON key-value telemetry payload.
 
     Args:
         payload: JSON object string, e.g. ``'{"temperature": 23.4, "humidity": 60}'``.

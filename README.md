@@ -1,4 +1,4 @@
-# Fieldmouse — IoT Monitoring, Control & Automation Platform
+# That Place — IoT Monitoring, Control & Automation Platform
 
 A B2B IoT platform for monitoring devices, controlling field hardware, and automating responses to sensor data — built for local councils, agriculture, and industry.
 
@@ -18,7 +18,7 @@ A B2B IoT platform for monitoring devices, controlling field hardware, and autom
 1. **Clone the repository**
    ```bash
    git clone <repo-url>
-   cd fieldmouse_v2
+   cd that-place
    ```
 
 2. **Copy the example environment file and fill in any values you need to change**
@@ -54,7 +54,7 @@ A B2B IoT platform for monitoring devices, controlling field hardware, and autom
 |---------|-----|-------|
 | Django API | http://localhost:8000 | DRF + SimpleJWT |
 | React web app | http://localhost:5173 | Vite dev server |
-| PostgreSQL | localhost:5432 | DB: `fieldmouse`, user: `fieldmouse` |
+| PostgreSQL | localhost:5432 | DB: `that_place`, user: `that_place` |
 | Redis | localhost:6379 | Celery broker + result backend |
 | Mosquitto MQTT | localhost:1883 | MQTT broker for device telemetry |
 | MinIO API | http://localhost:9000 | S3-compatible local object storage |

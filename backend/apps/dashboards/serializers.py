@@ -34,7 +34,7 @@ class DashboardWidgetSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('All stream_ids must be integers.')
         if value:
             request = self.context.get('request')
-            if request and not request.user.is_fieldmouse_admin:
+            if request and not request.user.is_that_place_admin:
                 tenant = request.user.tenantuser.tenant
                 valid_ids = set(
                     Stream.objects.filter(

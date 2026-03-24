@@ -1,4 +1,4 @@
-# Fieldmouse — Development Roadmap
+# That Place — Development Roadmap
 
 > Reflects SPEC.md v5.0. Sprints are sequenced as vertical slices — each sprint delivers
 > working backend, frontend, and tests for a complete feature before the next sprint begins.
@@ -62,24 +62,24 @@
 
 ---
 
-### Sprint 2 — Tenant Management (Fieldmouse Admin)
+### Sprint 2 — Tenant Management (That Place Admin)
 
-**Goal:** Fieldmouse Admin can create tenants and send the first admin invite.
+**Goal:** That Place Admin can create tenants and send the first admin invite.
 
 **Deliverables:**
 - [ ] Backend: `Tenant` model (with timezone field), `TenantUser` model
-- [ ] Backend: Fieldmouse Admin guard (`IsFieldmouseAdmin` permission class)
-- [ ] Backend: Tenant CRUD endpoints (Fieldmouse Admin only)
+- [ ] Backend: That Place Admin guard (`IsThat PlaceAdmin` permission class)
+- [ ] Backend: Tenant CRUD endpoints (That Place Admin only)
 - [ ] Backend: Invite endpoint — generates invite token, sends email via configured email backend
 - [ ] Backend: Tests — CRUD happy path, non-admin access denied, invite sent, duplicate tenant slug rejected
-- [ ] Frontend: Fieldmouse Admin layout (separate nav from tenant user layout)
+- [ ] Frontend: That Place Admin layout (separate nav from tenant user layout)
 - [ ] Frontend: Tenant list page, create tenant form, tenant detail / edit page
 - [ ] Frontend: Send invite action on tenant detail
 
 **Definition of Done:**
-- Fieldmouse Admin can create, view, edit, and deactivate tenants
+- That Place Admin can create, view, edit, and deactivate tenants
 - Invite email is sent to the first Tenant Admin
-- Non-Fieldmouse-Admin users cannot access tenant management endpoints (403 returned)
+- Non-That Place-Admin users cannot access tenant management endpoints (403 returned)
 - Deactivated tenant users cannot log in
 
 ---
@@ -129,24 +129,24 @@
 
 ### Sprint 5 — Device Type Library & Device Registration
 
-**Goal:** Fieldmouse Admin can define device types; Tenant Admin can register devices and go through the approval flow.
+**Goal:** That Place Admin can define device types; Tenant Admin can register devices and go through the approval flow.
 
 **Deliverables:**
 - [ ] Backend: `DeviceType` model (with commands JSONB, stream type definitions, offline threshold, ack timeout)
-- [ ] Backend: DeviceType CRUD (Fieldmouse Admin write, all authenticated read)
+- [ ] Backend: DeviceType CRUD (That Place Admin write, all authenticated read)
 - [ ] Backend: `Device` model (with `topic_format`, `offline_threshold_override_minutes`, `gateway_device_id`)
 - [ ] Backend: Device registration endpoint (creates device with status `pending`)
-- [ ] Backend: Device approval endpoint (Fieldmouse Admin only)
+- [ ] Backend: Device approval endpoint (That Place Admin only)
 - [ ] Backend: Tests — approval flow, pending device cannot ingest data, cross-tenant device isolation
-- [ ] Frontend: Device type library page (Fieldmouse Admin — create/edit types, define commands and stream types)
+- [ ] Frontend: Device type library page (That Place Admin — create/edit types, define commands and stream types)
 - [ ] Frontend: Device registration form (Tenant Admin — name, serial, site, device type)
-- [ ] Frontend: Pending device indicator + Fieldmouse Admin approval action
+- [ ] Frontend: Pending device indicator + That Place Admin approval action
 - [ ] Frontend: Device list page with status badges
 
 **Definition of Done:**
-- Fieldmouse Admin can create device types with stream type definitions and commands
+- That Place Admin can create device types with stream type definitions and commands
 - Tenant Admin can register a device — it appears as pending
-- Fieldmouse Admin can approve or reject — approved devices become active
+- That Place Admin can approve or reject — approved devices become active
 - Unapproved devices cannot submit data (API rejects with 403)
 
 ---
@@ -167,7 +167,7 @@
 
 **Deliverables:**
 - [ ] Mosquitto broker running in Docker Compose with authentication
-- [ ] Backend: Celery MQTT subscriber worker — subscribes to `fm/mm/+/#` and `fieldmouse/scout/+/#`
+- [ ] Backend: Celery MQTT subscriber worker — subscribes to `fm/mm/+/#` and `that-place/scout/+/#`
 - [ ] Backend: Topic router — registered pattern matching, extracts (scout_serial, device_serial, message_type, stream_key) from any registered pattern
 - [ ] Backend: Legacy v1 patterns registered (weatherstation, relays, tbox, admin)
 - [ ] Backend: New v2 pattern registered
@@ -240,10 +240,10 @@
 
 ### Sprint 10 — 3rd Party API Integration
 
-**Goal:** Fieldmouse Admin can add a provider; Tenant Admin can connect their account and have devices auto-discovered.
+**Goal:** That Place Admin can add a provider; Tenant Admin can connect their account and have devices auto-discovered.
 
 **Deliverables:**
-- [x] Backend: `ThirdPartyAPIProvider` model + CRUD (Fieldmouse Admin)
+- [x] Backend: `ThirdPartyAPIProvider` model + CRUD (That Place Admin)
 - [x] Backend: `DataSource` + `DataSourceDevice` models
 - [x] Backend: Device discovery endpoint — calls provider's discovery endpoint using tenant credentials, returns device list
 - [x] Backend: DataSourceDevice connect endpoint — creates virtual Device records for selected devices
@@ -251,12 +251,12 @@
 - [x] Backend: OAuth2 password grant token handling + refresh
 - [x] Backend: Poll failure logging, retry with exponential backoff, device health warning on consecutive failures
 - [x] Backend: Tests — discovery flow, polling stores StreamReadings, auth failure handled, retry logic
-- [x] Frontend: Fieldmouse Admin — provider library (create provider, define auth schema, discovery/detail endpoints, available streams)
+- [x] Frontend: That Place Admin — provider library (create provider, define auth schema, discovery/detail endpoints, available streams)
 - [x] Frontend: Tenant Admin — add data source (pick provider → enter credentials → discover devices → select devices → select streams)
 - [x] Frontend: DataSource management page (list connected devices, add/remove devices)
 
 **Definition of Done:**
-- SoilScouts (or equivalent) provider can be configured by Fieldmouse Admin
+- SoilScouts (or equivalent) provider can be configured by That Place Admin
 - Tenant Admin can connect their SoilScouts account, see discovered devices, and select which to activate
 - StreamReadings appear in the database within one poll interval of connecting
 
@@ -552,18 +552,18 @@
 
 ---
 
-### Sprint 23 — Fieldmouse Admin Notifications & Platform Events
+### Sprint 23 — That Place Admin Notifications & Platform Events
 
-**Goal:** Fieldmouse Admins receive notifications for platform-level events.
+**Goal:** That Place Admins receive notifications for platform-level events.
 
 **Deliverables:**
-- [ ] Backend: Fieldmouse Admin notification generation for: pending device approvals, MQTT broker connectivity failures, 3rd party API provider failures affecting multiple tenants
+- [ ] Backend: That Place Admin notification generation for: pending device approvals, MQTT broker connectivity failures, 3rd party API provider failures affecting multiple tenants
 - [ ] Backend: Notification event registry — centralised registration of event types (not hardcoded)
-- [ ] Backend: Tests — each platform event generates correct notifications, only Fieldmouse Admins receive them
-- [ ] Frontend: Fieldmouse Admin notification panel (separate from tenant user notifications)
+- [ ] Backend: Tests — each platform event generates correct notifications, only That Place Admins receive them
+- [ ] Frontend: That Place Admin notification panel (separate from tenant user notifications)
 
 **Definition of Done:**
-- Pending device creates a notification for all Fieldmouse Admins
+- Pending device creates a notification for all That Place Admins
 - MQTT connectivity failure creates a platform notification
 - Notification event registry allows new event types to be added without code changes to the dispatch layer
 

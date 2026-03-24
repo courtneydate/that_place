@@ -1,5 +1,5 @@
 /**
- * Semantic colour tokens for the Fieldmouse design system.
+ * Semantic colour tokens for the That Place design system.
  *
  * RULE: Always use these tokens in components — never hardcode hex values.
  * All device status colours, alert state colours, and UI colours live here.

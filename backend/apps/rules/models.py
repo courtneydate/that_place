@@ -1,6 +1,6 @@
 """Rules models: Rule, RuleConditionGroup, RuleCondition, RuleAction, RuleAuditLog.
 
-Rules are the automation heart of Fieldmouse. A rule evaluates one or more
+Rules are the automation heart of That Place. A rule evaluates one or more
 condition groups against live stream data and fires one or more actions when
 the overall condition is met.
 

@@ -41,7 +41,7 @@ class Site(models.Model):
 
 
 class DeviceType(models.Model):
-    """Device type definition managed by Fieldmouse Admin.
+    """Device type definition managed by That Place Admin.
 
     Defines the capabilities, stream hints, and command schemas for a
     category of hardware. All devices must be assigned a DeviceType.
@@ -111,7 +111,7 @@ class Device(models.Model):
     """A physical device registered by a tenant.
 
     Devices start as `pending` after registration and must be approved by a
-    Fieldmouse Admin before they can submit data. Tenant A's devices are
+    That Place Admin before they can submit data. Tenant A's devices are
     never visible to Tenant B.
     Ref: SPEC.md § Data Model: Device
     """
@@ -124,7 +124,7 @@ class Device(models.Model):
 
     class TopicFormat(models.TextChoices):
         LEGACY_V1 = 'legacy_v1', 'Legacy v1'
-        FIELDMOUSE_V2 = 'fieldmouse_v2', 'Fieldmouse v2'
+        THAT_PLACE_V1 = 'that_place_v1', 'That Place v1'
 
     tenant = models.ForeignKey(
         'accounts.Tenant',

@@ -36,7 +36,7 @@ def make_device(tenant, serial='DEV-001'):
     return Device.objects.create(
         tenant=tenant, site=site, device_type=dt,
         name='Test Device', serial_number=serial,
-        status=Device.Status.ACTIVE, topic_format='fieldmouse_v2',
+        status=Device.Status.ACTIVE, topic_format='that_place_v1',
     )
 
 
@@ -223,7 +223,7 @@ class TestStreamUpdate:
         stream.save()
 
         process_mqtt_message(
-            'fieldmouse/scout/DS-001/telemetry',
+            'that-place/scout/DS-001/telemetry',
             json.dumps({'Relay_1': 1}),
         )
 

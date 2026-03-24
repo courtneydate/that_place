@@ -52,7 +52,7 @@ def make_invite_token(email, tenant_id, role='admin'):
     """Generate a valid signed invite token."""
     return signing.dumps(
         {'email': email, 'tenant_id': tenant_id, 'role': role},
-        salt='fieldmouse-invite',
+        salt='that-place-invite',
     )
 
 
@@ -88,7 +88,7 @@ class TestAcceptInvite:
             mock_time.return_value = 0
             token = signing.dumps(
                 {'email': 'old@example.com', 'tenant_id': tenant.id, 'role': 'admin'},
-                salt='fieldmouse-invite',
+                salt='that-place-invite',
             )
         client = APIClient()
         resp = client.post(self.URL, {
@@ -201,8 +201,8 @@ class TestUserList:
         resp = APIClient().get(self.URL)
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_fieldmouse_admin_cannot_list(self):
-        fm_admin = make_user('fm@fieldmouse.io', is_fieldmouse_admin=True)
+    def test_that_place_admin_cannot_list(self):
+        fm_admin = make_user('fm@that-place.io', is_that_place_admin=True)
         resp = auth_client(fm_admin).get(self.URL)
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 

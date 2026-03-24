@@ -1,4 +1,4 @@
-"""Production settings for Fieldmouse.
+"""Production settings for That Place.
 
 Security hardening is applied here. All secrets must be supplied via
 environment variables — never hardcoded.

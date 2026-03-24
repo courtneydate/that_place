@@ -1,4 +1,4 @@
-# PROJECT SPEC — Fieldmouse
+# PROJECT SPEC — That Place
 
 > **Version:** 5.1
 > **Last Updated:** 2026-03-19
@@ -10,12 +10,12 @@
 ## 1. Project Identity
 
 ### What is this?
-Fieldmouse is an IoT monitoring, control, and automation platform. It ingests multiple data streams — from smart sensors, dumb field hardware, and third-party APIs — and turns them into intelligent, automated decisions.
+That Place is an IoT monitoring, control, and automation platform. It ingests multiple data streams — from smart sensors, dumb field hardware, and third-party APIs — and turns them into intelligent, automated decisions.
 
 **Core platform capabilities: Monitor · Control · Automate**
 
 ### What problem does it solve?
-Asset and operations teams managing distributed physical infrastructure (irrigation systems, environmental sensors, utility assets) need a single platform to see what's happening, respond to it, and automate repetitive decisions. The current solution is a clunky .NET system with hardcoded limitations — Fieldmouse v2 is the modern rebuild.
+Asset and operations teams managing distributed physical infrastructure (irrigation systems, environmental sensors, utility assets) need a single platform to see what's happening, respond to it, and automate repetitive decisions. The current solution is a clunky .NET system with hardcoded limitations — That Place v1 is the modern rebuild.
 
 ### Who is it for?
 - **Primary:** Local councils and managers of green spaces
@@ -23,7 +23,7 @@ Asset and operations teams managing distributed physical infrastructure (irrigat
 - **Tertiary:** Industries with distributed asset monitoring needs, environmental monitoring organisations
 
 ### Business Model
-B2B — sold to organisations on a subscription basis. Hardware (Fieldmouse Scout and other gateway devices) also sold on subscription.
+B2B — sold to organisations on a subscription basis. Hardware (That Place Scout and other gateway devices) also sold on subscription.
 
 ### Tech Stack
 
@@ -50,12 +50,12 @@ B2B — sold to organisations on a subscription basis. Hardware (Fieldmouse Scou
 ### Core Design Philosophy
 > **Everything must be dynamic and configurable. Nothing is hardcoded.**
 
-The existing .NET platform failed to grow because it was built feature-by-feature with assumptions baked into the code. Every field, stream key, device type, command, data source, and notification channel in Fieldmouse must be defined through configuration — not code. This is the primary architectural principle and must be respected in every implementation decision.
+The existing .NET platform failed to grow because it was built feature-by-feature with assumptions baked into the code. Every field, stream key, device type, command, data source, and notification channel in That Place must be defined through configuration — not code. This is the primary architectural principle and must be respected in every implementation decision.
 
 ### Project Structure
 
 ```
-fieldmouse/
+that_place/
 ├── backend/
 │   ├── apps/
 │   │   ├── accounts/        # User auth, tenants, tenant-user relationships, notification groups
@@ -109,10 +109,10 @@ Devices bridged by a Scout are registered as their own Device records with a ref
 
 | Level | Role | Responsibilities |
 |-------|------|-----------------|
-| Platform | Fieldmouse Admin | Manage Device Type library, approve device provisioning, manage 3rd-party API library, access all tenants |
+| Platform | That Place Admin | Manage Device Type library, approve device provisioning, manage 3rd-party API library, access all tenants |
 | Tenant | Tenant Admin | Register devices, configure streams, build rules, manage users, manage notification groups |
 
-### Fieldmouse Hardware Family
+### That Place Hardware Family
 
 | Device | Purpose | MVP |
 |--------|---------|-----|
@@ -124,13 +124,13 @@ Devices bridged by a Scout are registered as their own Device records with a ref
 All Scout-to-cloud communication uses the following topic structure:
 
 ```
-fieldmouse/scout/{scout_serial}/telemetry
-fieldmouse/scout/{scout_serial}/health
-fieldmouse/scout/{scout_serial}/{device_serial}/telemetry
-fieldmouse/scout/{scout_serial}/{device_serial}/health
-fieldmouse/scout/{scout_serial}/cmd/{command_name}
-fieldmouse/scout/{scout_serial}/{device_serial}/cmd/{command_name}
-fieldmouse/scout/{scout_serial}/{device_serial}/cmd/ack
+that-place/scout/{scout_serial}/telemetry
+that-place/scout/{scout_serial}/health
+that-place/scout/{scout_serial}/{device_serial}/telemetry
+that-place/scout/{scout_serial}/{device_serial}/health
+that-place/scout/{scout_serial}/cmd/{command_name}
+that-place/scout/{scout_serial}/{device_serial}/cmd/{command_name}
+that-place/scout/{scout_serial}/{device_serial}/cmd/ack
 ```
 
 | Topic | Direction | Purpose |
@@ -143,19 +143,19 @@ fieldmouse/scout/{scout_serial}/{device_serial}/cmd/ack
 | `.../{device_serial}/cmd/{command_name}` | Cloud → Scout | Command for a connected device — Scout routes it |
 | `.../{device_serial}/cmd/ack` | Scout → Cloud | Confirmation that a command was received and executed |
 
-**Scout subscribes to:** `fieldmouse/scout/{scout_serial}/#`
-**Backend subscribes to:** `fieldmouse/scout/+/#`
+**Scout subscribes to:** `that-place/scout/{scout_serial}/#`
+**Backend subscribes to:** `that-place/scout/+/#`
 
 **Telemetry payloads — stream values are sent as a JSON key-value object in a single message per device per interval:**
 
-v2 Scout own telemetry — includes `_battery` and `_signal` as reserved health keys alongside regular stream data:
+v1 Scout own telemetry — includes `_battery` and `_signal` as reserved health keys alongside regular stream data:
 ```json
 { "Relay_1": 0, "Relay_2": 1, "Relay_3": 0, "Relay_4": 0, "Analog_1": 3.2, "Analog_2": 0.0, "Analog_3": 1.5, "Analog_4": 0.8, "Digital_1": 1, "Digital_2": 0, "Digital_3": 0, "Digital_4": 1, "_battery": 82, "_signal": -67 }
 ```
 
 `_battery` and `_signal` are reserved key names — they are extracted from the payload to update `DeviceHealth` and are also stored as virtual `StreamReading` records so they are available to the rule engine and dashboard charts. Mains-powered Scouts always send `_battery: 100`. Both keys are optional — if absent the corresponding health fields are not updated.
 
-v2 bridged device telemetry (any device type including MODBUS — Scout handles protocol translation, Fieldmouse sees JSON):
+v1 bridged device telemetry (any device type including MODBUS — Scout handles protocol translation, That Place sees JSON):
 ```json
 { "temperature": 23.4, "humidity": 60.1, "pressure": 1013.2 }
 ```
@@ -174,8 +174,8 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 | Legacy v1 | `fm/mm/{scout_serial}/weatherstation` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
 | Legacy v1 | `fm/mm/{scout_serial}/tbox` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
 | Legacy v1 | `fm/mm/{scout_serial}/abb` | ⚑ Payload format TBC — hardware team input required | `fm/mm/+/#` |
-| Fieldmouse v2 | `fieldmouse/scout/{scout_serial}/telemetry` | JSON key-value object | `fieldmouse/scout/+/#` |
-| Fieldmouse v2 | `fieldmouse/scout/{scout_serial}/{device_serial}/telemetry` | JSON key-value object | `fieldmouse/scout/+/#` |
+| That Place v1 | `that-place/scout/{scout_serial}/telemetry` | JSON key-value object | `that-place/scout/+/#` |
+| That Place v1 | `that-place/scout/{scout_serial}/{device_serial}/telemetry` | JSON key-value object | `that-place/scout/+/#` |
 
 **Legacy v1 telemetry CSV field mapping (confirmed):**
 
@@ -199,20 +199,20 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **Topic router — dynamic pattern matching:**
 - Incoming messages matched against a registry of topic patterns — no hardcoded parsing logic
 - Each registered pattern defines how to extract: scout_serial, device_serial, message_type
-- Stream values extracted from payload according to format (JSON key-value for v2, CSV with fixed mapping for legacy v1 telemetry)
+- Stream values extracted from payload according to format (JSON key-value for v1, CSV with fixed mapping for legacy v1 telemetry)
 - New topic formats onboarded by registering a new pattern — no code changes required
 
 **MODBUS and other bridged protocols:**
 - The Scout handles all protocol translation (MODBUS, RS485, etc.) at the edge
-- Fieldmouse always receives JSON key-value telemetry regardless of the underlying device protocol
-- MODBUS register-to-stream-key mapping is configured on the Scout; Fieldmouse treats MODBUS devices identically to any other JSON-publishing device
+- That Place always receives JSON key-value telemetry regardless of the underlying device protocol
+- MODBUS register-to-stream-key mapping is configured on the Scout; That Place treats MODBUS devices identically to any other JSON-publishing device
 
 **Legacy firmware tracking:**
-- Device record includes `topic_format` field: `legacy_v1` / `fieldmouse_v2`
+- Device record includes `topic_format` field: `legacy_v1` / `that_place_v1`
 - Auto-detected: when a message arrives from a Scout, `topic_format` is updated to match the incoming topic prefix
-- When firmware is updated and the Scout begins sending on the new prefix, `topic_format` flips to `fieldmouse_v2` automatically — no manual intervention
-- Fieldmouse Admin can filter devices by `topic_format` to track fleet migration progress
-- Old Scouts re-registered as new Device records in Fieldmouse v2 during tenant onboarding — operate on `legacy_v1` until firmware updated, then seamlessly transition
+- When firmware is updated and the Scout begins sending on the new prefix, `topic_format` flips to `that_place_v1` automatically — no manual intervention
+- That Place Admin can filter devices by `topic_format` to track fleet migration progress
+- Old Scouts re-registered as new Device records in That Place v1 during tenant onboarding — operate on `legacy_v1` until firmware updated, then seamlessly transition
 
 **Remaining hardware team input required:**
 - ⚑ **Legacy weatherstation/tbox/abb payload format** — payload structure for these message types still required before their parsers can be built
@@ -224,7 +224,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 - All raw stream data is stored forever regardless of display settings
 - Stream display/activation is a view filter, not a data filter
 - Device commands can only be sent by Operator or Admin roles — enforced at API level
-- Fieldmouse platform admins can access all tenants; customer users cannot cross tenants
+- That Place platform admins can access all tenants; customer users cannot cross tenants
 - Every field, stream, command, and integration must be configurable — nothing hardcoded
 
 ### Explicitly Excluded (MVP)
@@ -251,28 +251,28 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **Acceptance Criteria:**
 - [ ] Email/password login with JWT access + refresh tokens
 - [ ] All sessions expire on logout (token blacklist)
-- [ ] Fieldmouse admin accounts can switch between and access all tenants
+- [ ] That Place admin accounts can switch between and access all tenants
 - [ ] Customer accounts are bound to a single tenant — cross-tenant access denied
 
 ---
 
-### Feature: Tenant Management (Fieldmouse Admin)
+### Feature: Tenant Management (That Place Admin)
 
-**User Story:** As a Fieldmouse Admin, I want to create and manage tenant accounts so that new customers can be onboarded.
+**User Story:** As a That Place Admin, I want to create and manage tenant accounts so that new customers can be onboarded.
 
 **Acceptance Criteria:**
-- [ ] Fieldmouse Admin can create, view, edit, and deactivate tenants
-- [ ] On tenant creation, Fieldmouse Admin sends an invite to the first Tenant Admin user
-- [ ] Fieldmouse Admin can access any tenant's data for support purposes
+- [ ] That Place Admin can create, view, edit, and deactivate tenants
+- [ ] On tenant creation, That Place Admin sends an invite to the first Tenant Admin user
+- [ ] That Place Admin can access any tenant's data for support purposes
 - [ ] Deactivated tenants cannot log in but their data is retained
 
 **Onboarding Flow:**
-1. Fieldmouse Admin creates Tenant record
-2. Fieldmouse Admin sends invite email to first Tenant Admin
+1. That Place Admin creates Tenant record
+2. That Place Admin sends invite email to first Tenant Admin
 3. Tenant Admin sets password and logs in
 4. Tenant Admin creates Sites
 5. Tenant Admin registers Devices by serial number (status: **pending**)
-6. Fieldmouse Admin receives notification and approves devices
+6. That Place Admin receives notification and approves devices
 7. Devices connect, streams are auto-discovered
 8. Tenant Admin configures streams, builds dashboards, invites users, creates rules
 
@@ -297,7 +297,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 - [ ] Tenant Admin can invite users by email and assign a role on invite
 - [ ] Three roles: Admin, Operator, View-Only
 - [ ] Tenant Admin can change a user's role or remove them
-- [ ] A user belongs to exactly one tenant (except Fieldmouse Admins)
+- [ ] A user belongs to exactly one tenant (except That Place Admins)
 - [ ] Removed users immediately lose access
 
 **Role Permissions:**
@@ -330,18 +330,18 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 
 ---
 
-### Feature: Device Type Library (Fieldmouse Admin)
+### Feature: Device Type Library (That Place Admin)
 
-**User Story:** As a Fieldmouse Admin, I want to maintain a library of supported device types so customers can select from known hardware when registering devices.
+**User Story:** As a That Place Admin, I want to maintain a library of supported device types so customers can select from known hardware when registering devices.
 
 **Acceptance Criteria:**
-- [ ] Fieldmouse Admin can create, view, edit, and deactivate device types
+- [ ] That Place Admin can create, view, edit, and deactivate device types
 - [ ] Each device type includes: name, description, connection type (MQTT/Modbus/API/etc), push vs pull flag
-- [ ] Fieldmouse Admin defines commands per device type — each with name, label, param schema (key/label/type/min/max/unit/default), and ack timeout (see Feature: Device Control)
+- [ ] That Place Admin defines commands per device type — each with name, label, param schema (key/label/type/min/max/unit/default), and ack timeout (see Feature: Device Control)
 - [ ] Device types are read-only for Tenant Admins — used for selection only
 - [ ] Device Type is a grouping/filter label; it does not define or constrain stream keys
-- [ ] Fieldmouse Admin declares expected streams per device type including their data type (numeric/boolean/string) — this is used by the rule builder to present correct operators. Devices may report additional undeclared streams; those default to data_type = numeric until manually corrected.
-- [ ] Fieldmouse Admin defines status indicator mappings per stream per device type: a list of value → colour + label entries (e.g. `"running" → green / "Running"`, `"fault" → red / "Fault"`). Used by the Status Indicator dashboard widget.
+- [ ] That Place Admin declares expected streams per device type including their data type (numeric/boolean/string) — this is used by the rule builder to present correct operators. Devices may report additional undeclared streams; those default to data_type = numeric until manually corrected.
+- [ ] That Place Admin defines status indicator mappings per stream per device type: a list of value → colour + label entries (e.g. `"running" → green / "Running"`, `"fault" → red / "Fault"`). Used by the Status Indicator dashboard widget.
 
 ---
 
@@ -352,7 +352,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **Acceptance Criteria:**
 - [ ] Tenant Admin registers a device with: name, serial number, site, device type
 - [ ] Device is created with status: **pending**
-- [ ] Fieldmouse Admin receives notification of a pending device and can approve or reject it
+- [ ] That Place Admin receives notification of a pending device and can approve or reject it
 - [ ] On approval, device status becomes **active** and it can begin sending data
 - [ ] Devices can be edited (name, site) and deactivated
 - [ ] Deactivated devices retain all historical data
@@ -393,7 +393,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **Acceptance Criteria:**
 - [ ] Platform tracks per device: online/offline status, last-seen timestamp, first-active timestamp, signal strength, battery level, activity level
 - [ ] Device list shows a health status indicator at a glance (colour-coded)
-- [ ] **Offline threshold:** Fieldmouse Admin sets a default offline threshold per device type (e.g. "mark offline if no data for 15 minutes"). Tenant Admin can override the threshold per device instance (e.g. a critical device may have a tighter threshold)
+- [ ] **Offline threshold:** That Place Admin sets a default offline threshold per device type (e.g. "mark offline if no data for 15 minutes"). Tenant Admin can override the threshold per device instance (e.g. a critical device may have a tighter threshold)
 - [ ] **Activity level** is derived by the platform from signal strength, battery level, and time since last message — not manually set. Enum: `normal / degraded / critical`. Derived rules:
   - `normal` — signal > -70 dBm (or null) AND battery > 40% (or null) AND recently heard from
   - `degraded` — signal -70 to -85 dBm OR battery 20–40% OR time since last message > 75% of offline threshold
@@ -405,7 +405,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
   - `battery_critical_threshold`: 20% (default)
   - `offline_approaching_percent`: 75% of offline threshold triggers degraded (default)
 - [ ] **Legacy v1 devices** have no battery or signal data — activity level derived from time since last message only. `battery_level` and `signal_strength` remain null.
-- [ ] **Battery and signal stored as virtual streams** — `_battery` and `_signal` reserved keys in v2 Scout telemetry are stored as `StreamReading` records alongside regular telemetry. This makes them available to the rule engine and dashboard charts without special handling. Mains-powered Scouts always send `_battery: 100`.
+- [ ] **Battery and signal stored as virtual streams** — `_battery` and `_signal` reserved keys in v1 Scout telemetry are stored as `StreamReading` records alongside regular telemetry. This makes them available to the rule engine and dashboard charts without special handling. Mains-powered Scouts always send `_battery: 100`.
 - [ ] Health metrics (battery level, signal strength) are both **displayable on dashboards** and **usable as rule conditions** in the rule builder via virtual streams
 - [ ] Health metrics can be added to dashboards as widgets (e.g. uptime chart, battery gauge)
 - [ ] All users including View-Only can see device health
@@ -418,14 +418,14 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 **User Story:** As the platform, I want to receive and store data from Scout-connected devices in near real time.
 
 **Acceptance Criteria:**
-- [ ] Backend subscribes to `fieldmouse/scout/+/#` and routes all incoming messages
+- [ ] Backend subscribes to `that-place/scout/+/#` and routes all incoming messages
 - [ ] Telemetry messages are parsed and stored as StreamReadings on the correct stream
 - [ ] Unknown stream keys on a known device automatically create new Stream records
 - [ ] Messages from unregistered or unapproved devices are logged and discarded
 - [ ] Ingestion latency from MQTT receipt to stored reading is under 5 seconds
 - [ ] `DeviceHealth.last_seen_at` is updated on every received message for both v2 and legacy v1 devices
-- [ ] `_battery` and `_signal` reserved keys in v2 Scout telemetry update `DeviceHealth` and are stored as virtual StreamReadings
-- [ ] Scout health topic (`fieldmouse/scout/{serial}/health`) — Phase 2 only, not implemented in MVP
+- [ ] `_battery` and `_signal` reserved keys in v1 Scout telemetry update `DeviceHealth` and are stored as virtual StreamReadings
+- [ ] Scout health topic (`that-place/scout/{serial}/health`) — Phase 2 only, not implemented in MVP
 
 ---
 
@@ -433,10 +433,10 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 
 **User Story:** As a Tenant Admin, I want to connect approved 3rd-party data sources so their data appears alongside device streams.
 
-**Design principle:** Fieldmouse Admin does all integration work once per provider. Every tenant using that provider gets an auto-generated credential form and a guided device discovery flow — no manual config required beyond entering credentials and selecting devices.
+**Design principle:** That Place Admin does all integration work once per provider. Every tenant using that provider gets an auto-generated credential form and a guided device discovery flow — no manual config required beyond entering credentials and selecting devices.
 
-**Platform-level (Fieldmouse Admin):**
-- [ ] Fieldmouse Admin creates and maintains a library of provider configs (`ThirdPartyAPIProvider`)
+**Platform-level (That Place Admin):**
+- [ ] That Place Admin creates and maintains a library of provider configs (`ThirdPartyAPIProvider`)
 - [ ] Each provider config defines:
   - Identity: name, slug, description, logo (file upload — stored in S3/MinIO, not a URL)
   - Base URL
@@ -508,7 +508,7 @@ _Post-wizard:_
 - [ ] **Line chart** — plots one or more streams over time; each stream rendered as a separate line; configurable time range (last hour / 24h / 7d / 30d / custom with plain date inputs). Dual Y-axis: all streams default to the left axis; any stream beyond the first can be individually toggled to the right axis. Implemented with ApexCharts.
 - [ ] **Gauge** — displays current value of a single stream against a min/max range; configurable min, max, and exactly 3 fixed threshold bands (normal / warning / danger) with configurable boundary values (`warning_threshold`, `danger_threshold`); band colours are green / yellow / red using semantic tokens. Implemented with ApexCharts.
 - [ ] **Value card** — displays latest reading for a single stream, a trend indicator (up / down / stable, derived from comparison to previous reading), and time since last update
-- [ ] **Status indicator** — displays a colour/label state derived from a stream's current value; state-to-colour/label mapping defined at device type configuration by Fieldmouse Admin
+- [ ] **Status indicator** — displays a colour/label state derived from a stream's current value; state-to-colour/label mapping defined at device type configuration by That Place Admin
 - [ ] **Health/uptime chart** — plots a device's online/offline history over time, or battery/signal as a line chart
 
 **General:**
@@ -649,7 +649,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 **System event notifications:**
 - [ ] The following platform events trigger in-app (and optionally email) notifications to relevant tenant users:
-  - Device approved by Fieldmouse Admin
+  - Device approved by That Place Admin
   - Device went offline (per device's configured offline threshold)
   - Device deleted
   - DataSource poll failed (after retry exhausted)
@@ -658,13 +658,13 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] Notification retention: kept forever (consistent with raw data retention policy)
 - [ ] ⚑ **Flag:** notification volume at scale could become a concern — revisit retention policy if needed
 
-**Fieldmouse Admin notification channel:**
-- [ ] Fieldmouse Admins have a separate system-level notification channel for platform-wide events:
+**That Place Admin notification channel:**
+- [ ] That Place Admins have a separate system-level notification channel for platform-wide events:
   - Platform/service degradation or downtime
   - MQTT broker connectivity failures
   - 3rd party API provider failures (affecting multiple tenants)
   - Any tenant device pending approval
-- [ ] ⚑ **Fieldmouse Admin notification channel design** — delivery mechanism (in-app, email, PagerDuty-style alerting) and the full event list to be defined in a dedicated deep dive
+- [ ] ⚑ **That Place Admin notification channel design** — delivery mechanism (in-app, email, PagerDuty-style alerting) and the full event list to be defined in a dedicated deep dive
 
 ---
 
@@ -674,8 +674,8 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 **Acceptance Criteria:**
 
-**Command definition (Fieldmouse Admin):**
-- [ ] Commands are defined per device type in the Fieldmouse Admin library
+**Command definition (That Place Admin):**
+- [ ] Commands are defined per device type in the That Place Admin library
 - [ ] Each command has: name (machine key), label (human-readable), description, and a param schema
 - [ ] Param schema is a JSONB array — each param has: key, label, type (int/float/string/bool), optional min/max/unit, and an optional default value
 - [ ] Params with a default value are pre-filled in the UI; params without one require the user to enter a value before sending
@@ -694,7 +694,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 **Sending commands (Tenant Admin / Operator):**
 - [ ] Admin and Operator can send a command from the device detail screen
 - [ ] UI renders a form from the command's param schema — pre-filled defaults where defined, input fields for variable params
-- [ ] Commands sent via MQTT: `fieldmouse/scout/{scout_serial}/{device_serial}/cmd/{command_name}` with params as JSON payload
+- [ ] Commands sent via MQTT: `that-place/scout/{scout_serial}/{device_serial}/cmd/{command_name}` with params as JSON payload
 - [ ] View-Only users cannot send commands
 
 **Acknowledgement:**
@@ -747,12 +747,12 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 | Entity | Relationships | Key Fields |
 |--------|--------------|------------|
-| User | base auth | id, email, password, is_fieldmouse_admin, created_at |
+| User | base auth | id, email, password, is_that_place_admin, created_at |
 | Tenant | has many Sites, TenantUsers | id, name, slug, timezone (IANA tz string, e.g. "Australia/Brisbane"), is_active, signal_degraded_threshold (int dBm, default -70), signal_critical_threshold (int dBm, default -85), battery_degraded_threshold (int %, default 40), battery_critical_threshold (int %, default 20), offline_approaching_percent (int %, default 75), created_at |
 | TenantUser | links User ↔ Tenant | id, user_id, tenant_id, role (admin/operator/viewer), joined_at |
 | Site | belongs to Tenant | id, tenant_id, name, description, latitude, longitude, created_at |
 | DeviceType | platform library | id, name, slug, description, connection_type, is_push, default_offline_threshold_minutes (int), command_ack_timeout_seconds (int), commands (JSONB array — each entry: name, label, description, params array), is_active, created_at |
-| Device | belongs to Site + Tenant | id, tenant_id, site_id, device_type_id, name, serial_number, gateway_device_id (nullable FK → Device), status (pending/active/deactivated), offline_threshold_override_minutes (nullable int — if set, overrides device type default), topic_format (legacy_v1/fieldmouse_v2 — auto-detected from incoming MQTT traffic), created_at |
+| Device | belongs to Site + Tenant | id, tenant_id, site_id, device_type_id, name, serial_number, gateway_device_id (nullable FK → Device), status (pending/active/deactivated), offline_threshold_override_minutes (nullable int — if set, overrides device type default), topic_format (legacy_v1/that_place_v1 — auto-detected from incoming MQTT traffic), created_at |
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
 | Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
 | StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
@@ -776,7 +776,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 ### Key Business Rules
 - Every queryset must be filtered by `tenant_id` — no cross-tenant data leakage
-- A User belongs to at most one Tenant (Fieldmouse Admins belong to none but access all)
+- A User belongs to at most one Tenant (That Place Admins belong to none but access all)
 - Streams are created automatically on first data receipt — never pre-defined
 - All StreamReadings are retained forever — no deletion policy
 - A Device's `tenant_id` is set directly (not just via Site) to support cross-site queries
@@ -791,7 +791,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - A RuleCondition with condition_type = staleness does not use operator or threshold_value — only staleness_minutes
 - Pre-defined NotificationGroups (All Users, All Admins, All Operators) are maintained automatically by the system — membership derived from TenantUser roles, not manually managed
 - DataSource credentials must be stored encrypted
-- Virtual devices (created from 3rd-party API connection) are created with `status=active` — no FM Admin approval required (the provider itself is pre-approved)
+- Virtual devices (created from 3rd-party API connection) are created with `status=active` — no That Place Admin approval required (the provider itself is pre-approved)
 - Virtual device `serial_number` is generated as `api-{provider_slug}-{tenant_id}-{external_device_id}` — guaranteed unique across all tenants
 - Removing a device from a DataSource deactivates it (`DataSourceDevice.is_active=False`) — the virtual Device record and all StreamReadings are retained; hard delete is available from the device detail page
 - Re-connecting a previously deactivated device reactivates the existing virtual Device and DataSourceDevice records rather than creating duplicates — poll failure counters are reset, historical StreamReadings and Stream records are preserved
@@ -861,7 +861,7 @@ POST   /api/v1/auth/login/
 POST   /api/v1/auth/refresh/
 POST   /api/v1/auth/logout/
 
-# Tenants (Fieldmouse Admin only)
+# Tenants (That Place Admin only)
 GET    /api/v1/tenants/
 POST   /api/v1/tenants/
 GET    /api/v1/tenants/:id/
@@ -890,7 +890,7 @@ GET    /api/v1/sites/:id/
 PUT    /api/v1/sites/:id/
 DELETE /api/v1/sites/:id/
 
-# Device Types (Fieldmouse Admin write, all read)
+# Device Types (That Place Admin write, all read)
 GET    /api/v1/device-types/
 POST   /api/v1/device-types/
 GET    /api/v1/device-types/:id/
@@ -902,7 +902,7 @@ POST   /api/v1/devices/
 GET    /api/v1/devices/:id/
 PUT    /api/v1/devices/:id/
 DELETE /api/v1/devices/:id/
-POST   /api/v1/devices/:id/approve/        # Fieldmouse Admin only
+POST   /api/v1/devices/:id/approve/        # That Place Admin only
 GET    /api/v1/devices/:id/health/
 POST   /api/v1/devices/:id/command/
 GET    /api/v1/devices/:id/commands/       # command history
@@ -913,7 +913,7 @@ GET    /api/v1/streams/:id/
 PUT    /api/v1/streams/:id/
 GET    /api/v1/streams/:id/readings/       # ?from=, ?to=, ?limit=
 
-# 3rd Party API Provider Library (Fieldmouse Admin write, Tenant Admin read)
+# 3rd Party API Provider Library (That Place Admin write, Tenant Admin read)
 GET    /api/v1/api-providers/
 POST   /api/v1/api-providers/
 GET    /api/v1/api-providers/:id/
@@ -1062,7 +1062,7 @@ POST   /api/v1/exports/stream/   # triggers immediate streaming CSV download
 
 ### Deployment Options
 
-Fieldmouse is designed to run on any Linux server. All external service dependencies are configured via environment variables — no AWS SDK calls are hardcoded.
+That Place is designed to run on any Linux server. All external service dependencies are configured via environment variables — no AWS SDK calls are hardcoded.
 
 | Component | AWS deployment | Self-hosted deployment |
 |-----------|---------------|----------------------|
@@ -1092,11 +1092,11 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 
 ### Phase 1 — Foundation
 - [ ] User auth (JWT login, refresh, logout)
-- [ ] Tenant management (Fieldmouse Admin creates tenants, sends first Admin invite)
+- [ ] Tenant management (That Place Admin creates tenants, sends first Admin invite)
 - [ ] Tenant user management with three roles
 - [ ] Notification groups (custom + pre-defined system groups)
 - [ ] Site management (CRUD)
-- [ ] Device Type library (Fieldmouse Admin manages, all can read)
+- [ ] Device Type library (That Place Admin manages, all can read)
 - [ ] Device registration with pending/approved provisioning flow
 - [ ] Scout gateway reference on bridged device records
 
@@ -1106,7 +1106,7 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 - [ ] Stream auto-discovery and StreamReading storage
 - [ ] Stream display configuration (enable/disable, label/unit override)
 - [ ] Device health tracking (all fields) + configurable offline threshold (per device type + per device override)
-- [ ] 3rd-party API provider library (Fieldmouse Admin)
+- [ ] 3rd-party API provider library (That Place Admin)
 - [ ] DataSource instances + DataSourceDevice discovery flow (Tenant Admin)
 - [ ] Celery beat polling for 3rd-party data sources (discovery + detail endpoints)
 - [ ] OAuth2 token refresh handling for oauth2_password and oauth2_client_credentials auth types
@@ -1175,12 +1175,12 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 
 - [ ] **SMS provider** — which provider is preferred? (Twilio preferred — works on any deployment. AWS SNS as alternative for AWS-only deployments.)
 - [x] **MQTT broker** — resolved: Mosquitto for local dev and self-hosted production deployments. AWS IoT Core supported as an alternative for AWS production deployments. Both use the same ingestion code path — broker connection configured entirely via env vars (`MQTT_BROKER_HOST`, `MQTT_BROKER_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`).
-- [x] **Legacy telemetry payload format (Scout/telemetry)** — resolved: 12-value CSV string, fixed field order (4 relays, 4 analog inputs, 4 digital inputs). Stream keys match v2 Scout JSON keys. See MQTT Topic Structure section for full mapping.
-- [x] **Battery and signal as virtual streams** — resolved: `_battery` and `_signal` are reserved keys in v2 Scout telemetry. Stored as StreamReadings (virtual streams) AND update DeviceHealth. Makes them available to rule engine and dashboard without special handling. Legacy v1 devices have null battery/signal.
+- [x] **Legacy telemetry payload format (Scout/telemetry)** — resolved: 12-value CSV string, fixed field order (4 relays, 4 analog inputs, 4 digital inputs). Stream keys match v1 Scout JSON keys. See MQTT Topic Structure section for full mapping.
+- [x] **Battery and signal as virtual streams** — resolved: `_battery` and `_signal` are reserved keys in v1 Scout telemetry. Stored as StreamReadings (virtual streams) AND update DeviceHealth. Makes them available to rule engine and dashboard without special handling. Legacy v1 devices have null battery/signal.
 - [x] **Activity level thresholds** — resolved: configurable per tenant via Tenant model fields with platform defaults (signal: -70/-85 dBm, battery: 40%/20%, offline approaching: 75%). See Feature: Device Health Monitoring for full derivation rules.
 - [ ] ⚑ **Legacy weatherstation/tbox/abb payload format** — payload structure for these three legacy message types still required before their parsers can be built. Hardware team input needed.
 - [ ] ⚑ **Legacy command format** — current command format sent to Scouts is inconsistent (strings, JSON, raw characters). Clarify with hardware team and define migration path before legacy command handling can be specced.
-- [ ] **Scout firmware rollout plan** — ~500 Scouts across ~30 customers need firmware updates to move from `legacy_v1` to `fieldmouse_v2` topic format. Dual-format support handles the transition period. Coordinate update timeline and rollout order with hardware team.
+- [ ] **Scout firmware rollout plan** — ~500 Scouts across ~30 customers need firmware updates to move from `legacy_v1` to `that_place_v1` topic format. Dual-format support handles the transition period. Coordinate update timeline and rollout order with hardware team.
 - [ ] **Existing customer migration** — post-launch activity. No migration tooling required for MVP. Approach to be planned separately.
 - [ ] **Dashboard public/shared links** — is sharing a dashboard view (read-only link) ever needed?
 - [ ] ⚑ **Unknown condition state** — when a stream referenced in a rule condition stops reporting, the last known value is used OR the condition is treated as unknown/false. Decision: if a stream goes stale, should point-in-time conditions using that stream be treated as false (rule cannot fire) or continue using the last known value? Staleness conditions handle the "offline sensor" case explicitly, but this edge case remains for standard stream conditions.
@@ -1188,6 +1188,6 @@ Fieldmouse is designed to run on any Linux server. All external service dependen
 - [x] **3rd party API — bulk device management UX** — resolved: two-phase wizard. Phase A: tenant sets a default site for all discovered devices with per-device site override, selects devices via checkboxes (select-all supported). Phase B: stream activation configured as a batch across all selected devices; per-device overrides available later via the device detail Streams tab. Post-connection management page shows all connected devices with add/deactivate actions. See Feature: Data Ingestion — 3rd Party APIs for full detail.
 - [ ] ⚑ **3rd party API — history endpoint** — some providers offer a date-range endpoint for historical data (e.g. `/history/?from=&to=`). Phase 2 item: design a backfill polling pattern that does not conflict with the regular detail endpoint polling.
 - [ ] ⚑ **Notification event registry** — system event notifications should be registered centrally rather than hardcoded. Architectural design required during Phase 5 implementation — how event types are registered, what metadata they carry, and how they map to notification templates.
-- [ ] ⚑ **Fieldmouse Admin notification channel** — delivery mechanism (in-app, email, external alerting tool) and full platform event list to be defined in a dedicated deep dive before Phase 5.
+- [ ] ⚑ **That Place Admin notification channel** — delivery mechanism (in-app, email, external alerting tool) and full platform event list to be defined in a dedicated deep dive before Phase 5.
 - [ ] ⚑ **Notification retention at scale** — currently retained forever consistent with raw data policy. Revisit if notification volume becomes a storage concern.
 - [ ] ⚑ **Redis atomic flag deep dive** — before implementing the rule evaluation engine, review how `SET NX` works in practice: key naming, TTL/expiry strategy to prevent stale locks if a worker crashes mid-evaluation, how the Redis flag stays in sync with `Rule.current_state` in the DB, and degraded behaviour if Redis is temporarily unavailable.

@@ -1,10 +1,10 @@
-"""Custom DRF permission classes for Fieldmouse.
+"""Custom DRF permission classes for That Place.
 
 Hierarchy (least → most privileged):
   IsViewOnly   — any authenticated tenant user (viewer, operator, or admin)
   IsOperator   — tenant admin or operator
   IsTenantAdmin — tenant admin only
-  IsFieldmouseAdmin — Fieldmouse platform admin only
+  IsThatPlaceAdmin — That Place platform admin only
 """
 import logging
 
@@ -18,21 +18,21 @@ def _get_tenant_user(request):
     return getattr(request.user, 'tenantuser', None)
 
 
-class IsFieldmouseAdmin(BasePermission):
-    """Allows access only to users with is_fieldmouse_admin=True.
+class IsThatPlaceAdmin(BasePermission):
+    """Allows access only to users with is_that_place_admin=True.
 
-    Used on all Fieldmouse platform management endpoints (tenant management,
+    Used on all That Place platform management endpoints (tenant management,
     device type library, provider library).
     """
 
-    message = 'Access restricted to Fieldmouse platform administrators.'
+    message = 'Access restricted to That Place platform administrators.'
 
     def has_permission(self, request, view):
-        """Return True only if the user is authenticated and is a Fieldmouse Admin."""
+        """Return True only if the user is authenticated and is a That Place Admin."""
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.is_fieldmouse_admin
+            and request.user.is_that_place_admin
         )
 
 
@@ -40,7 +40,7 @@ class IsViewOnly(BasePermission):
     """Any authenticated tenant user (viewer, operator, or admin).
 
     This is the minimum permission required for tenant-scoped read endpoints.
-    Fieldmouse Admins (who have no TenantUser) are explicitly excluded.
+    That Place Admins (who have no TenantUser) are explicitly excluded.
     """
 
     message = 'Access restricted to tenant users.'

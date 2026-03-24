@@ -1,5 +1,5 @@
 /**
- * Device Type Library — Fieldmouse Admin page.
+ * Device Type Library — That Place Admin page.
  *
  * Lists all device types. FM Admin can create and edit types including
  * stream type definitions and command schemas.

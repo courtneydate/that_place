@@ -1,5 +1,5 @@
 /**
- * Pending Devices — Fieldmouse Admin approval queue.
+ * Pending Devices — That Place Admin approval queue.
  *
  * Shows all devices with status=pending across all tenants.
  * FM Admin can approve or reject each device.

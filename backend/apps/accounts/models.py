@@ -27,24 +27,24 @@ class UserManager(BaseUserManager):
         """Create and return a superuser."""
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_fieldmouse_admin', True)
+        extra_fields.setdefault('is_that_place_admin', True)
         return self.create_user(email, password, **extra_fields)
 
 
 class User(AbstractUser):
-    """Custom user model for Fieldmouse.
+    """Custom user model for That Place.
 
     Uses email as the primary identifier instead of username.
-    `is_fieldmouse_admin` marks platform-level admins (Fieldmouse staff)
+    `is_that_place_admin` marks platform-level admins (That Place staff)
     who can access all tenants. Regular users belong to a single tenant
     via TenantUser (Sprint 2).
     """
 
     username = None  # Removed — email is the identifier
     email = models.EmailField(unique=True, verbose_name='email address')
-    is_fieldmouse_admin = models.BooleanField(
+    is_that_place_admin = models.BooleanField(
         default=False,
-        help_text='Designates whether this user is a Fieldmouse platform admin with access to all tenants.',
+        help_text='Designates whether this user is a That Place platform admin with access to all tenants.',
     )
 
     USERNAME_FIELD = 'email'
@@ -61,7 +61,7 @@ class User(AbstractUser):
 
 
 class Tenant(models.Model):
-    """An organisation (customer) on the Fieldmouse platform.
+    """An organisation (customer) on the That Place platform.
 
     Each tenant is a completely isolated data silo. All tenant data
     (devices, streams, rules, alerts) is filtered by tenant_id.
@@ -114,7 +114,7 @@ class Tenant(models.Model):
 class TenantUser(models.Model):
     """Links a User to a Tenant with a role.
 
-    A User belongs to at most one Tenant (Fieldmouse Admins belong to none).
+    A User belongs to at most one Tenant (That Place Admins belong to none).
     """
 
     class Role(models.TextChoices):

@@ -1,7 +1,7 @@
 """Tests for Tenant management endpoints.
 
 Covers Sprint 2 acceptance criteria:
-- Fieldmouse Admin can create, list, retrieve, and update (deactivate) tenants
+- That Place Admin can create, list, retrieve, and update (deactivate) tenants
 - Duplicate slug is handled (auto-incremented)
 - Non-admin users cannot access tenant endpoints (403)
 - Invite sends email (mocked)
@@ -24,9 +24,9 @@ def client():
 @pytest.fixture
 def fm_admin(db):
     return User.objects.create_user(
-        email='admin@fieldmouse.io',
+        email='admin@that-place.io',
         password='AdminPass123!',
-        is_fieldmouse_admin=True,
+        is_that_place_admin=True,
     )
 
 

@@ -64,8 +64,8 @@ class TestTenantSettings:
         resp = APIClient().get(URL)
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_fieldmouse_admin_cannot_access_settings(self):
-        fm = User.objects.create_user(email='fm@fieldmouse.io', password='pass', is_fieldmouse_admin=True)
+    def test_that_place_admin_cannot_access_settings(self):
+        fm = User.objects.create_user(email='fm@that-place.io', password='pass', is_that_place_admin=True)
         resp = auth_client(fm, 'pass').get(URL)
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 

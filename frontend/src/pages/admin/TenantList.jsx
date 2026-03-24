@@ -1,5 +1,5 @@
 /**
- * Tenant list page — Fieldmouse Admin.
+ * Tenant list page — That Place Admin.
  * Shows all tenants with status badges and a link to each tenant's detail page.
  */
 import { Link } from 'react-router-dom';

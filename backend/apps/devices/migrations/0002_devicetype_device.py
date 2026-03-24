@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ('serial_number', models.CharField(help_text='Hardware serial number — must be unique across all tenants.', max_length=255, unique=True)),
                 ('status', models.CharField(choices=[('pending', 'Pending'), ('active', 'Active'), ('rejected', 'Rejected'), ('deactivated', 'Deactivated')], default='pending', max_length=20)),
                 ('offline_threshold_override_minutes', models.PositiveIntegerField(blank=True, help_text='If set, overrides the device type default offline threshold for this device.', null=True)),
-                ('topic_format', models.CharField(blank=True, choices=[('legacy_v1', 'Legacy v1'), ('fieldmouse_v2', 'Fieldmouse v2')], help_text='Auto-detected from incoming MQTT traffic. Null until first message received.', max_length=20, null=True)),
+                ('topic_format', models.CharField(blank=True, choices=[('legacy_v1', 'Legacy v1'), ('that_place_v1', 'That Place v1')], help_text='Auto-detected from incoming MQTT traffic. Null until first message received.', max_length=20, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('device_type', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='devices', to='devices.devicetype')),
                 ('gateway_device', models.ForeignKey(blank=True, help_text='Parent Scout that bridges this device over MQTT, if applicable.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='bridged_devices', to='devices.device')),

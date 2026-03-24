@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsFieldmouseAdmin, IsTenantAdmin, IsViewOnly
+from apps.accounts.permissions import IsThatPlaceAdmin, IsTenantAdmin, IsViewOnly
 from apps.devices.models import Device, DeviceType, Site
 from apps.readings.models import Stream
 
@@ -58,9 +58,9 @@ def _get_or_create_api_device_type() -> DeviceType:
 class ThirdPartyAPIProviderViewSet(viewsets.GenericViewSet):
     """3rd party API provider library.
 
-    FM Admin can create, update, and delete providers.
+    That Place Admin can create, update, and delete providers.
     All authenticated users can list and retrieve providers — but the serializer
-    returned differs by role (full detail for FM Admin; limited for tenants).
+    returned differs by role (full detail for That Place Admin; limited for tenants).
 
     Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
     """
@@ -70,7 +70,7 @@ class ThirdPartyAPIProviderViewSet(viewsets.GenericViewSet):
     def get_permissions(self):
         """FM Admin only for writes; any authenticated user for reads."""
         if self.action in ('create', 'update', 'destroy'):
-            return [IsAuthenticated(), IsFieldmouseAdmin()]
+            return [IsAuthenticated(), IsThatPlaceAdmin()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -79,7 +79,7 @@ class ThirdPartyAPIProviderViewSet(viewsets.GenericViewSet):
 
     def get_serializer_class(self):
         """Return full serializer for FM Admins; limited serializer for tenants."""
-        if self.request.user.is_fieldmouse_admin:
+        if self.request.user.is_that_place_admin:
             return ThirdPartyAPIProviderAdminSerializer
         return ThirdPartyAPIProviderTenantSerializer
 
