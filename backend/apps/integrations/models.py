@@ -31,6 +31,7 @@ class ThirdPartyAPIProvider(models.Model):
         BASIC_AUTH = 'basic_auth', 'Basic Auth (Username/Password)'
         OAUTH2_CLIENT_CREDENTIALS = 'oauth2_client_credentials', 'OAuth2 Client Credentials'
         OAUTH2_PASSWORD = 'oauth2_password', 'OAuth2 Password Grant'
+        DUAL_API_KEY = 'dual_api_key', 'Dual API Key (Key as query param + Secret as header)'
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
@@ -77,11 +78,26 @@ class ThirdPartyAPIProvider(models.Model):
             'device_name_jsonpath (optional)}.'
         ),
     )
+    device_detail_endpoint = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Optional device metadata endpoint. Called as a background task after devices are '
+            'connected to populate virtual device names from the provider. '
+            'Schema: {path_template (with {device_id}), method, name_jsonpath}. '
+            'Leave empty for providers where discovery already returns names (e.g. SoilScout, Davis).'
+        ),
+    )
     detail_endpoint = models.JSONField(
         default=dict,
         help_text=(
-            'Detail endpoint config: {path_template (with {device_id}), method}. '
-            'Called per device to retrieve current readings.'
+            'Measurement endpoint config: {path_template (with {device_id}), method, '
+            'params (optional dict of query params — values may contain time tokens: '
+            '{from_unix}, {to_unix} for Unix timestamps; {from_iso}, {to_iso} for '
+            'ISO 8601 UTC strings e.g. 2025-04-15T09:00:00Z), '
+            'window_seconds (int — time window for first poll when last_polled_at is None, '
+            'default 300)}. '
+            'Called per device on every poll cycle to retrieve current readings.'
         ),
     )
     available_streams = models.JSONField(

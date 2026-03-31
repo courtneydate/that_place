@@ -7,7 +7,7 @@
  *
  * Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
  */
-import { useState } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { useSites } from '../../hooks/useSites';
 import {
@@ -755,8 +755,8 @@ function DataSources() {
             </thead>
             <tbody>
               {dataSources.map((ds) => (
-                <>
-                  <tr key={ds.id}>
+                <React.Fragment key={ds.id}>
+                  <tr>
                     <td>{ds.name}</td>
                     <td>{ds.provider_name}</td>
                     <td>{ds.connected_device_count}</td>
@@ -794,28 +794,38 @@ function DataSources() {
                       </button>
                     </td>
                   </tr>
-                  {addingDevicesForId === ds.id && (
-                    <tr key={`${ds.id}-add-devices`}>
-                      <td colSpan={5} style={{ padding: 0 }}>
-                        <div style={{ padding: '1rem', background: 'var(--surface-raised, #f9f9f9)', borderTop: '1px solid var(--border)' }}>
-                          <AddDevicesFlow
-                            ds={ds}
-                            provider={providers.find((p) => p.id === ds.provider)}
-                            sites={sites}
-                            onDone={() => setAddingDevicesForId(null)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  {addingDevicesForId === ds.id && (() => {
+                    const dsProvider = providers.find((p) => p.id === ds.provider);
+                    if (!dsProvider) return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '1rem', color: 'var(--danger)' }}>
+                          Provider data not yet loaded — please try again in a moment.
+                        </td>
+                      </tr>
+                    );
+                    return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: 0 }}>
+                          <div style={{ padding: '1rem', background: 'var(--surface-raised, #f9f9f9)', borderTop: '1px solid var(--border)' }}>
+                            <AddDevicesFlow
+                              ds={ds}
+                              provider={dsProvider}
+                              sites={sites}
+                              onDone={() => setAddingDevicesForId(null)}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })()}
                   {expandedId === ds.id && (
-                    <tr key={`${ds.id}-devices`}>
+                    <tr>
                       <td colSpan={5} style={{ padding: 0 }}>
                         <ConnectedDevicesPanel ds={ds} />
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

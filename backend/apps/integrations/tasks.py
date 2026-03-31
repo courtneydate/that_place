@@ -9,6 +9,8 @@ poll_single_device — polls one DataSourceDevice, extracts values via JSONPath,
 Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
 """
 import logging
+import time as time_lib
+from datetime import timedelta
 
 import requests as http_requests
 from celery import shared_task
@@ -113,12 +115,13 @@ def poll_single_device(datasource_device_id: int) -> None:
     credentials = dsd.datasource.credentials or {}
     token_cache = dsd.datasource.auth_token_cache or {}
 
-    # --- Build request URL (static across retries) ---
+    # --- Build request URL and time-windowed params ---
     detail_cfg = provider.detail_endpoint
     path_template = detail_cfg.get('path_template', detail_cfg.get('path', ''))
     path = path_template.replace('{device_id}', str(dsd.external_device_id))
     method = detail_cfg.get('method', 'GET').upper()
     url = provider.base_url.rstrip('/') + '/' + path.lstrip('/')
+    time_params = _build_time_params(detail_cfg, dsd.last_polled_at, now)
 
     # --- Authenticate and call provider, retrying up to MAX_AUTH_RETRIES times on 401.
     # A 401 from the device endpoint means the token was revoked server-side before its
@@ -142,7 +145,7 @@ def poll_single_device(datasource_device_id: int) -> None:
 
         try:
             resp = http_requests.request(
-                method, url, headers=headers, params=params, timeout=REQUEST_TIMEOUT,
+                method, url, headers=headers, params={**params, **time_params}, timeout=REQUEST_TIMEOUT,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -250,6 +253,126 @@ def poll_single_device(datasource_device_id: int) -> None:
         'Polled DataSourceDevice %d: %d reading(s) stored',
         dsd.pk, len(readings_to_create),
     )
+
+
+def _build_time_params(detail_cfg: dict, last_polled_at, now) -> dict:
+    """Interpolate time tokens in measurement endpoint query params.
+
+    Supports four tokens in param values:
+      {from_unix} / {to_unix}  — Unix timestamps (integer seconds, as strings)
+      {from_iso}  / {to_iso}   — ISO 8601 UTC (e.g. 2025-04-15T09:00:00Z)
+
+    'from' is last_polled_at, or (now - window_seconds) on the first poll.
+    'to' is always now.
+
+    Returns an empty dict when no params are configured, leaving the existing
+    behaviour for providers that don't use time-windowed measurement.
+    """
+    raw_params = detail_cfg.get('params')
+    if not raw_params:
+        return {}
+
+    window = detail_cfg.get('window_seconds', 300)
+    from_dt = last_polled_at if last_polled_at is not None else now - timedelta(seconds=window)
+
+    tokens = {
+        '{from_unix}': str(int(from_dt.timestamp())),
+        '{to_unix}': str(int(now.timestamp())),
+        '{from_iso}': from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        '{to_iso}': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+    }
+
+    result = {}
+    for key, value in raw_params.items():
+        for token, replacement in tokens.items():
+            value = str(value).replace(token, replacement)
+        result[key] = value
+    return result
+
+
+@shared_task(name='integrations.fetch_device_metadata')
+def fetch_device_metadata(datasource_device_ids: list) -> None:
+    """Fetch device metadata for newly connected DataSourceDevices.
+
+    Dispatched after the connection wizard completes. If the provider has
+    device_detail_endpoint configured, calls it once per device to populate
+    the virtual device name from the provider's own metadata.
+
+    Only updates the name when the endpoint returns a non-empty value, so any
+    name the tenant typed manually in the wizard is preserved.
+
+    Respects the provider's max_requests_per_second between calls.
+    """
+    from .auth_handlers import AuthError, get_auth_session
+    from .models import DataSourceDevice
+
+    dsds = (
+        DataSourceDevice.objects
+        .filter(pk__in=datasource_device_ids, is_active=True)
+        .select_related('datasource__provider', 'virtual_device')
+    )
+
+    for dsd in dsds:
+        provider = dsd.datasource.provider
+        detail_cfg = provider.device_detail_endpoint
+        if not detail_cfg or not detail_cfg.get('path_template'):
+            continue
+
+        path = detail_cfg['path_template'].replace('{device_id}', str(dsd.external_device_id))
+        method = detail_cfg.get('method', 'GET').upper()
+        url = provider.base_url.rstrip('/') + '/' + path.lstrip('/')
+        name_jsonpath = detail_cfg.get('name_jsonpath')
+
+        credentials = dsd.datasource.credentials or {}
+        token_cache = dsd.datasource.auth_token_cache or {}
+        try:
+            headers, params, updated_cache = get_auth_session(provider, credentials, token_cache)
+        except AuthError as exc:
+            logger.warning(
+                'fetch_device_metadata auth failure for DataSourceDevice %d: %s', dsd.pk, exc,
+            )
+            continue
+
+        if updated_cache is not None:
+            dsd.datasource.auth_token_cache = updated_cache
+            dsd.datasource.save(update_fields=['auth_token_cache'])
+
+        try:
+            resp = http_requests.request(
+                method, url, headers=headers, params=params, timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except http_requests.RequestException as exc:
+            logger.warning(
+                'fetch_device_metadata request failed for DataSourceDevice %d: %s', dsd.pk, exc,
+            )
+            continue
+
+        if name_jsonpath:
+            try:
+                matches = jp_parse(name_jsonpath).find(data)
+            except Exception as exc:
+                logger.warning(
+                    'fetch_device_metadata JSONPath error for DataSourceDevice %d: %s', dsd.pk, exc,
+                )
+                continue
+
+            if matches:
+                name = str(matches[0].value).strip()
+                if name:
+                    device = dsd.virtual_device
+                    device.name = name
+                    device.save(update_fields=['name'])
+                    logger.debug(
+                        'Updated virtual device %d name to %r via metadata endpoint',
+                        device.pk, name,
+                    )
+
+        # Respect provider rate limit between successive calls
+        rate = provider.max_requests_per_second
+        if rate:
+            time_lib.sleep(1.0 / rate)
 
 
 def _record_failure(dsd, poll_status: str, error_msg: str, now) -> None:

@@ -208,7 +208,7 @@ class ConnectDeviceSerializer(serializers.Serializer):
     """
 
     external_device_id = serializers.CharField(max_length=500)
-    external_device_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    external_device_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     site_id = serializers.IntegerField()
     name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     active_stream_keys = serializers.ListField(

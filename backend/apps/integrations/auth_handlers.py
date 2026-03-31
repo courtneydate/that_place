@@ -50,6 +50,9 @@ def get_auth_session(
         return _bearer_token(credentials), {}, None
     elif auth_type == 'basic_auth':
         return _basic_auth(credentials), {}, None
+    elif auth_type == 'dual_api_key':
+        headers, params = _dual_api_key(credentials)
+        return headers, params, None
     elif auth_type in ('oauth2_client_credentials', 'oauth2_password'):
         headers, updated_cache = _oauth2(
             auth_type, provider, credentials, token_cache or {},
@@ -87,6 +90,22 @@ def _bearer_token(credentials: dict) -> dict:
     Expects credentials: {token: str}
     """
     return {'Authorization': f'Bearer {credentials["token"]}'}
+
+
+def _dual_api_key(credentials: dict) -> tuple[dict, dict]:
+    """Build headers and query params for dual_api_key auth.
+
+    Used by providers such as Davis WeatherLink v2 that require an API key
+    as a query parameter and an API secret as a request header simultaneously.
+
+    Expects credentials: {api_key: str, api_secret: str}
+    Sends:  query param  api-key=<api_key>
+            header       X-Api-Secret: <api_secret>
+    """
+    return (
+        {'X-Api-Secret': credentials['api_secret']},
+        {'api-key': credentials['api_key']},
+    )
 
 
 def _basic_auth(credentials: dict) -> dict:

@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsThatPlaceAdmin, IsTenantAdmin, IsViewOnly
+from apps.accounts.permissions import IsTenantAdmin, IsThatPlaceAdmin, IsViewOnly
 from apps.devices.models import Device, DeviceType, Site
 from apps.readings.models import Stream
 
@@ -448,6 +448,12 @@ class DataSourceViewSet(viewsets.GenericViewSet):
                     'Connected device "%s" (ext_id=%s) to DataSource %d for tenant %s',
                     device_name, ext_id, ds.pk, tenant.name,
                 )
+
+        # Dispatch background metadata fetch if the provider has a device detail endpoint.
+        # Runs after the transaction so IDs are guaranteed to exist in the DB.
+        if provider.device_detail_endpoint and created:
+            from .tasks import fetch_device_metadata
+            fetch_device_metadata.delay([dsd.pk for dsd in created])
 
         return Response(
             DataSourceDeviceSerializer(created, many=True).data,
