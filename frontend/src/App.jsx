@@ -24,6 +24,9 @@ import DeviceDetail from './pages/tenant/DeviceDetail';
 import DataSources from './pages/tenant/DataSources';
 import Dashboards from './pages/tenant/Dashboards';
 import DashboardDetail from './pages/tenant/DashboardDetail';
+import Rules from './pages/tenant/Rules';
+import RuleBuilder from './pages/tenant/RuleBuilder';
+import RuleDetail from './pages/tenant/RuleDetail';
 
 function App() {
   const { user } = useAuth();
@@ -70,6 +73,10 @@ function App() {
         <Route path="devices/:id" element={<DeviceDetail />} />
         <Route path="data-sources" element={<DataSources />} />
         <Route path="groups" element={<Groups />} />
+        <Route path="rules" element={<Rules />} />
+        <Route path="rules/new" element={<RuleBuilder />} />
+        <Route path="rules/:id" element={<RuleDetail />} />
+        <Route path="rules/:id/edit" element={<RuleBuilder />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

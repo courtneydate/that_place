@@ -7,6 +7,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 
+export function useStream(streamId) {
+  return useQuery({
+    queryKey: ['stream', streamId],
+    queryFn: () => api.get(`/api/v1/streams/${streamId}/`).then((r) => r.data),
+    enabled: !!streamId,
+  });
+}
+
 export function useDeviceStreams(deviceId) {
   return useQuery({
     queryKey: ['device-streams', deviceId],

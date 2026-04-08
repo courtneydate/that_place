@@ -66,7 +66,8 @@ that_place/
 │   │   ├── rules/           # Rule builder, conditions, actions, audit trail
 │   │   ├── alerts/          # Alert generation and management
 │   │   ├── dashboards/      # Dashboard and widget configuration
-│   │   └── notifications/   # In-app, email, SMS, push delivery
+│   │   ├── notifications/   # In-app, email, SMS, push delivery
+│   │   └── feeds/           # Feed providers (API-polled channels) + reference datasets (admin-managed lookup tables)
 │   ├── config/              # Django settings (base, dev, prod, test)
 │   ├── requirements/        # Split requirements files
 │   └── manage.py
@@ -489,6 +490,134 @@ _Post-wizard:_
 
 ---
 
+### Feature: Feed Providers (API-Polled Data Channels)
+
+**User Story:** As a That Place Admin, I want to configure API-polled data feeds so that live external values (market prices, indices, forecasts) are available to all tenants as rule condition sources — without needing device records.
+
+**Design principle:** The same configuration-driven approach as `ThirdPartyAPIProvider`, but feed-centric. A feed produces named scalar channels over time rather than per-device stream readings. Adding a new feed requires only a new provider record — no code changes.
+
+**Platform-level (That Place Admin):**
+- [ ] That Place Admin creates and maintains a library of `FeedProvider` configs
+- [ ] Each provider config defines:
+  - Identity: name, slug, description
+  - Base URL
+  - Auth type: `none` / `api_key_header` / `bearer_token` / `oauth2_client_credentials` / `oauth2_password`
+  - Auth param schema (JSONB): credential fields required — used to auto-generate credential forms for `scope=tenant` providers
+  - Scope: `system` — polled once globally, readings available to all tenants; `tenant` — each tenant subscribes with their own credentials
+  - Poll interval (seconds, min 60, default 300)
+  - Endpoints (JSONB array): each endpoint has `path`, `method`, optional `response_root_jsonpath` (JSONPath to iterate rows — omit for single-object responses), optional `dimension_key` (field in each row that identifies the channel variant, e.g. `"REGIONID"`), and `channels` (array of `key`, `label`, `unit`, `data_type`, `value_jsonpath`)
+- [ ] On provider create/update, `FeedChannel` records are auto-populated from the endpoint channel config — one record per channel × dimension value combination. Dimension values are discovered on the first successful poll and are not pre-configured.
+- [ ] Provider configs visible to Tenant Admins (name + description only) — auth schemas and JSONPath internals not exposed
+
+**System-scope feed polling:**
+- [ ] Celery beat task polls each active `scope=system` provider on its configured interval
+- [ ] For each endpoint: fetches URL, iterates `response_root_jsonpath` (or treats response as single object), extracts dimension value and channel values via JSONPath, stores `FeedReading` records
+- [ ] `unique_together: (channel_id, timestamp)` — duplicate readings are silently ignored (idempotent)
+- [ ] On new `FeedReading`, a Celery task dispatches rule evaluation for all rules referencing that channel (via `FeedChannelRuleIndex`) — same pattern as `RuleStreamIndex` for stream readings
+- [ ] Poll failures are logged; after 3 consecutive failures a platform notification is sent to That Place Admins
+
+**Tenant-scope feeds:**
+- [ ] Tenant Admin subscribes to a `scope=tenant` provider via a connection flow (enter credentials → channels auto-listed → select which to subscribe)
+- [ ] `TenantFeedSubscription` record stores encrypted credentials and subscribed channel IDs
+- [ ] Celery beat task polls each active subscription on the provider's interval
+- [ ] Readings stored as `FeedReading` records on the shared `FeedChannel` — readings are NOT tenant-isolated at the model level for system feeds; for tenant-scope feeds, readings are stored against tenant-specific channel instances
+
+**AEMO NEM — first registered system feed:**
+- [ ] AEMO NEM registered as a `scope=system` provider on first deployment (see `docs/providers/aemo-nem.md`)
+- [ ] Channels: `rrp` (spot price $/MWh), `raise_reg_rrp`, `lower_reg_rrp`, and full FCAS band prices — per region (NSW1, QLD1, SA1, TAS1, VIC1)
+- [ ] No auth required; poll interval 300 seconds
+
+---
+
+### Feature: Reference Datasets (Admin-Managed Lookup Tables)
+
+**User Story:** As a That Place Admin, I want to define structured lookup tables of reference data (network tariff rates, CO2 emission factors, fuel price indices) so that tenants can assign them to sites and use the values in rule conditions and cost calculations — without needing code changes to add a new dataset type.
+
+**Design principle:** A generic "lookup table builder". The admin defines the schema (columns) of a dataset once; rows are managed via the admin UI. Datasets can optionally support time-of-use (rows apply only during certain hours/days) and versioning (rows are labelled by period, e.g. financial year). Tenants are assigned to specific row subsets via dimension filters.
+
+**Platform-level (That Place Admin):**
+- [ ] That Place Admin creates and maintains `ReferenceDataset` configs defining:
+  - Identity: name, slug, description
+  - Dimension schema (JSONB array): `[{key, label, type}]` — the lookup key columns used to identify which rows apply (e.g. `distributor_slug`, `tariff_code`, `energy_source`)
+  - Value schema (JSONB array): `[{key, label, type, unit}]` — the actual values stored in each row (e.g. `rate_cents_per_kwh`, `kg_per_kwh`)
+  - `has_time_of_use` (bool): if true, rows carry `applicable_days` (int array) + `time_from` / `time_to` (time fields) — resolved in tenant timezone
+  - `has_version` (bool): if true, rows carry a `version` label (e.g. `"2025-26"`) — used for annual datasets like network tariffs
+  - Scope: `system` (shared, managed by That Place Admin) / `tenant` (each tenant manages their own rows — for future use)
+- [ ] That Place Admin manages `ReferenceDatasetRow` records per dataset:
+  - `version` (nullable string — required when `has_version` is true)
+  - `dimensions` (JSONB) — values matching the dataset's dimension schema (e.g. `{distributor_slug: "ausgrid", tariff_code: "RES_TOU", period_name: "peak"}`)
+  - `values` (JSONB) — actual values matching value schema (e.g. `{rate_cents_per_kwh: 32.5, daily_supply_cents: 110.0}`)
+  - `applicable_days` (int array, nullable — 0=Mon…6=Sun), `time_from` (time, nullable), `time_to` (time, nullable) — only when `has_time_of_use` is true
+  - `valid_from` (date, nullable), `valid_to` (date, nullable) — for date-bounded validity independent of versioning
+
+**Tenant-level (Tenant Admin):**
+- [ ] Tenant Admin creates `TenantDatasetAssignment` records per site (or tenant-wide if `site_id` is null):
+  - Selects a dataset and enters `dimension_filter` (JSONB) — the dimension values that identify the correct rows for this site (e.g. `{distributor_slug: "ausgrid", tariff_code: "RES_TOU"}`)
+  - Optionally pins a `version` (e.g. `"2025-26"`) — when null, always uses the latest active version
+  - Sets `effective_from` / `effective_to` date range
+- [ ] At evaluation time the platform resolves the applicable row(s): filter by assignment's `dimension_filter` → filter by version (pinned or latest) → if `has_time_of_use`, filter by current day/time in tenant timezone → return matching row's `values`
+
+**Worked example — network tariffs as a ReferenceDataset:**
+
+The `network-tariffs` dataset demonstrates how a complex, annually-updated, time-of-use rate structure is expressed entirely as data with no bespoke code:
+
+Dataset config:
+```
+slug:               network-tariffs
+has_version:        true    ← rows labelled by financial year ("2025-26", "2026-27")
+has_time_of_use:    true    ← rows carry applicable_days + time_from/time_to
+dimension_schema:   [{key: "distributor_slug"}, {key: "tariff_code"}, {key: "period_name"}]
+value_schema:       [{key: "rate_cents_per_kwh", unit: "c/kWh"}, {key: "daily_supply_cents", unit: "c/day"}]
+```
+
+Sample rows (each row = one rate for one period of one tariff):
+
+| version | dimensions | values | applicable_days | time_from | time_to |
+|---------|-----------|--------|-----------------|-----------|---------|
+| 2025-26 | `{distributor_slug: "ausgrid", tariff_code: "EA305", period_name: "peak"}` | `{rate_cents_per_kwh: 32.50, daily_supply_cents: 110.0}` | [0,1,2,3,4] | 07:00 | 21:00 |
+| 2025-26 | `{distributor_slug: "ausgrid", tariff_code: "EA305", period_name: "off_peak"}` | `{rate_cents_per_kwh: 12.80, daily_supply_cents: 110.0}` | [0,1,2,3,4,5,6] | 21:00 | 07:00 |
+| 2025-26 | `{distributor_slug: "energex", tariff_code: "CAC", period_name: "flat"}` | `{rate_cents_per_kwh: 28.10, daily_supply_cents: 95.0}` | null | null | null |
+
+Tenant assignment (Tenant Admin sets this per site):
+```
+dataset:          network-tariffs
+dimension_filter: {distributor_slug: "ausgrid", tariff_code: "EA305"}
+version:          null   ← always use latest active version
+effective_from:   2025-07-01
+```
+
+Resolution at rule evaluation time:
+1. Find site's active `TenantDatasetAssignment` for `network-tariffs` → dimension filter `{distributor_slug: "ausgrid", tariff_code: "EA305"}`
+2. Query rows matching those dimensions + latest version (`2025-26`)
+3. `has_time_of_use` is true → filter by current day/time in tenant timezone → selects "peak" or "off_peak" row
+4. Return `rate_cents_per_kwh` → evaluate condition
+
+**What "dynamic" means — what requires code vs. what does not:**
+
+| Task | How it's done | Code changes required? |
+|------|--------------|------------------------|
+| Add a new DNSP | Add rows with a new `distributor_slug` | No |
+| Add a new tariff type for an existing DNSP | Add rows with a new `tariff_code` | No |
+| Update rates each July 1 | Add rows with `version: "2026-27"`; old rows retained for history | No |
+| Add a new dataset type (e.g. water rates, gas prices) | Create a new `ReferenceDataset` with its own dimension + value schema | No |
+| Add TOU complexity to a currently flat tariff | Add `applicable_days`/`time_from`/`time_to` to the new version's rows | No |
+| Tenant changes DNSP or tariff type | Tenant Admin updates their `TenantDatasetAssignment` dimension filter | No |
+| Define an entirely new schema structure | Create a new `ReferenceDataset` with any combination of dimension/value columns | No |
+| Change the resolution logic (e.g. new version selection rule) | Code change to row resolver | Yes — this is the only case |
+
+The schema is defined once by That Place Admin through the admin UI. All subsequent data management — new DNSPs, new tariff products, annual rate updates, new dataset categories — is pure data entry.
+
+**Seeded datasets on first deployment:**
+- [ ] `network-tariffs` — network tariff rates for all 8 Australian NEM DNSPs; dimension schema: `distributor_slug`, `tariff_code`, `period_name`; value schema: `rate_cents_per_kwh`, `daily_supply_cents`; `has_time_of_use: true`, `has_version: true`
+- [ ] `co2-emission-factors` — kg CO2 equivalent per kWh by energy source; dimension schema: `energy_source`; value schema: `kg_per_kwh`; `has_time_of_use: false`, `has_version: false`
+
+**Rule integration:**
+- [ ] New rule condition type `reference_value`: Tenant Admin selects a dataset, optionally overrides dimension filter, selects a value key, and sets operator + threshold
+- [ ] `reference_value` conditions are evaluated on a Celery beat schedule (every 5 minutes) for rules where the only condition source is reference data — catches time-of-use boundary changes without requiring an incoming reading to trigger evaluation
+- [ ] `reference_value` conditions are also evaluated inline whenever another condition in the same rule triggers evaluation (a new stream reading or feed reading)
+
+---
+
 ### Feature: Dashboards & Visualisation
 
 **User Story:** As any tenant user, I want configurable dashboards showing live and historical data from my devices.
@@ -592,6 +721,8 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
   - String/Enum streams: `==`, `!=`
 - [ ] Staleness conditions: "stream has not reported in X minutes/hours" — available as a condition type for any stream
 - [ ] Staleness conditions are evaluated by a Celery beat scheduled task, not ingestion-triggered
+- [ ] Feed channel conditions: reference a `FeedChannel` (provider → channel → optional dimension value, e.g. NSW1 spot price); numeric operators only; evaluated against the latest `FeedReading` for that channel; triggers rule evaluation via `FeedChannelRuleIndex` when a new reading arrives
+- [ ] Reference value conditions: reference a `ReferenceDataset` value key (resolved via the site's `TenantDatasetAssignment` at evaluation time, including TOU period lookup in tenant timezone); numeric operators only; evaluated on a Celery beat schedule (every 5 minutes) and also inline when another condition in the same rule is triggered
 
 **Actions:**
 - [ ] Rule actions: send notification to groups/users AND/OR send device command
@@ -767,7 +898,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | Rule | belongs to Tenant | id, tenant_id, name, description, is_active, cooldown_minutes (nullable int), active_days (int array, nullable — 0=Mon…6=Sun), active_from (time, nullable), active_to (time, nullable), condition_group_operator (AND/OR), current_state (bool — tracks last evaluated result for re-trigger suppression), last_fired_at (nullable datetime), created_by, created_at, updated_at |
 | RuleStreamIndex | links Stream ↔ Rule | id, stream_id, rule_id — auto-maintained index for efficient rule lookup on ingestion |
 | RuleConditionGroup | belongs to Rule | id, rule_id, logical_operator (AND/OR), order |
-| RuleCondition | belongs to RuleConditionGroup | id, group_id, condition_type (stream/staleness), stream_id (FK → Stream, nullable), operator (nullable — operators vary by stream data_type), threshold_value (nullable text), staleness_minutes (nullable int), order |
+| RuleCondition | belongs to RuleConditionGroup | id, group_id, condition_type (stream/staleness/feed_channel/reference_value), stream_id (FK → Stream, nullable), operator (nullable — operators vary by stream data_type), threshold_value (nullable text), staleness_minutes (nullable int), channel_id (FK → FeedChannel, nullable — for feed_channel type), dataset_id (FK → ReferenceDataset, nullable — for reference_value type), value_key (nullable string — which value_schema field to compare, for reference_value type), dimension_overrides (nullable JSONB — overrides TenantDatasetAssignment dimension_filter for this condition, for reference_value type), order |
 | RuleAction | belongs to Rule | id, rule_id, action_type (notify/command), notification_channels (array: in_app/email/sms/push), group_ids (array), user_ids (array), message_template, target_device_id (nullable), command (nullable) |
 | RuleAuditLog | belongs to Rule | id, rule_id, changed_by, changed_at, changed_fields (JSONB: {field: {before, after}}) |
 | Alert | belongs to Rule + Tenant | id, rule_id, tenant_id, triggered_at, status (active/acknowledged/resolved), acknowledged_by, acknowledged_at, acknowledged_note (nullable text), resolved_by, resolved_at |
@@ -776,6 +907,14 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | DataExport | belongs to Tenant + User | id, tenant_id, exported_by, stream_ids (array), date_from, date_to, exported_at |
 | Dashboard | belongs to Tenant | id, tenant_id, name, created_by, created_at |
 | DashboardWidget | belongs to Dashboard | id, dashboard_id, widget_type, config (JSONB — includes stream binding; see widget config schemas in Dashboards feature), position (JSONB) |
+| FeedProvider | platform library | id, name, slug, description, base_url, auth_type (none/api_key_header/bearer_token/oauth2_client_credentials/oauth2_password), auth_param_schema (JSONB — credential fields for scope=tenant providers), scope (system/tenant), poll_interval_seconds (min 60, default 300), endpoints (JSONB array: path, method, response_root_jsonpath, dimension_key, channels[key/label/unit/data_type/value_jsonpath]), is_active, created_at |
+| FeedChannel | belongs to FeedProvider | id, provider_id, key, label, unit, data_type (numeric/boolean/string), dimension_value (nullable string — e.g. "NSW1"; null for dimensionless channels), is_active |
+| FeedReading | belongs to FeedChannel | id, channel_id, value (JSONB), timestamp, fetched_at — unique_together: (channel_id, timestamp) |
+| TenantFeedSubscription | belongs to Tenant + FeedProvider | id, tenant_id, provider_id, credentials (encrypted JSONB — for scope=tenant providers only), subscribed_channel_ids (int array), is_active, last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text) |
+| FeedChannelRuleIndex | links FeedChannel ↔ Rule | id, channel_id, rule_id — auto-maintained on rule create/edit/delete; same pattern as RuleStreamIndex |
+| ReferenceDataset | platform library | id, name, slug, description, dimension_schema (JSONB array: [{key, label, type}] — lookup key columns), value_schema (JSONB array: [{key, label, type, unit}] — value columns), has_time_of_use (bool), has_version (bool), scope (system/tenant), is_active, created_at |
+| ReferenceDatasetRow | belongs to ReferenceDataset | id, dataset_id, version (nullable string — e.g. "2025-26"; required when dataset.has_version is true), dimensions (JSONB — values matching dimension_schema), values (JSONB — values matching value_schema), applicable_days (int array, nullable — 0=Mon…6=Sun), time_from (time, nullable), time_to (time, nullable), valid_from (date, nullable), valid_to (date, nullable), is_active |
+| TenantDatasetAssignment | belongs to Tenant + Site (optional) + ReferenceDataset | id, tenant_id, site_id (nullable — null = tenant-wide), dataset_id, dimension_filter (JSONB — identifies applicable rows for this tenant/site, e.g. {distributor_slug: "ausgrid", tariff_code: "RES_TOU"}), version (nullable string — pinned version; null = always use latest active), effective_from (date), effective_to (date, nullable), created_at |
 
 ### Key Business Rules
 - Every queryset must be filtered by `tenant_id` — no cross-tenant data leakage
@@ -798,6 +937,15 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - Virtual device `serial_number` is generated as `api-{provider_slug}-{tenant_id}-{external_device_id}` — guaranteed unique across all tenants
 - Removing a device from a DataSource deactivates it (`DataSourceDevice.is_active=False`) — the virtual Device record and all StreamReadings are retained; hard delete is available from the device detail page
 - Re-connecting a previously deactivated device reactivates the existing virtual Device and DataSourceDevice records rather than creating duplicates — poll failure counters are reset, historical StreamReadings and Stream records are preserved
+- `FeedReading` records have a unique constraint on `(channel_id, timestamp)` — duplicate polls within the same interval are silently ignored (idempotent)
+- `FeedChannel` records are auto-populated from the provider's endpoint config on provider create/update; dimension values are discovered on first poll (not pre-configured)
+- `FeedChannelRuleIndex` is maintained on every rule create/edit/delete — same responsibility as `RuleStreamIndex`; both must be kept in sync
+- `scope=system` FeedProviders are polled by a single Celery beat task; no `TenantFeedSubscription` records are created for them
+- `RuleCondition` with `condition_type=feed_channel` uses `channel_id` (FK → FeedChannel); `operator` and `threshold_value` follow the same rules as numeric stream conditions
+- `RuleCondition` with `condition_type=reference_value` uses `dataset_id` (FK → ReferenceDataset), `value_key` (string — which value_schema field to compare), optional `dimension_overrides` (JSONB — overrides the site's TenantDatasetAssignment dimension_filter for this condition), `operator`, and `threshold_value`
+- `ReferenceDatasetRow` resolution order: filter by `dimension_filter` (merged with any `dimension_overrides`) → filter by version (pinned or latest active) → if `has_time_of_use`, filter by current day/time in tenant timezone → if multiple rows match, raise a configuration error (admin must ensure rows are non-overlapping)
+- `TenantDatasetAssignment` with `site_id=null` applies tenant-wide; a site-specific assignment (non-null `site_id`) overrides the tenant-wide assignment for that site
+- A `TenantDatasetAssignment` must have `effective_to=null` (currently active) for its rows to be used in rule evaluation; expired assignments are retained for audit but not evaluated
 
 ---
 
@@ -810,6 +958,8 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] An index (`RuleStreamIndex`) maps each `stream_id` to the rules that reference it — only those rules are evaluated on each new reading, not all rules in the tenant
 - [ ] The index is updated whenever a rule is created, edited, or deleted
 - [ ] Evaluation latency target: rule fires within 5 seconds of the qualifying reading being ingested
+- [ ] When a `FeedReading` is saved, the same pattern applies via `FeedChannelRuleIndex` — rules with `feed_channel` conditions referencing that channel are evaluated immediately
+- [ ] `reference_value` conditions are additionally evaluated by a Celery beat task every 5 minutes (catches time-of-use boundary transitions); also evaluated inline when any other condition in the same rule is triggered by a stream or feed reading
 
 **Staleness condition evaluation:**
 - [ ] A Celery beat task runs every 60 seconds and checks all active staleness conditions across all tenants
@@ -941,7 +1091,7 @@ POST   /api/v1/rules/
 GET    /api/v1/rules/:id/
 PUT    /api/v1/rules/:id/
 DELETE /api/v1/rules/:id/
-GET    /api/v1/rules/:id/audit/
+GET    /api/v1/rules/:id/audit-logs/
 
 # Alerts
 GET    /api/v1/alerts/                     # ?status=, ?site=, ?rule=
@@ -967,6 +1117,44 @@ DELETE /api/v1/dashboards/:id/widgets/:widget_id/
 # Exports
 GET    /api/v1/exports/          # export history log (Admin only)
 POST   /api/v1/exports/stream/   # triggers immediate streaming CSV download
+
+# Feed Providers (That Place Admin write, all authenticated read name+description)
+GET    /api/v1/feed-providers/
+POST   /api/v1/feed-providers/
+GET    /api/v1/feed-providers/:id/
+PUT    /api/v1/feed-providers/:id/
+DELETE /api/v1/feed-providers/:id/
+GET    /api/v1/feed-providers/:id/channels/   # list FeedChannels for this provider
+
+# Feed Readings — current values (all authenticated)
+GET    /api/v1/feed-channels/:id/readings/    # ?limit=, ?from=, ?to=
+
+# Tenant Feed Subscriptions (Tenant Admin — scope=tenant providers only)
+GET    /api/v1/feed-subscriptions/
+POST   /api/v1/feed-subscriptions/
+GET    /api/v1/feed-subscriptions/:id/
+PUT    /api/v1/feed-subscriptions/:id/
+DELETE /api/v1/feed-subscriptions/:id/
+
+# Reference Datasets (That Place Admin write, Tenant Admin read)
+GET    /api/v1/reference-datasets/
+POST   /api/v1/reference-datasets/
+GET    /api/v1/reference-datasets/:id/
+PUT    /api/v1/reference-datasets/:id/
+DELETE /api/v1/reference-datasets/:id/
+GET    /api/v1/reference-datasets/:id/rows/
+POST   /api/v1/reference-datasets/:id/rows/
+PUT    /api/v1/reference-datasets/:id/rows/:row_id/
+DELETE /api/v1/reference-datasets/:id/rows/:row_id/
+POST   /api/v1/reference-datasets/:id/rows/bulk/   # CSV upload — upserts rows; returns per-row errors
+
+# Tenant Dataset Assignments (Tenant Admin — per site or tenant-wide)
+GET    /api/v1/dataset-assignments/           # ?site=
+POST   /api/v1/dataset-assignments/
+GET    /api/v1/dataset-assignments/:id/
+PUT    /api/v1/dataset-assignments/:id/
+DELETE /api/v1/dataset-assignments/:id/
+GET    /api/v1/dataset-assignments/:id/resolve/  # returns current resolved row(s) for this assignment — useful for previewing what value a rule would see
 ```
 
 ---
@@ -1137,6 +1325,18 @@ That Place is designed to run on any Linux server. All external service dependen
 - [ ] Alert generation: active alert model with separate history
 - [ ] Alert acknowledge (single tap + optional troubleshooting note) / resolve flow — Admin + Operator only
 - [ ] Windowed aggregate conditions (avg/max/min over rolling window) — **Phase 5**
+
+### Phase 4b — Feed Providers & Reference Datasets
+- [ ] `FeedProvider` engine: system + tenant scope, JSONB endpoint config, auto-populated `FeedChannel` records, `FeedReading` storage
+- [ ] AEMO NEM registered as first `scope=system` FeedProvider; spot prices polling every 5 minutes
+- [ ] `FeedChannelRuleIndex` maintained on rule create/edit/delete
+- [ ] Feed channel rule conditions: evaluated against latest `FeedReading`; triggers via `FeedChannelRuleIndex`
+- [ ] `ReferenceDataset` engine: schema-defined lookup tables with optional TOU and versioning
+- [ ] `ReferenceDatasetRow` management (admin UI)
+- [ ] `TenantDatasetAssignment` per site (tenant admin UI) with dimension filter + optional version pin
+- [ ] Reference value rule conditions: resolved at evaluation time via assignment; beat-evaluated every 5 minutes
+- [ ] Seeded on first deployment: `network-tariffs` dataset (all 8 NEM DNSPs), `co2-emission-factors` dataset
+- [ ] Rule builder UI extended: feed channel picker and reference value picker in condition builder
 
 ### Phase 5 — Notifications, Control & Export
 - [ ] In-app notifications + unread badge

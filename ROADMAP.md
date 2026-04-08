@@ -404,20 +404,73 @@
 
 ---
 
+### Sprint 15a — Feed Providers & Reference Datasets
+
+**Goal:** That Place Admin can configure API-polled data feeds and admin-managed lookup tables; both are available as rule condition sources in the rule builder and evaluation engine.
+
+**Context:** This sprint must be complete before Sprint 16 (Rule Evaluation Engine) — the evaluator needs to handle `feed_channel` and `reference_value` condition types. The rule builder frontend (Sprint 15) should have stub pickers for these condition types that are fully wired up once this sprint is complete.
+
+**Deliverables:**
+
+_Backend — Feed Providers:_
+- [ ] `FeedProvider`, `FeedChannel`, `FeedReading`, `TenantFeedSubscription`, `FeedChannelRuleIndex` models + migrations
+- [ ] `FeedProvider` CRUD endpoints (That Place Admin only)
+- [ ] `FeedChannel` records auto-populated from endpoint channel config on provider create/update; dimension values discovered and created on first successful poll
+- [ ] Celery beat task: polls each active `scope=system` FeedProvider on its configured interval; iterates `response_root_jsonpath`, extracts dimension + channel values via JSONPath, stores `FeedReading` records (idempotent — duplicate `(channel_id, timestamp)` silently ignored)
+- [ ] On new `FeedReading`, dispatch rule evaluation for rules in `FeedChannelRuleIndex` for that channel
+- [ ] `TenantFeedSubscription` model + endpoints (for `scope=tenant` providers); Celery beat task polls active subscriptions
+- [ ] Poll failure logging; platform notification to That Place Admins after 3 consecutive failures
+- [ ] `FeedChannelRuleIndex` maintained on rule create/edit/delete (alongside existing `RuleStreamIndex`)
+- [ ] New `RuleCondition.condition_type = feed_channel`: evaluated against latest `FeedReading`; numeric operators only
+- [ ] AEMO NEM `FeedProvider` seeded on first deployment (see `docs/providers/aemo-nem.md`)
+- [ ] Tests: feed polling stores readings (idempotent), FeedChannelRuleIndex accurate, feed condition evaluates correctly, poll failure logged, cross-tenant isolation on subscription endpoints
+
+_Backend — Reference Datasets:_
+- [ ] `ReferenceDataset`, `ReferenceDatasetRow`, `TenantDatasetAssignment` models + migrations
+- [ ] `ReferenceDataset` CRUD + row CRUD endpoints (That Place Admin only)
+- [ ] `TenantDatasetAssignment` CRUD endpoints (Tenant Admin; filtered by tenant)
+- [ ] `/resolve/` endpoint on assignment — returns current row(s) that would be used in evaluation (preview)
+- [ ] Row resolution logic: dimension filter match → version selection (pinned or latest active) → TOU filter in tenant timezone → return `values`; raise error if multiple rows match (misconfiguration guard)
+- [ ] New `RuleCondition.condition_type = reference_value`: resolved at evaluation time via assignment; Celery beat task re-evaluates rules with reference_value-only conditions every 5 minutes
+- [ ] `network-tariffs` dataset seeded via Django fixture (`backend/apps/feeds/fixtures/network_tariffs_2025_26.json`) — all 8 NEM DNSPs (Ausgrid, Endeavour Energy, Essential Energy, Energex, Ergon Energy, Evoenergy, SA Power Networks, TasNetworks), all published tariff codes, all TOU period rows for financial year 2025-26; rates sourced from each DNSP's published network pricing schedule (see `docs/providers/` for source links)
+- [ ] `co2-emission-factors` dataset seeded via fixture (`backend/apps/feeds/fixtures/co2_emission_factors.json`) — standard Australian grid emission factors by energy source (grid electricity, natural gas, diesel, LPG) sourced from Australian Government National Greenhouse Accounts
+- [ ] Row bulk import: That Place Admin can upload a CSV to `POST /api/v1/reference-datasets/:id/rows/bulk/` — CSV columns match the dataset's dimension schema + value schema fields + optional version/applicable_days/time_from/time_to; rows are upserted (matched on dimensions + version, updated if exists, created if not); import errors returned per row with row number and reason
+- [ ] Annual update workflow: adding a new financial year's rates requires only uploading a new CSV with `version: "2026-27"` — existing rows are untouched; tenants with `version: null` assignments automatically resolve to the new version from their effective date
+- [ ] Tests: row resolution (flat, versioned, TOU in tenant timezone), assignment override for site vs tenant-wide, reference_value condition evaluates correctly, beat task re-evaluates on schedule, bulk import upserts correctly, bulk import returns per-row errors on bad data, Tenant B cannot read Tenant A's assignments
+
+_Frontend:_
+- [ ] That Place Admin: Feed Provider management page — create/edit provider (name, base URL, auth type, scope, poll interval, endpoint builder with channel rows)
+- [ ] That Place Admin: Reference Dataset management page — create/edit dataset (schema builder for dimension + value columns, TOU and version toggles), manage rows (table with inline add/edit/delete, version filter)
+- [ ] Tenant Admin: Feed Subscriptions page — lists `scope=tenant` providers, subscribe/unsubscribe, select channels
+- [ ] Tenant Admin: Dataset Assignments page (accessible per site from site settings) — assign a dataset, enter dimension filter, pin version or use latest, set effective dates; preview resolved row(s) via `/resolve/` endpoint
+- [ ] Rule builder condition builder: feed channel picker (provider → dimension value → channel, with current reading shown as preview); reference value picker (dataset → value key, with resolved current value shown as preview)
+
+**Definition of Done:**
+- AEMO NEM spot prices are stored as `FeedReading` records every 5 minutes
+- A rule with condition "AEMO NSW1 spot price > 300 $/MWh" evaluates correctly and fires when the threshold is crossed
+- A `network-tariffs` dataset assignment can be created for a site; `/resolve/` returns the correct rate for the current time of day
+- A `reference_value` condition resolves to the correct rate in tenant timezone (peak vs off-peak)
+- Celery beat task re-evaluates reference_value-only rules every 5 minutes
+- All new endpoints pass cross-tenant isolation tests
+- Rule builder shows feed channel and reference value pickers with live previews
+
+---
+
 ### Sprint 16 — Rule Evaluation Engine
 
 **Goal:** Rules evaluate automatically when qualifying readings arrive; firing is correct and race-condition safe.
 
 **Deliverables:**
 - [ ] Backend: Celery task dispatched on StreamReading save — looks up rules via `RuleStreamIndex`, evaluates each
+- [ ] Backend: Celery task dispatched on FeedReading save — looks up rules via `FeedChannelRuleIndex`, evaluates each (Sprint 15a must be complete)
 - [ ] Backend: Schedule gate evaluation (day of week + time window in tenant timezone)
-- [ ] Backend: Point-in-time condition evaluation (numeric/boolean/string operators)
+- [ ] Backend: Point-in-time condition evaluation (numeric/boolean/string operators) — stream, feed_channel, and reference_value condition types all supported
 - [ ] Backend: Compound condition group evaluation (AND/OR per group, top-level AND/OR)
 - [ ] Backend: Re-triggering suppression — fire only on false→true transition
 - [ ] Backend: Redis atomic flag (`SET rule:{id}:state NX`) for concurrency safety
 - [ ] Backend: Cooldown logic — respect `cooldown_minutes` before re-firing after condition clears
 - [ ] Backend: `Rule.current_state` and `last_fired_at` updated on every evaluation
-- [ ] Backend: Tests — false→true fires, true→true suppressed, true→false clears state, cooldown respected, concurrent evaluation race condition test
+- [ ] Backend: Tests — false→true fires, true→true suppressed, true→false clears state, cooldown respected, concurrent evaluation race condition test, feed_channel condition fires on new FeedReading, reference_value condition resolves correctly
 
 **Definition of Done:**
 - A rule with `temp > 30` fires exactly once when temperature crosses 30
@@ -425,6 +478,8 @@
 - Fires again after temperature drops below 30 and rises above again
 - Two simultaneous readings do not cause duplicate firing (Redis flag test)
 - Schedule gate prevents firing outside the configured window
+- A rule with a feed_channel condition fires when a new FeedReading crosses the threshold
+- A rule mixing stream and reference_value conditions evaluates both correctly
 
 ---
 
