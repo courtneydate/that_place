@@ -16,7 +16,7 @@ import requests as http_requests
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
-from jsonpath_ng.ext import parse as jp_parse
+from jsonpath_ng import parse as jp_parse
 
 logger = logging.getLogger(__name__)
 

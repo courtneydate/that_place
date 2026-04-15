@@ -24,10 +24,22 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2
+    entrypoint: ['/mosquitto/config/entrypoint.sh']
     ports:
-      - '1883:1883'
+      - '1883:1883'   # username/password (legacy devices)
+      - '8883:8883'   # mTLS (certificate-based devices)
+    environment:
+      MQTT_ADMIN_USERNAME: ${MQTT_ADMIN_USERNAME}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD}
+      # PKI — leave blank in dev; entrypoint auto-generates self-signed certs.
+      # In production, provide base64-encoded PEM values generated offline.
+      MQTT_CA_CERT_B64: ${MQTT_CA_CERT_B64:-}
+      MQTT_CA_KEY_B64: ${MQTT_CA_KEY_B64:-}
+      MQTT_BROKER_CERT_B64: ${MQTT_BROKER_CERT_B64:-}
+      MQTT_BROKER_KEY_B64: ${MQTT_BROKER_KEY_B64:-}
     volumes:
       - ./docker/mosquitto:/mosquitto/config
+      - mosquitto_certs:/mosquitto/certs
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
 
@@ -119,6 +131,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  mosquitto_certs:
   mosquitto_data:
   mosquitto_logs:
   minio_data:

@@ -10,7 +10,7 @@ import logging
 import requests as http_requests
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from jsonpath_ng.ext import parse as jp_parse
+from jsonpath_ng import parse as jp_parse
 from rest_framework import parsers, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated

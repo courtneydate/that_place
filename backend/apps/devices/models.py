@@ -6,6 +6,7 @@ Sprint 5: DeviceType, Device
 import logging
 
 from django.db import models
+from encrypted_model_fields.fields import EncryptedTextField
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,46 @@ class Device(models.Model):
         null=True,
         blank=True,
         help_text='Auto-detected from incoming MQTT traffic. Null until first message received.',
+    )
+    class MQTTAuthMode(models.TextChoices):
+        PASSWORD = 'password', 'Username / Password (port 1883)'
+        CERTIFICATE = 'certificate', 'Client Certificate / mTLS (port 8883)'
+
+    mqtt_auth_mode = models.CharField(
+        max_length=20,
+        choices=MQTTAuthMode.choices,
+        default=MQTTAuthMode.PASSWORD,
+        help_text=(
+            'Authentication mode used when this Scout connects to the MQTT broker. '
+            'Password: legacy devices or devices without TLS support (port 1883). '
+            'Certificate: new That Place v1 Scouts with mTLS support (port 8883).'
+        ),
+    )
+    mqtt_password = EncryptedTextField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Encrypted MQTT password (password mode only). '
+            'Provide to the device operator for Scout firmware configuration.'
+        ),
+    )
+    mqtt_certificate = models.TextField(
+        null=True,
+        blank=True,
+        help_text=(
+            'PEM-encoded client certificate (certificate mode only). '
+            'Public — safe to store unencrypted. Provide to the device operator '
+            'alongside the private key for Scout firmware configuration.'
+        ),
+    )
+    mqtt_private_key = EncryptedTextField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Encrypted PEM-encoded private key (certificate mode only). '
+            'Provide to the device operator for Scout firmware configuration. '
+            'Clear this field once the operator confirms the key has been loaded.'
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

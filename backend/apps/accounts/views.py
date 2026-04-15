@@ -7,7 +7,6 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core import signing
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -21,7 +20,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
-from .models import NotificationGroup, NotificationGroupMember, Tenant, TenantUser
+from .models import NotificationGroup, NotificationGroupMember, Tenant, TenantInvite, TenantUser
 from .permissions import IsTenantAdmin, IsThatPlaceAdmin, IsViewOnly
 from .serializers import (
     AcceptInviteSerializer,
@@ -131,8 +130,9 @@ class TenantViewSet(viewsets.ModelViewSet):
     def invite(self, request, pk=None):
         """POST /api/v1/tenants/{id}/invite/ — send an invite email to a new Tenant Admin.
 
-        Generates a signed invite token containing email, tenant_id, and role.
-        The accept flow validates the token and creates the User.
+        Generates a cryptographically random invite token (256-bit entropy), stores only
+        its SHA-256 hash in the DB, and emails the raw token to the invitee. Tokens expire
+        after 72 hours and are single-use.
         """
         tenant = self.get_object()
         serializer = InviteSerializer(data=request.data)
@@ -141,13 +141,12 @@ class TenantViewSet(viewsets.ModelViewSet):
         email = serializer.validated_data['email']
         role = serializer.validated_data['role']
 
-        token = signing.dumps(
-            {'email': email, 'tenant_id': tenant.id, 'role': role},
-            salt='that-place-invite',
+        _, raw_token = TenantInvite.generate(
+            tenant=tenant, email=email, role=role, created_by=request.user
         )
 
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-        invite_url = f'{frontend_url}/accept-invite/{token}/'
+        invite_url = f'{frontend_url}/accept-invite/{raw_token}/'
 
         send_mail(
             subject=f'You have been invited to {tenant.name} on That Place',
@@ -156,7 +155,7 @@ class TenantViewSet(viewsets.ModelViewSet):
                 f'You have been invited to join {tenant.name} on That Place as {role}.\n\n'
                 f'Click the link below to set your password and activate your account:\n'
                 f'{invite_url}\n\n'
-                f'This invite link expires in 7 days.\n\n'
+                f'This invite link expires in 72 hours.\n\n'
                 f'— The That Place Team'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -255,7 +254,12 @@ class UserViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], url_path='invite')
     def invite(self, request):
-        """POST /api/v1/users/invite/ — send invite email. Tenant Admin only."""
+        """POST /api/v1/users/invite/ — send invite email. Tenant Admin only.
+
+        Generates a cryptographically random invite token (256-bit entropy), stores only
+        its SHA-256 hash in the DB, and emails the raw token to the invitee. Tokens expire
+        after 72 hours and are single-use.
+        """
         tenant = request.user.tenantuser.tenant
         serializer = InviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -263,13 +267,12 @@ class UserViewSet(viewsets.GenericViewSet):
         email = serializer.validated_data['email']
         role = serializer.validated_data['role']
 
-        token = signing.dumps(
-            {'email': email, 'tenant_id': tenant.id, 'role': role},
-            salt='that-place-invite',
+        _, raw_token = TenantInvite.generate(
+            tenant=tenant, email=email, role=role, created_by=request.user
         )
 
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-        invite_url = f'{frontend_url}/accept-invite/{token}/'
+        invite_url = f'{frontend_url}/accept-invite/{raw_token}/'
 
         send_mail(
             subject=f'You have been invited to {tenant.name} on That Place',
@@ -278,7 +281,7 @@ class UserViewSet(viewsets.GenericViewSet):
                 f'You have been invited to join {tenant.name} on That Place as {role}.\n\n'
                 f'Click the link below to set your password and activate your account:\n'
                 f'{invite_url}\n\n'
-                f'This invite link expires in 7 days.\n\n'
+                f'This invite link expires in 72 hours.\n\n'
                 f'— The That Place Team'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,

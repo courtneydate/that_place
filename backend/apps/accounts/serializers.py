@@ -3,14 +3,15 @@
 Covers User (read-only me endpoint), Tenant CRUD, TenantUser management,
 and the invite accept flow.
 """
+import hashlib
 import logging
 
-from django.core import signing
 from django.db import transaction
+from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import NotificationGroup, NotificationGroupMember, Tenant, TenantUser, User
+from .models import NotificationGroup, NotificationGroupMember, Tenant, TenantInvite, TenantUser, User
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,11 @@ class InviteSerializer(serializers.Serializer):
 class AcceptInviteSerializer(serializers.Serializer):
     """Serializer for the accept-invite endpoint.
 
-    Validates the signed token and the new user's details, then creates
-    the User and TenantUser records atomically.
+    Validates the stored invite record (looked up by SHA-256 hash of the raw token),
+    enforces TTL and single-use, then creates the User and TenantUser records atomically.
+
+    The raw token is never stored — only its SHA-256 hash — so a DB breach cannot be
+    used to accept outstanding invites.
     """
 
     token = serializers.CharField()
@@ -87,33 +91,28 @@ class AcceptInviteSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150)
     password = serializers.CharField(min_length=8, write_only=True)
 
-    def validate_token(self, value):
-        """Decode and validate the signed invite token (max age: 7 days)."""
+    def validate_token(self, value: str) -> str:
+        """Look up the invite by token hash and enforce TTL and single-use."""
+        token_hash = hashlib.sha256(value.encode()).hexdigest()
         try:
-            data = signing.loads(value, salt='that-place-invite', max_age=604800)
-        except signing.SignatureExpired:
-            raise serializers.ValidationError('Invite link has expired.')
-        except signing.BadSignature:
+            invite = TenantInvite.objects.select_related('tenant').get(token_hash=token_hash)
+        except TenantInvite.DoesNotExist:
             raise serializers.ValidationError('Invalid invite link.')
 
-        # Validate the referenced tenant still exists and is active
-        try:
-            tenant = Tenant.objects.get(pk=data['tenant_id'])
-        except Tenant.DoesNotExist:
-            raise serializers.ValidationError('The organisation no longer exists.')
-
-        if not tenant.is_active:
+        if invite.is_used:
+            raise serializers.ValidationError('This invite link has already been used.')
+        if invite.is_expired:
+            raise serializers.ValidationError('Invite link has expired.')
+        if not invite.tenant.is_active:
             raise serializers.ValidationError('The organisation account has been deactivated.')
 
-        self._invite_data = data
+        self._invite = invite
         return value
 
     def validate(self, attrs):
         """Ensure the invite email has not already been registered as an active account."""
-        invite_data = getattr(self, '_invite_data', {})
-        if 'email' in invite_data and User.objects.filter(
-            email=invite_data['email'], is_active=True,
-        ).exists():
+        invite = getattr(self, '_invite', None)
+        if invite and User.objects.filter(email=invite.email, is_active=True).exists():
             raise serializers.ValidationError(
                 {'token': 'This invite has already been accepted.'}
             )
@@ -121,13 +120,14 @@ class AcceptInviteSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        """Create (or reactivate) the User and TenantUser from the validated invite data.
+        """Create (or reactivate) the User and TenantUser from the validated invite.
 
         If a previously deactivated user exists with the invite email, reactivate
         them and update their details rather than creating a duplicate record.
+        Marks the invite as used so it cannot be replayed.
         """
-        data = self._invite_data
-        existing = User.objects.filter(email=data['email']).first()
+        invite = self._invite
+        existing = User.objects.filter(email=invite.email).first()
         if existing is not None:
             # Reactivate a previously removed user
             existing.set_password(validated_data['password'])
@@ -138,16 +138,15 @@ class AcceptInviteSerializer(serializers.Serializer):
             user = existing
         else:
             user = User.objects.create_user(
-                email=data['email'],
+                email=invite.email,
                 password=validated_data['password'],
                 first_name=validated_data['first_name'],
                 last_name=validated_data['last_name'],
             )
-        TenantUser.objects.create(
-            user=user,
-            tenant_id=data['tenant_id'],
-            role=data['role'],
-        )
+        TenantUser.objects.create(user=user, tenant=invite.tenant, role=invite.role)
+        # Mark invite as used — single-use enforcement
+        invite.used_at = timezone.now()
+        invite.save(update_fields=['used_at'])
         return user
 
 

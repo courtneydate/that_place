@@ -1,0 +1,15 @@
+version,state,dnsp,tariff_type,voltage_level,rate_cents_per_kwh,daily_supply_charge_cents,capacity_charge_cents_per_kva,applicable_days,time_from,time_to,valid_from,valid_to
+2025-26,QLD,Energex,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,QLD,Energex,residential_tou,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,QLD,Energex,residential_tou,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,QLD,Ergon Energy,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,NSW,Ausgrid,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,NSW,Endeavour Energy,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,NSW,Essential Energy,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,VIC,Ausnet Services,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,VIC,CitiPower,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,VIC,Jemena,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,VIC,Powercor,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,VIC,United Energy,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,SA,SA Power Networks,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30
+2025-26,TAS,TasNetworks,residential_flat,LV,12,1.9,45,10,06:00,18:00,2025-07-01,2026-06-30

@@ -136,13 +136,22 @@ class RuleCondition(models.Model):
       threshold_value using operator.
     condition_type='staleness': true if the stream has not reported within
       staleness_minutes.
+    condition_type='feed_channel': compares the latest FeedReading on a
+      FeedChannel against threshold_value using operator (numeric only).
+    condition_type='reference_value': resolves the current value from a
+      ReferenceDataset via the site's TenantDatasetAssignment and compares
+      against threshold_value using operator (numeric only).
 
     Ref: SPEC.md § Data Model — RuleCondition
+         SPEC.md § Feature: Feed Providers — Rule integration
+         SPEC.md § Feature: Reference Datasets — Rule integration
     """
 
     class ConditionType(models.TextChoices):
         STREAM = 'stream', 'Stream value comparison'
         STALENESS = 'staleness', 'Stream staleness'
+        FEED_CHANNEL = 'feed_channel', 'Feed channel value comparison'
+        REFERENCE_VALUE = 'reference_value', 'Reference dataset value comparison'
 
     group = models.ForeignKey(
         RuleConditionGroup,
@@ -150,6 +159,7 @@ class RuleCondition(models.Model):
         related_name='conditions',
     )
     condition_type = models.CharField(max_length=20, choices=ConditionType.choices)
+    # --- stream / staleness fields ---
     stream = models.ForeignKey(
         'readings.Stream',
         on_delete=models.CASCADE,
@@ -163,6 +173,40 @@ class RuleCondition(models.Model):
     threshold_value = models.TextField(null=True, blank=True)
     # For staleness conditions only
     staleness_minutes = models.PositiveIntegerField(null=True, blank=True)
+    # --- feed_channel fields ---
+    channel = models.ForeignKey(
+        'feeds.FeedChannel',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='rule_conditions',
+        help_text='FeedChannel to compare against (feed_channel condition type only).',
+    )
+    # --- reference_value fields ---
+    dataset = models.ForeignKey(
+        'feeds.ReferenceDataset',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='rule_conditions',
+        help_text='ReferenceDataset to resolve value from (reference_value condition type only).',
+    )
+    value_key = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=(
+            'Which value_schema key to compare (reference_value type only). '
+            'E.g. "rate_cents_per_kwh".'
+        ),
+    )
+    dimension_overrides = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Optional JSONB overrides merged over the site\'s TenantDatasetAssignment '
+            'dimension_filter for this condition (reference_value type only).'
+        ),
+    )
     order = models.PositiveIntegerField(default=0)
 
     class Meta:

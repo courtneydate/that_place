@@ -65,6 +65,18 @@ function TenantLayout() {
             Data Sources
           </NavLink>
           <NavLink
+            to="/app/feed-subscriptions"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Feeds
+          </NavLink>
+          <NavLink
+            to="/app/dataset-assignments"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Datasets
+          </NavLink>
+          <NavLink
             to="/app/settings"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
           >

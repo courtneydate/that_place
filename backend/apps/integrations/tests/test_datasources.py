@@ -1,10 +1,12 @@
 """Tests for DataSource CRUD, device discovery, and device connection.
 
 Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
+     security_risks.md § SR-02 — Third-Party API Credential Storage
 """
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.db import connection
 from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -594,3 +596,107 @@ class TestPollSingleDevice:
         dsd.refresh_from_db()
         assert dsd.consecutive_poll_failures == 0
         assert dsd.last_poll_status == 'ok'
+
+
+# ---------------------------------------------------------------------------
+# SR-02 — Credential encryption at rest
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestCredentialEncryptionAtRest:
+    """Verify that credential and token fields are stored as ciphertext.
+
+    These tests query the raw database column value and assert the plaintext
+    credential value is not visible. The decrypted value must round-trip
+    correctly through the ORM.
+
+    Ref: security_risks.md § SR-02 — Third-Party API Credential Storage
+    """
+
+    PLAINTEXT_KEY = 'super-secret-api-key-12345'
+
+    def _make_datasource(self):
+        tenant = make_tenant('EncTest')
+        provider = make_provider()
+        return DataSource.objects.create(
+            tenant=tenant,
+            provider=provider,
+            name='Enc DS',
+            credentials={'X-API-Key': self.PLAINTEXT_KEY},
+        )
+
+    def _raw_column(self, table: str, pk: int, column: str) -> str:
+        """Return the raw bytes stored in a column, as a string."""
+        with connection.cursor() as cursor:
+            cursor.execute(f'SELECT {column} FROM {table} WHERE id = %s', [pk])
+            row = cursor.fetchone()
+        return str(row[0]) if row else ''
+
+    def test_credentials_not_plaintext_in_db(self):
+        """The credentials column must not contain the raw API key."""
+        ds = self._make_datasource()
+        raw = self._raw_column('integrations_datasource', ds.pk, 'credentials')
+        assert self.PLAINTEXT_KEY not in raw
+
+    def test_credentials_round_trip(self):
+        """ORM must decrypt credentials back to the original dict."""
+        ds = self._make_datasource()
+        ds.refresh_from_db()
+        assert ds.credentials == {'X-API-Key': self.PLAINTEXT_KEY}
+
+    def test_auth_token_cache_not_plaintext_in_db(self):
+        """The auth_token_cache column must not contain plaintext tokens."""
+        plaintext_token = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test-payload'
+        tenant = make_tenant('TokTest')
+        provider = make_provider('TokProv', slug='tok-prov')
+        ds = DataSource.objects.create(
+            tenant=tenant,
+            provider=provider,
+            name='Tok DS',
+            credentials={'X-API-Key': 'key'},
+            auth_token_cache={'access_token': plaintext_token, 'expires_at': 9999999999},
+        )
+        raw = self._raw_column('integrations_datasource', ds.pk, 'auth_token_cache')
+        assert plaintext_token not in raw
+
+    def test_auth_token_cache_round_trip(self):
+        """ORM must decrypt auth_token_cache back to the original dict."""
+        cache = {'access_token': 'tok-abc', 'expires_at': 9999999999}
+        tenant = make_tenant('TokRT')
+        provider = make_provider('TokRT', slug='tok-rt')
+        ds = DataSource.objects.create(
+            tenant=tenant,
+            provider=provider,
+            name='DS',
+            credentials={},
+            auth_token_cache=cache,
+        )
+        ds.refresh_from_db()
+        assert ds.auth_token_cache['access_token'] == 'tok-abc'
+
+    def test_credentials_absent_from_api_response(self):
+        """credentials must never appear in GET or POST API responses (write-only)."""
+        ds = self._make_datasource()
+        user = make_tenant_user('enc@acme.com', ds.tenant)
+        client = auth_client(user)
+
+        get_resp = client.get(f'{DATA_SOURCES_URL}{ds.pk}/')
+        assert 'credentials' not in get_resp.data
+
+        list_resp = client.get(DATA_SOURCES_URL)
+        for item in list_resp.data:
+            assert 'credentials' not in item
+
+    def test_credentials_absent_from_create_response(self):
+        """credentials must not be echoed back in the 201 response."""
+        tenant = make_tenant('CrRT')
+        user = make_tenant_user('cr@acme.com', tenant)
+        provider = make_provider('CrProv', slug='cr-prov')
+        payload = {
+            'provider': provider.pk,
+            'name': 'New DS',
+            'credentials': {'X-API-Key': self.PLAINTEXT_KEY},
+        }
+        resp = auth_client(user).post(DATA_SOURCES_URL, payload, format='json')
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert 'credentials' not in resp.data

@@ -7,14 +7,16 @@ Covers:
 - UserViewSet.update: role change rules enforced
 - UserViewSet.destroy: removal rules enforced, removed user loses access
 """
-from unittest.mock import patch
-
+import hashlib
 import pytest
-from django.core import mail, signing
+from datetime import timedelta
+
+from django.core import mail
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.accounts.models import Tenant, TenantUser, User
+from apps.accounts.models import Tenant, TenantInvite, TenantUser, User
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,12 +50,10 @@ def auth_client(user, password='testpass123'):
     return client
 
 
-def make_invite_token(email, tenant_id, role='admin'):
-    """Generate a valid signed invite token."""
-    return signing.dumps(
-        {'email': email, 'tenant_id': tenant_id, 'role': role},
-        salt='that-place-invite',
-    )
+def make_invite(email, tenant, role='admin') -> str:
+    """Create a TenantInvite record and return the raw token."""
+    _, raw_token = TenantInvite.generate(tenant=tenant, email=email, role=role, created_by=None)
+    return raw_token
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ class TestAcceptInvite:
 
     def test_valid_token_creates_user_and_returns_tokens(self):
         tenant = make_tenant()
-        token = make_invite_token('new@example.com', tenant.id, 'admin')
+        token = make_invite('new@example.com', tenant, 'admin')
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,
@@ -81,15 +81,52 @@ class TestAcceptInvite:
         assert user.first_name == 'Alice'
         assert TenantUser.objects.filter(user=user, tenant=tenant, role='admin').exists()
 
-    def test_expired_token_rejected(self):
+    def test_invite_marked_used_after_accept(self):
+        """The TenantInvite record must have used_at set after a successful accept."""
         tenant = make_tenant()
-        # Sign with a timestamp in the past beyond max_age
-        with patch('django.core.signing.time') as mock_time:
-            mock_time.return_value = 0
-            token = signing.dumps(
-                {'email': 'old@example.com', 'tenant_id': tenant.id, 'role': 'admin'},
-                salt='that-place-invite',
-            )
+        token = make_invite('usecheck@example.com', tenant, 'admin')
+        client = APIClient()
+        client.post(self.URL, {
+            'token': token,
+            'first_name': 'Use',
+            'last_name': 'Check',
+            'password': 'securepass1',
+        })
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        invite = TenantInvite.objects.get(token_hash=token_hash)
+        assert invite.used_at is not None
+
+    def test_token_cannot_be_used_twice(self):
+        """Single-use enforcement: the same token must be rejected on second attempt."""
+        tenant = make_tenant()
+        token = make_invite('once@example.com', tenant, 'admin')
+        client = APIClient()
+        # First use — succeeds
+        resp1 = client.post(self.URL, {
+            'token': token,
+            'first_name': 'First',
+            'last_name': 'Use',
+            'password': 'securepass1',
+        })
+        assert resp1.status_code == status.HTTP_201_CREATED
+        # Second use — rejected
+        resp2 = client.post(self.URL, {
+            'token': token,
+            'first_name': 'Second',
+            'last_name': 'Use',
+            'password': 'securepass1',
+        })
+        assert resp2.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_expired_token_rejected(self):
+        """Tokens with expires_at in the past must be rejected."""
+        tenant = make_tenant()
+        token = make_invite('old@example.com', tenant, 'admin')
+        # Back-date the invite's expiry
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        TenantInvite.objects.filter(token_hash=token_hash).update(
+            expires_at=timezone.now() - timedelta(hours=1)
+        )
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,
@@ -99,10 +136,11 @@ class TestAcceptInvite:
         })
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_bad_signature_rejected(self):
+    def test_bad_token_rejected(self):
+        """A token with no matching DB record must be rejected."""
         client = APIClient()
         resp = client.post(self.URL, {
-            'token': 'not.a.valid.token',
+            'token': 'not-a-real-token',
             'first_name': 'Eve',
             'last_name': 'Hacker',
             'password': 'securepass1',
@@ -110,9 +148,11 @@ class TestAcceptInvite:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_already_used_token_rejected(self):
+        """A token whose used_at is already set must be rejected immediately."""
         tenant = make_tenant()
-        make_user('taken@example.com')
-        token = make_invite_token('taken@example.com', tenant.id, 'admin')
+        token = make_invite('taken@example.com', tenant, 'admin')
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        TenantInvite.objects.filter(token_hash=token_hash).update(used_at=timezone.now())
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,
@@ -126,7 +166,7 @@ class TestAcceptInvite:
         tenant = make_tenant()
         tenant.is_active = False
         tenant.save()
-        token = make_invite_token('new@example.com', tenant.id, 'admin')
+        token = make_invite('new@example.com', tenant, 'admin')
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,
@@ -141,7 +181,7 @@ class TestAcceptInvite:
         tenant = make_tenant(name='Reactivate Corp')
         # Simulate a user who was previously removed from the tenant
         existing = make_user('returnee@example.com', is_active=False)
-        token = make_invite_token('returnee@example.com', tenant.id, 'operator')
+        token = make_invite('returnee@example.com', tenant, 'operator')
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,
@@ -156,7 +196,7 @@ class TestAcceptInvite:
 
     def test_short_password_rejected(self):
         tenant = make_tenant()
-        token = make_invite_token('pw@example.com', tenant.id, 'admin')
+        token = make_invite('pw@example.com', tenant, 'admin')
         client = APIClient()
         resp = client.post(self.URL, {
             'token': token,

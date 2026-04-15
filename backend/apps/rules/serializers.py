@@ -12,6 +12,7 @@ import logging
 
 from rest_framework import serializers
 
+from apps.feeds.models import FeedChannel, FeedChannelRuleIndex, ReferenceDataset
 from apps.readings.models import RuleStreamIndex, Stream
 
 from .models import Rule, RuleAction, RuleAuditLog, RuleCondition, RuleConditionGroup
@@ -39,21 +40,37 @@ class RuleConditionSerializer(serializers.ModelSerializer):
         allow_null=True,
         required=False,
     )
+    channel = serializers.PrimaryKeyRelatedField(
+        queryset=FeedChannel.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+    dataset = serializers.PrimaryKeyRelatedField(
+        queryset=ReferenceDataset.objects.all(),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = RuleCondition
         fields = [
-            'id', 'condition_type', 'stream', 'operator',
-            'threshold_value', 'staleness_minutes', 'order',
+            'id', 'condition_type',
+            'stream', 'operator', 'threshold_value', 'staleness_minutes',
+            'channel',
+            'dataset', 'value_key', 'dimension_overrides',
+            'order',
         ]
 
     def validate(self, attrs):
-        """Cross-field validation for stream vs staleness conditions."""
+        """Cross-field validation for all condition types."""
         condition_type = attrs.get('condition_type')
         stream = attrs.get('stream')
         operator = attrs.get('operator', '')
         threshold_value = attrs.get('threshold_value')
         staleness_minutes = attrs.get('staleness_minutes')
+        channel = attrs.get('channel')
+        dataset = attrs.get('dataset')
+        value_key = attrs.get('value_key', '')
 
         if condition_type == RuleCondition.ConditionType.STREAM:
             if not stream:
@@ -87,6 +104,56 @@ class RuleConditionSerializer(serializers.ModelSerializer):
             if not stream:
                 raise serializers.ValidationError(
                     {'stream': 'A staleness condition requires a stream to monitor.'}
+                )
+
+        elif condition_type == RuleCondition.ConditionType.FEED_CHANNEL:
+            if not channel:
+                raise serializers.ValidationError(
+                    {'channel': 'A feed_channel condition requires a channel.'}
+                )
+            if not operator:
+                raise serializers.ValidationError(
+                    {'operator': 'A feed_channel condition requires an operator.'}
+                )
+            if operator not in NUMERIC_OPERATORS:
+                raise serializers.ValidationError(
+                    {
+                        'operator': (
+                            f"Operator '{operator}' is not valid for feed_channel conditions. "
+                            f"Allowed: {sorted(NUMERIC_OPERATORS)}."
+                        )
+                    }
+                )
+            if threshold_value is None:
+                raise serializers.ValidationError(
+                    {'threshold_value': 'A feed_channel condition requires a threshold_value.'}
+                )
+
+        elif condition_type == RuleCondition.ConditionType.REFERENCE_VALUE:
+            if not dataset:
+                raise serializers.ValidationError(
+                    {'dataset': 'A reference_value condition requires a dataset.'}
+                )
+            if not value_key:
+                raise serializers.ValidationError(
+                    {'value_key': 'A reference_value condition requires a value_key.'}
+                )
+            if not operator:
+                raise serializers.ValidationError(
+                    {'operator': 'A reference_value condition requires an operator.'}
+                )
+            if operator not in NUMERIC_OPERATORS:
+                raise serializers.ValidationError(
+                    {
+                        'operator': (
+                            f"Operator '{operator}' is not valid for reference_value conditions. "
+                            f"Allowed: {sorted(NUMERIC_OPERATORS)}."
+                        )
+                    }
+                )
+            if threshold_value is None:
+                raise serializers.ValidationError(
+                    {'threshold_value': 'A reference_value condition requires a threshold_value.'}
                 )
 
         return attrs
@@ -200,7 +267,7 @@ class RuleSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        """Validate that referenced streams and devices belong to the requesting tenant."""
+        """Validate that referenced streams, channels, datasets, and devices belong to the requesting tenant."""
         request = self.context.get('request')
         if not request:
             return attrs
@@ -214,6 +281,9 @@ class RuleSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         f"Stream {stream.id} does not belong to your tenant."
                     )
+                # FeedChannels are system/global — no tenant check needed.
+                # ReferenceDatasets are system/global — no tenant check needed.
+                # TenantDatasetAssignment scoping is enforced at evaluation time.
 
         for action_data in attrs.get('actions', []):
             device = action_data.get('target_device')
@@ -254,6 +324,19 @@ class RuleSerializer(serializers.ModelSerializer):
                 RuleStreamIndex(rule=rule, stream_id=sid) for sid in stream_ids
             ])
 
+    def _rebuild_channel_index(self, rule: Rule) -> None:
+        """Rebuild FeedChannelRuleIndex entries for this rule from its current conditions."""
+        FeedChannelRuleIndex.objects.filter(rule=rule).delete()
+        channel_ids = set()
+        for group in rule.condition_groups.all():
+            for condition in group.conditions.all():
+                if condition.channel_id:
+                    channel_ids.add(condition.channel_id)
+        if channel_ids:
+            FeedChannelRuleIndex.objects.bulk_create([
+                FeedChannelRuleIndex(rule=rule, channel_id=cid) for cid in channel_ids
+            ])
+
     def _snapshot(self, rule: Rule) -> dict:
         """Return a plain-dict snapshot of rule state for audit log comparison."""
         return {
@@ -276,6 +359,10 @@ class RuleSerializer(serializers.ModelSerializer):
                             'operator': c.operator,
                             'threshold_value': c.threshold_value,
                             'staleness_minutes': c.staleness_minutes,
+                            'channel_id': c.channel_id,
+                            'dataset_id': c.dataset_id,
+                            'value_key': c.value_key,
+                            'dimension_overrides': c.dimension_overrides,
                             'order': c.order,
                         }
                         for c in g.conditions.all()
@@ -328,6 +415,7 @@ class RuleSerializer(serializers.ModelSerializer):
         self._create_groups(rule, groups_data)
         self._create_actions(rule, actions_data)
         self._rebuild_stream_index(rule)
+        self._rebuild_channel_index(rule)
         self._write_audit_log(rule, changed_by=rule.created_by, before=None)
 
         logger.info('Rule "%s" (id=%s) created.', rule.name, rule.id)
@@ -350,6 +438,7 @@ class RuleSerializer(serializers.ModelSerializer):
         self._create_actions(instance, actions_data)
 
         self._rebuild_stream_index(instance)
+        self._rebuild_channel_index(instance)
 
         request = self.context.get('request')
         changed_by = request.user if request else None

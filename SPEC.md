@@ -296,6 +296,8 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 
 **Acceptance Criteria:**
 - [ ] Tenant Admin can invite users by email and assign a role on invite
+- [ ] Invite tokens are cryptographically random (`secrets.token_urlsafe(32)`, 256-bit entropy); only the SHA-256 hash is stored in the DB — the raw token is never persisted
+- [ ] Invite tokens expire after 72 hours and are single-use — `used_at` is set atomically on first acceptance; subsequent submissions with the same token are rejected
 - [ ] Three roles: Admin, Operator, View-Only
 - [ ] Tenant Admin can change a user's role or remove them
 - [ ] A user belongs to exactly one tenant (except That Place Admins)
@@ -352,9 +354,14 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 
 **Acceptance Criteria:**
 - [ ] Tenant Admin registers a device with: name, serial number, site, device type
+- [ ] Tenant Admin selects MQTT auth mode at registration time: **Username / Password** (port 1883, default — works with all Scout firmware) or **Client Certificate / mTLS** (port 8883 — requires Scout firmware with TLS client cert support)
 - [ ] Device is created with status: **pending**
 - [ ] That Place Admin receives notification of a pending device and can approve or reject it
-- [ ] On approval, device status becomes **active** and it can begin sending data
+- [ ] On approval, device status becomes **active**, MQTT credentials are automatically provisioned via the Mosquitto Dynamic Security plugin, and stored encrypted on the Device record
+  - Password mode: generates a random password, creates a per-device Mosquitto client + role with ACLs restricted to that device's serial namespace
+  - Certificate mode: issues a signed X.509 client certificate (RSA 2048, 2-year validity, CN = `scout-{serial}`); certificate and encrypted private key stored on Device record
+- [ ] Credentials are available to Tenant Admin on the device detail page for handoff to the hardware operator
+- [ ] On deactivation or rejection, credentials are automatically revoked in Mosquitto (client disabled)
 - [ ] Devices can be edited (name, site) and deactivated
 - [ ] Deactivated devices retain all historical data
 
@@ -450,6 +457,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
   - Default poll interval (seconds) — minimum 30 s, default 300 s (5 minutes)
   - Max requests per second (optional) — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls are sent per second
 - [ ] Provider configs are visible to Tenant Admins (name + description only) — credential schemas and JSONPath internals are not exposed
+- [ ] JSONPath expressions are evaluated using `jsonpath_ng` (core module only — not `jsonpath_ng.ext`). Standard path navigation (`$.field`, `[*]`, `$.results[*].id`) is supported. Filter expressions (`?(@.price > 100)`) and arithmetic are intentionally unsupported — the parser will raise an error if a provider config contains them. This is a deliberate security constraint (SR-08).
 
 **Tenant-level (Tenant Admin) — connection wizard:**
 
@@ -508,6 +516,7 @@ _Post-wizard:_
   - Endpoints (JSONB array): each endpoint has `path`, `method`, optional `response_root_jsonpath` (JSONPath to iterate rows — omit for single-object responses), optional `dimension_key` (field in each row that identifies the channel variant, e.g. `"REGIONID"`), and `channels` (array of `key`, `label`, `unit`, `data_type`, `value_jsonpath`)
 - [ ] On provider create/update, `FeedChannel` records are auto-populated from the endpoint channel config — one record per channel × dimension value combination. Dimension values are discovered on the first successful poll and are not pre-configured.
 - [ ] Provider configs visible to Tenant Admins (name + description only) — auth schemas and JSONPath internals not exposed
+- [ ] JSONPath expressions are evaluated using `jsonpath_ng` (core module only — not `jsonpath_ng.ext`). Standard path navigation is supported; filter expressions and arithmetic are not (SR-08).
 
 **System-scope feed polling:**
 - [ ] Celery beat task polls each active `scope=system` provider on its configured interval
@@ -884,9 +893,10 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | User | base auth | id, email, password, is_that_place_admin, created_at |
 | Tenant | has many Sites, TenantUsers | id, name, slug, timezone (IANA tz string, e.g. "Australia/Brisbane"), is_active, signal_degraded_threshold (int dBm, default -70), signal_critical_threshold (int dBm, default -85), battery_degraded_threshold (int %, default 40), battery_critical_threshold (int %, default 20), offline_approaching_percent (int %, default 75), created_at |
 | TenantUser | links User ↔ Tenant | id, user_id, tenant_id, role (admin/operator/viewer), joined_at |
+| TenantInvite | belongs to Tenant | id, tenant_id, email, role (admin/operator/viewer), token_hash (SHA-256 hex of raw token — raw token never stored), created_by (FK → User, nullable), expires_at (72 hours from creation), used_at (nullable — set on acceptance; null = not yet used), created_at |
 | Site | belongs to Tenant | id, tenant_id, name, description, latitude, longitude, created_at |
 | DeviceType | platform library | id, name, slug, description, connection_type, is_push, default_offline_threshold_minutes (int), command_ack_timeout_seconds (int), commands (JSONB array — each entry: name, label, description, params array), is_active, created_at |
-| Device | belongs to Site + Tenant | id, tenant_id, site_id, device_type_id, name, serial_number, gateway_device_id (nullable FK → Device), status (pending/active/deactivated), offline_threshold_override_minutes (nullable int — if set, overrides device type default), topic_format (legacy_v1/that_place_v1 — auto-detected from incoming MQTT traffic), created_at |
+| Device | belongs to Site + Tenant | id, tenant_id, site_id, device_type_id, name, serial_number, gateway_device_id (nullable FK → Device), status (pending/active/deactivated), offline_threshold_override_minutes (nullable int — if set, overrides device type default), topic_format (legacy_v1/that_place_v1 — auto-detected from incoming MQTT traffic), mqtt_auth_mode (password/certificate — selected at registration; determines credential type provisioned on approval), mqtt_password (encrypted text, nullable — provisioned on approval for password mode), mqtt_certificate (text, nullable — PEM client cert for certificate mode), mqtt_private_key (encrypted text, nullable — PEM private key for certificate mode; cleared after operator confirms loading), created_at |
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
 | Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
 | StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
@@ -1146,7 +1156,8 @@ GET    /api/v1/reference-datasets/:id/rows/
 POST   /api/v1/reference-datasets/:id/rows/
 PUT    /api/v1/reference-datasets/:id/rows/:row_id/
 DELETE /api/v1/reference-datasets/:id/rows/:row_id/
-POST   /api/v1/reference-datasets/:id/rows/bulk/   # CSV upload — upserts rows; returns per-row errors
+POST   /api/v1/reference-datasets/:id/rows/bulk/   # CSV upload — upserts rows; returns per-row errors; max 10 MB / 50,000 rows
+GET    /api/v1/reference-datasets/:id/rows/export/ # CSV download of all rows; cell values sanitised against formula injection; supports ?version= filter
 
 # Tenant Dataset Assignments (Tenant Admin — per site or tenant-wide)
 GET    /api/v1/dataset-assignments/           # ?site=

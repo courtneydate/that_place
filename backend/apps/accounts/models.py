@@ -2,10 +2,14 @@
 
 Tenant and TenantUser are implemented in Sprint 2.
 """
+import hashlib
 import logging
+import secrets
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -206,3 +210,83 @@ class NotificationGroupMember(models.Model):
 
     def __str__(self):
         return f'{self.tenant_user.user.email} in {self.group.name}'
+
+
+# ---------------------------------------------------------------------------
+# Invite tokens
+# ---------------------------------------------------------------------------
+
+INVITE_TTL_HOURS = 72
+
+
+class TenantInvite(models.Model):
+    """A single-use, time-limited invite token for a new tenant user.
+
+    The raw token is never stored — only its SHA-256 hash. This ensures
+    that a database breach cannot be used to accept outstanding invites.
+
+    Ref: SPEC.md § Feature: User Invites (Sprint 1, 3); SR-05
+    """
+
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name='invites',
+    )
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=TenantUser.Role.choices)
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        help_text='SHA-256 hex digest of the raw invite token. Never store the raw token.',
+    )
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='sent_invites',
+    )
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Invite for {self.email} to {self.tenant.name} ({self.role})'
+
+    @classmethod
+    def generate(
+        cls,
+        tenant: 'Tenant',
+        email: str,
+        role: str,
+        created_by: 'User',
+    ) -> tuple['TenantInvite', str]:
+        """Generate a cryptographically random invite token, persist the hash, return (invite, raw_token).
+
+        The raw token must be sent to the invitee and never stored.
+        The returned invite object holds only the hashed value.
+        """
+        raw = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw.encode()).hexdigest()
+        invite = cls.objects.create(
+            tenant=tenant,
+            email=email,
+            role=role,
+            token_hash=token_hash,
+            created_by=created_by,
+            expires_at=timezone.now() + timedelta(hours=INVITE_TTL_HOURS),
+        )
+        return invite, raw
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True if the invite TTL has elapsed."""
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_used(self) -> bool:
+        """Return True if the invite has already been accepted."""
+        return self.used_at is not None

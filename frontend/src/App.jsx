@@ -15,6 +15,10 @@ import TenantDetail from './pages/admin/TenantDetail';
 import DeviceTypeLibrary from './pages/admin/DeviceTypeLibrary';
 import PendingDevices from './pages/admin/PendingDevices';
 import ProviderLibrary from './pages/admin/ProviderLibrary';
+import FeedProviders from './pages/admin/FeedProviders';
+import ReferenceDatasets from './pages/admin/ReferenceDatasets';
+import FeedSubscriptions from './pages/tenant/FeedSubscriptions';
+import DatasetAssignments from './pages/tenant/DatasetAssignments';
 import UserManagement from './pages/tenant/UserManagement';
 import Sites from './pages/tenant/Sites';
 import Groups from './pages/tenant/Groups';
@@ -53,6 +57,8 @@ function App() {
         <Route path="device-types" element={<DeviceTypeLibrary />} />
         <Route path="pending-devices" element={<PendingDevices />} />
         <Route path="api-providers" element={<ProviderLibrary />} />
+        <Route path="feed-providers" element={<FeedProviders />} />
+        <Route path="reference-datasets" element={<ReferenceDatasets />} />
       </Route>
 
       {/* Tenant user routes */}
@@ -77,6 +83,8 @@ function App() {
         <Route path="rules/new" element={<RuleBuilder />} />
         <Route path="rules/:id" element={<RuleDetail />} />
         <Route path="rules/:id/edit" element={<RuleBuilder />} />
+        <Route path="feed-subscriptions" element={<FeedSubscriptions />} />
+        <Route path="dataset-assignments" element={<DatasetAssignments />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

@@ -15,6 +15,11 @@ import { useDeviceStreams, useStream } from '../../hooks/useStreams';
 import { useDeviceTypes } from '../../hooks/useDeviceTypes';
 import { useGroups } from '../../hooks/useGroups';
 import { useUsers } from '../../hooks/useUsers';
+import {
+  useFeedProviderChannels,
+  useFeedProviders,
+  useReferenceDatasets,
+} from '../../hooks/useFeeds';
 import styles from '../admin/AdminPage.module.css';
 import b from './RuleBuilder.module.css';
 
@@ -67,6 +72,11 @@ const emptyCondition = (order = 0) => ({
   operator: '',
   threshold_value: '',
   staleness_minutes: '',
+  channel: null,
+  _provider_id: null,
+  dataset: null,
+  value_key: '',
+  dimension_overrides: null,
   order,
 });
 
@@ -120,11 +130,25 @@ const buildPayload = (form) => ({
     logical_operator: g.logical_operator,
     order: gi,
     conditions: g.conditions.map((c, ci) => {
-      const base = { condition_type: c.condition_type, stream: c.stream, order: ci };
+      const base = { condition_type: c.condition_type, order: ci };
       if (c.condition_type === 'stream') {
-        return { ...base, operator: c.operator, threshold_value: c.threshold_value };
+        return { ...base, stream: c.stream, operator: c.operator, threshold_value: c.threshold_value };
       }
-      return { ...base, staleness_minutes: parseInt(c.staleness_minutes, 10) };
+      if (c.condition_type === 'staleness') {
+        return { ...base, stream: c.stream, staleness_minutes: parseInt(c.staleness_minutes, 10) };
+      }
+      if (c.condition_type === 'feed_channel') {
+        return { ...base, channel: c.channel, operator: c.operator, threshold_value: c.threshold_value };
+      }
+      // reference_value
+      return {
+        ...base,
+        dataset: c.dataset,
+        value_key: c.value_key,
+        operator: c.operator,
+        threshold_value: c.threshold_value,
+        dimension_overrides: c.dimension_overrides || null,
+      };
     }),
   })),
   actions: form.actions.map((a) => {
@@ -166,6 +190,11 @@ const formFromRule = (rule) => ({
           operator: c.operator || '',
           threshold_value: c.threshold_value != null ? String(c.threshold_value) : '',
           staleness_minutes: c.staleness_minutes != null ? String(c.staleness_minutes) : '',
+          channel: c.channel || null,
+          _provider_id: null,
+          dataset: c.dataset || null,
+          value_key: c.value_key || '',
+          dimension_overrides: c.dimension_overrides || null,
           order: c.order ?? ci,
         })),
       }))
@@ -198,15 +227,24 @@ const validateStep = (step, form) => {
     for (const g of form.condition_groups) {
       if (g.conditions.length === 0) return 'Each group needs at least one condition.';
       for (const c of g.conditions) {
-        if (!c.stream) return 'Select a stream for every condition.';
         if (c.condition_type === 'stream') {
+          if (!c.stream) return 'Select a stream for every stream condition.';
           if (!c.operator) return 'Select an operator for every stream condition.';
           if (c.threshold_value === '') return 'Enter a value for every stream condition.';
-        }
-        if (c.condition_type === 'staleness') {
+        } else if (c.condition_type === 'staleness') {
+          if (!c.stream) return 'Select a stream for every staleness condition.';
           if (!c.staleness_minutes || parseInt(c.staleness_minutes, 10) < 2) {
             return 'Staleness threshold must be at least 2 minutes.';
           }
+        } else if (c.condition_type === 'feed_channel') {
+          if (!c.channel) return 'Select a feed channel for every feed_channel condition.';
+          if (!c.operator) return 'Select an operator for every feed_channel condition.';
+          if (c.threshold_value === '') return 'Enter a value for every feed_channel condition.';
+        } else if (c.condition_type === 'reference_value') {
+          if (!c.dataset) return 'Select a dataset for every reference_value condition.';
+          if (!c.value_key) return 'Select a value key for every reference_value condition.';
+          if (!c.operator) return 'Select an operator for every reference_value condition.';
+          if (c.threshold_value === '') return 'Enter a value for every reference_value condition.';
         }
       }
     }
@@ -377,6 +415,134 @@ StreamPicker.propTypes = {
 };
 
 // ---------------------------------------------------------------------------
+// Feed channel picker — provider → channel cascade
+// ---------------------------------------------------------------------------
+
+function FeedChannelPicker({ channelId, providerId, onChangeChannel }) {
+  /**
+   * Two-step cascade: pick provider (system-scope) → pick channel.
+   * Shows latest reading value as a hint when available.
+   */
+  const { data: providersData } = useFeedProviders();
+  const { data: channelsData, isLoading: loadingChannels } = useFeedProviderChannels(providerId);
+
+  const providers = Array.isArray(providersData)
+    ? providersData.filter((p) => p.scope === 'system')
+    : (providersData?.results ?? []).filter((p) => p.scope === 'system');
+  const channels = Array.isArray(channelsData) ? channelsData : (channelsData?.results ?? []);
+  const selected = channels.find((c) => c.id === channelId);
+
+  return (
+    <>
+      <select
+        className={b.selectSmall}
+        value={providerId || ''}
+        onChange={(e) => onChangeChannel({ channel: null, _provider_id: parseInt(e.target.value, 10) || null })}
+        style={{ minWidth: '160px' }}
+      >
+        <option value="">Provider…</option>
+        {providers.map((p) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
+        ))}
+      </select>
+
+      {providerId && (
+        <select
+          className={b.selectSmall}
+          value={channelId || ''}
+          onChange={(e) => onChangeChannel({ channel: parseInt(e.target.value, 10) || null, _provider_id: providerId })}
+          disabled={loadingChannels}
+          style={{ minWidth: '180px' }}
+        >
+          <option value="">Channel…</option>
+          {channels.map((ch) => (
+            <option key={ch.id} value={ch.id}>
+              {ch.label || ch.key}
+              {ch.dimension_value ? ` [${ch.dimension_value}]` : ''}
+              {' '}({ch.unit || ch.data_type})
+            </option>
+          ))}
+        </select>
+      )}
+
+      {selected?.latest_reading && (
+        <span style={{ fontSize: '0.8125rem', color: '#6B7280', whiteSpace: 'nowrap' }}>
+          Last: <strong>{selected.latest_reading.value}</strong> {selected.unit}
+        </span>
+      )}
+    </>
+  );
+}
+
+FeedChannelPicker.propTypes = {
+  channelId: PropTypes.number,
+  providerId: PropTypes.number,
+  onChangeChannel: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
+// Reference value picker — dataset → value key
+// ---------------------------------------------------------------------------
+
+function ReferenceValuePicker({ datasetId, valueKey, onChangeDataset }) {
+  /**
+   * Selects a dataset then the value key to compare.
+   * Shows the schema-defined value keys from the selected dataset.
+   */
+  const { data: datasetsData } = useReferenceDatasets();
+  const datasets = Array.isArray(datasetsData) ? datasetsData : (datasetsData?.results ?? []);
+  const selectedDataset = datasets.find((d) => d.id === datasetId);
+  const valueKeys = selectedDataset ? Object.keys(selectedDataset.value_schema || {}) : [];
+
+  return (
+    <>
+      <select
+        className={b.selectSmall}
+        value={datasetId || ''}
+        onChange={(e) => onChangeDataset({ dataset: parseInt(e.target.value, 10) || null, value_key: '' })}
+        style={{ minWidth: '180px' }}
+      >
+        <option value="">Dataset…</option>
+        {datasets.map((d) => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
+      </select>
+
+      {datasetId && (
+        <select
+          className={b.selectSmall}
+          value={valueKey || ''}
+          onChange={(e) => onChangeDataset({ dataset: datasetId, value_key: e.target.value })}
+          style={{ minWidth: '160px' }}
+        >
+          <option value="">Value key…</option>
+          {valueKeys.map((k) => {
+            const def = selectedDataset.value_schema[k] || {};
+            return (
+              <option key={k} value={k}>
+                {def.label || k}{def.unit ? ` (${def.unit})` : ''}
+              </option>
+            );
+          })}
+        </select>
+      )}
+
+      {selectedDataset?.has_time_of_use && (
+        <span style={{ fontSize: '0.8125rem', color: '#6B7280', whiteSpace: 'nowrap' }}>
+          TOU — resolved from assignment at eval time
+        </span>
+      )}
+    </>
+  );
+}
+
+ReferenceValuePicker.propTypes = {
+  datasetId: PropTypes.number,
+  valueKey: PropTypes.string,
+  onChangeDataset: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
 // Condition editor — one condition row
 // ---------------------------------------------------------------------------
 
@@ -406,19 +572,51 @@ function ConditionEditor({ condition, devices, onChange, onRemove }) {
         <select
           className={b.selectSmall}
           value={condition.condition_type}
-          onChange={(e) => set({ condition_type: e.target.value, stream: null, _device_id: null, operator: '', threshold_value: '', staleness_minutes: '' })}
+          onChange={(e) => set({
+            condition_type: e.target.value,
+            stream: null, _device_id: null,
+            operator: '', threshold_value: '', staleness_minutes: '',
+            channel: null, _provider_id: null,
+            dataset: null, value_key: '', dimension_overrides: null,
+          })}
         >
           <option value="stream">Stream value</option>
           <option value="staleness">Not reported in…</option>
+          <option value="feed_channel">Feed channel value</option>
+          <option value="reference_value">Reference dataset value</option>
         </select>
 
-        {/* Stream picker — shared by both condition types */}
-        <StreamPicker
-          streamId={condition.stream}
-          deviceId={condition._device_id}
-          onChangeStream={handleStreamChange}
-          devices={devices}
-        />
+        {/* Stream picker — for stream and staleness types */}
+        {(condition.condition_type === 'stream' || condition.condition_type === 'staleness') && (
+          <StreamPicker
+            streamId={condition.stream}
+            deviceId={condition._device_id}
+            onChangeStream={handleStreamChange}
+            devices={devices}
+          />
+        )}
+
+        {/* Feed channel picker */}
+        {condition.condition_type === 'feed_channel' && (
+          <FeedChannelPicker
+            channelId={condition.channel}
+            providerId={condition._provider_id}
+            onChangeChannel={({ channel, _provider_id }) =>
+              set({ channel, _provider_id, operator: '', threshold_value: '' })
+            }
+          />
+        )}
+
+        {/* Reference value picker */}
+        {condition.condition_type === 'reference_value' && (
+          <ReferenceValuePicker
+            datasetId={condition.dataset}
+            valueKey={condition.value_key}
+            onChangeDataset={({ dataset, value_key }) =>
+              set({ dataset, value_key, operator: '', threshold_value: '' })
+            }
+          />
+        )}
 
         {condition.condition_type === 'stream' && (
           <>
@@ -483,6 +681,36 @@ function ConditionEditor({ condition, devices, onChange, onRemove }) {
               style={{ width: '90px' }}
             />
             <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>minutes</span>
+          </>
+        )}
+
+        {/* Numeric operator + threshold for feed_channel and reference_value */}
+        {(condition.condition_type === 'feed_channel' || condition.condition_type === 'reference_value') && (
+          <>
+            <select
+              className={b.selectSmall}
+              value={condition.operator}
+              onChange={(e) => set({ operator: e.target.value })}
+              disabled={
+                condition.condition_type === 'feed_channel'
+                  ? !condition.channel
+                  : !condition.value_key
+              }
+            >
+              <option value="">Operator…</option>
+              {OPERATORS_BY_TYPE.numeric.map((op) => (
+                <option key={op} value={op}>{OPERATOR_LABELS[op] || op}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              className={b.inputSmall}
+              placeholder="Value"
+              value={condition.threshold_value}
+              onChange={(e) => set({ threshold_value: e.target.value })}
+              disabled={!condition.operator}
+              style={{ width: '100px' }}
+            />
           </>
         )}
       </div>

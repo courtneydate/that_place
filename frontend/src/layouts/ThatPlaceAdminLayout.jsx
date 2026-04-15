@@ -47,6 +47,18 @@ function ThatPlaceAdminLayout() {
           >
             API Providers
           </NavLink>
+          <NavLink
+            to="/admin/feed-providers"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Feed Providers
+          </NavLink>
+          <NavLink
+            to="/admin/reference-datasets"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Reference Datasets
+          </NavLink>
         </nav>
         <button onClick={handleLogout} className={styles.logoutButton}>
           Sign out

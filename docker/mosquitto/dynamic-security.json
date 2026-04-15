@@ -1,0 +1,173 @@
+{
+	"defaultACLAccess":	{
+		"publishClientSend":	false,
+		"publishClientReceive":	true,
+		"subscribe":	false,
+		"unsubscribe":	true
+	},
+	"clients":	[{
+			"encoded_password":	"$7$1000$pC8x+X9QzQHWuE2GsHNLMd7H1n+M4ti8zEg5tr+biitEasRKMBtXg3sgQ9OitsxMKFKHIc4M4qfETJnTkUXy0g==$7DPrj66Om1idU2hIOnIYFht4Cj4WMaieuszsvsCQd3nvF+oxsWcyGRXzyglsVbRAZCXPTZYb5rW6D3T6R0AEUQ==",
+			"username":	"admin",
+			"textname":	"Admin user",
+			"roles":	[{
+					"rolename":	"super-admin"
+				}, {
+					"rolename":	"sys-observe"
+				}, {
+					"rolename":	"topic-observe"
+				}]
+		}, {
+			"encoded_password":	"$7$1000$DIO1ozvcHkeyC6PWDKOiuBilfFVB/bf3atVc3aSgohYxD9vz5NEO7tVU7QwYnbUKisYkJhw7sCgZmekDVl5h3A==$/2F5eQKy4lU4PEbk6qB2Q5ycbFu7Y6glQXuZLAomhKMHhgCOco6iLUzO2jMV40QGSkd70jmUVyxibl07YpC5Hg==",
+			"username":	"democlient",
+			"textname":	"Demonstration client with full read/write access to the '#' topic hierarchy.",
+			"roles":	[{
+					"rolename":	"client"
+				}]
+		}],
+	"groups":	[{
+			"groupname":	"unauthenticated",
+			"textname":	"Unauthenticated group",
+			"textdescription":	"If unauthenticated access is allowed, this group can be used to define roles for clients that connect without a password.",
+			"roles":	[]
+		}],
+	"roles":	[{
+			"rolename":	"client",
+			"textdescription":	"Read/write access to the full application topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"broker-admin",
+			"textdescription":	"Grants access to administer general broker configuration.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/broker/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$CONTROL/broker/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$CONTROL/broker/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"$CONTROL/broker/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"dynsec-admin",
+			"textdescription":	"Grants access to administer clients/groups/roles.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"super-admin",
+			"textdescription":	"Grants access to administer all kind of broker controls",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$CONTROL/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$CONTROL/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"$CONTROL/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"sys-notify",
+			"textdescription":	"Allow bridges to publish connection state messages.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$SYS/broker/connection/%c/state",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"sys-observe",
+			"textdescription":	"Observe the $SYS topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientReceive",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"topic-observe",
+			"textdescription":	"Read only access to the full application topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientReceive",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}],
+	"anonymousGroup":	"unauthenticated"
+}
