@@ -760,7 +760,7 @@ class BulkImportLimitsTest(APITestCase):
         r = self._upload(oversized)
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         error_msg = r.data['errors'][0]['error']
-        self.assertIn(str(CSV_MAX_ROWS), error_msg)
+        self.assertIn(f'{CSV_MAX_ROWS:,}', error_msg)
 
     def test_row_count_at_limit_accepted(self):
         """Exactly CSV_MAX_ROWS data rows must not trigger the row-count error."""

@@ -61,13 +61,17 @@ def make_tenant_feed_provider() -> FeedProvider:
     )
 
 
-def make_subscription(tenant: Tenant, provider: FeedProvider) -> TenantFeedSubscription:
+def make_subscription(
+    tenant: Tenant,
+    provider: FeedProvider,
+    channel_key: str = 'price',
+) -> TenantFeedSubscription:
     channel, _ = FeedChannel.objects.get_or_create(
         provider=provider,
-        key='price',
+        key=channel_key,
         dimension_value=None,
         defaults={
-            'label': 'Price',
+            'label': channel_key.capitalize(),
             'unit': '$/MWh',
             'data_type': FeedChannel.DataType.NUMERIC,
         },
@@ -147,8 +151,10 @@ class TestPollSingleSubscriptionCrossTenant:
         tenant_a = make_tenant('ReadIsoA')
         tenant_b = make_tenant('ReadIsoB')
         provider = make_tenant_feed_provider()
-        sub_a = make_subscription(tenant_a, provider)
-        sub_b = make_subscription(tenant_b, provider)
+        # Give each subscription its own distinct channel so polling sub_a
+        # cannot produce readings that appear in sub_b's channel set.
+        sub_a = make_subscription(tenant_a, provider, channel_key='price')
+        sub_b = make_subscription(tenant_b, provider, channel_key='price-b')
 
         # Record the state of sub_b's subscribed channel readings before polling
         sub_b_channel_ids = set(sub_b.subscribed_channel_ids)

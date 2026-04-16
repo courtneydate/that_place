@@ -71,6 +71,9 @@ else
     echo "[mqtt] Broker certificate found in volume."
 fi
 
+# Ensure cert files are readable by the mosquitto process user
+chown -R mosquitto:mosquitto "$CERTS_DIR" 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # Dynamic Security bootstrap
 # ---------------------------------------------------------------------------

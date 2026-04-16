@@ -4,9 +4,11 @@ Sprint 6: Route the topic, look up the device, validate status,
           update topic_format, and discard unknown/unapproved messages.
 Sprint 7: Parse the payload and create StreamReadings. Auto-discover
           new stream keys as Stream records.
+Sprint 16: Dispatch rule evaluation after each StreamReading batch.
 
 Ref: SPEC.md § Feature: MQTT Ingestion Pipeline
      SPEC.md § Feature: Stream Discovery & Configuration
+     SPEC.md § Feature: Rule Evaluation Engine
 """
 import logging
 from typing import Any
@@ -230,3 +232,36 @@ def _store_stream_readings(
         ))
 
     StreamReading.objects.bulk_create(readings_to_create)
+
+    # Dispatch rule evaluation after the transaction commits so workers see the
+    # new readings immediately. on_commit is a no-op if no transaction is active
+    # (CELERY_TASK_ALWAYS_EAGER in tests handles this transparently).
+    stream_ids = frozenset(r.stream_id for r in readings_to_create)
+
+    def _dispatch():
+        for stream_id in stream_ids:
+            _dispatch_stream_rule_evaluation.delay(stream_id)
+
+    transaction.on_commit(_dispatch)
+
+
+@shared_task(name='ingestion.dispatch_stream_rule_evaluation')
+def _dispatch_stream_rule_evaluation(stream_id: int) -> None:
+    """Look up rules referencing this stream and dispatch one evaluate_rule task each.
+
+    Uses RuleStreamIndex for an O(matching rules) lookup rather than scanning
+    all tenant rules on every reading.
+
+    Ref: SPEC.md § Feature: Rule Evaluation Engine — RuleStreamIndex
+    """
+    from apps.readings.models import RuleStreamIndex
+    from apps.rules.tasks import evaluate_rule
+
+    rule_ids = list(
+        RuleStreamIndex.objects
+        .filter(stream_id=stream_id, rule__is_active=True)
+        .values_list('rule_id', flat=True)
+    )
+
+    for rule_id in rule_ids:
+        evaluate_rule.delay(rule_id)

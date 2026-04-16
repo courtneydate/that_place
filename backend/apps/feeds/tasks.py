@@ -24,6 +24,9 @@ from celery import shared_task
 from django.utils import timezone
 from jsonpath_ng import parse as jp_parse
 
+from apps.rules.models import RuleCondition
+from apps.rules.tasks import evaluate_rule
+
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 15
@@ -367,17 +370,6 @@ def _dispatch_feed_rule_evaluation(channel_id: int) -> None:
     if not rule_ids:
         return
 
-    # Import the rule evaluation task from the rules app
-    try:
-        from apps.rules.tasks import evaluate_rule
-    except ImportError:
-        logger.warning(
-            'feeds._dispatch_feed_rule_evaluation: rules.tasks.evaluate_rule not yet '
-            'available (Sprint 16). Skipping evaluation dispatch for channel %d.',
-            channel_id,
-        )
-        return
-
     for rule_id in rule_ids:
         evaluate_rule.delay(rule_id)
 
@@ -406,16 +398,6 @@ def evaluate_reference_value_rules() -> None:
 
     Ref: SPEC.md § Feature: Reference Datasets — Rule integration
     """
-    try:
-        from apps.rules.models import RuleCondition
-        from apps.rules.tasks import evaluate_rule
-    except ImportError:
-        logger.warning(
-            'feeds.evaluate_reference_value_rules: rules app not yet available. '
-            'Skipping reference value rule evaluation.'
-        )
-        return
-
     # Find rules that have at least one reference_value condition and are active
     rule_ids_with_ref = set(
         RuleCondition.objects
