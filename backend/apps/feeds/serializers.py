@@ -17,6 +17,18 @@ import logging
 
 from rest_framework import serializers
 
+from .models import (
+    FeedChannel,
+    FeedProvider,
+    FeedReading,
+    ReferenceDataset,
+    ReferenceDatasetRow,
+    TenantDatasetAssignment,
+    TenantFeedSubscription,
+)
+
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # SR-04 — CSV injection / resource exhaustion constants
 # ---------------------------------------------------------------------------
@@ -48,18 +60,6 @@ def sanitize_csv_cell(value: str) -> str:
     if value and value[0] in _FORMULA_PREFIXES:
         return '\t' + value
     return value
-
-from .models import (
-    FeedChannel,
-    FeedProvider,
-    FeedReading,
-    ReferenceDataset,
-    ReferenceDatasetRow,
-    TenantDatasetAssignment,
-    TenantFeedSubscription,
-)
-
-logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------

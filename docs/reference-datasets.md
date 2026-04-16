@@ -132,7 +132,7 @@ Upload a UTF-8 CSV file. Column requirements:
 | Column | Format | Description |
 |--------|--------|-------------|
 | `version` | Text string, e.g. `2025-26` | Required if `has_version` is enabled |
-| `applicable_days` | Comma-separated integers, e.g. `0,1,2,3,4` | 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun. Leave blank = all days |
+| `applicable_days` | Comma-separated integers, e.g. `0,1,2,3,4` | 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun. Leave blank = applies all days |
 | `time_from` | `HH:MM` | Start of TOU window, e.g. `07:00` |
 | `time_to` | `HH:MM` | End of TOU window, e.g. `21:00`. Can wrap midnight (e.g. `21:00` → `07:00`) |
 | `valid_from` | `YYYY-MM-DD` | Row becomes active on this date |
@@ -144,14 +144,14 @@ Upload a UTF-8 CSV file. Column requirements:
 
 ```csv
 version,state,dnsp,tariff_type,voltage_level,rate_cents_per_kwh,daily_supply_charge_cents,capacity_charge_cents_per_kva,applicable_days,time_from,time_to
-2025-26,QLD,Energex,residential_tou,LV,29.50,98.00,,0|1|2|3|4,07:00,21:00
+2025-26,QLD,Energex,residential_tou,LV,29.50,98.00,,0,07:00,21:00
 2025-26,QLD,Energex,residential_tou,LV,10.20,98.00,,,21:00,07:00
-2025-26,QLD,Energex,residential_tou,LV,10.20,98.00,,5|6,,
-2025-26,NSW,Ausgrid,residential_tou,LV,32.50,110.00,,0|1|2|3|4,07:00,21:00
+2025-26,QLD,Energex,residential_tou,LV,10.20,98.00,,5,
+2025-26,NSW,Ausgrid,residential_tou,LV,32.50,110.00,,0,07:00,21:00
 2025-26,NSW,Ausgrid,residential_tou,LV,12.80,110.00,,,21:00,07:00
 ```
 
-> **Note:** The `applicable_days` column uses `|` as the separator within the cell to avoid conflict with the CSV comma delimiter. Both comma and pipe are accepted.
+> **Note:** To specify multiple days, use a separate row per day group, or use a comma-separated list **inside a quoted cell**: `"0,1,2,3,4"`. For example, to apply a rate Monday–Friday: `applicable_days` = `"0,1,2,3,4"`.
 
 The import returns a summary:
 ```
@@ -307,6 +307,129 @@ Tariff data is not pre-loaded — rates must be imported each financial year via
 ```json
 { "state": "QLD", "grid": "NEM" }
 ```
+
+---
+
+---
+
+## How-To: Update Network Tariffs Each Financial Year
+
+Every July, DNSP network pricing schedules change. Follow these steps to load the new year's rates without affecting tenants mid-year.
+
+### Step 1 — Obtain the new tariff data
+
+Download each DNSP's published network pricing schedule for the new financial year. See `docs/providers/` for direct links to each DNSP's pricing page.
+
+You need these values per tariff code:
+- Peak energy rate (c/kWh)
+- Off-peak energy rate (c/kWh, if the tariff is TOU)
+- Shoulder rate (c/kWh, if applicable)
+- Daily supply charge (c/day)
+- Capacity charge (c/kVA/day, if applicable)
+
+### Step 2 — Prepare the CSV
+
+Copy `backend/apps/feeds/seed_data/network_tariffs_template.csv` as your starting point.
+
+Rules:
+- Set `version` to the new financial year string, e.g. `2026-27`
+- Include every row for every DNSP × tariff code × TOU period combination
+- Time windows must cover all 24 hours with no gaps — include a catch-all row (blank `time_from` / `time_to`) for any periods not otherwise covered
+- `applicable_days` uses comma-separated integers `0`–`6` inside a **quoted cell** if multiple days: `"0,1,2,3,4"`
+
+**Peak/off-peak example for a single DNSP:**
+
+```csv
+version,state,dnsp,tariff_type,voltage_level,rate_cents_per_kwh,daily_supply_charge_cents,capacity_charge_cents_per_kva,applicable_days,time_from,time_to
+2026-27,NSW,Ausgrid,residential_tou,LV,34.00,115.00,,"0,1,2,3,4",07:00,21:00
+2026-27,NSW,Ausgrid,residential_tou,LV,13.50,115.00,,,21:00,07:00
+2026-27,NSW,Ausgrid,residential_tou,LV,13.50,115.00,,"5,6",,
+```
+
+### Step 3 — Upload via the Admin UI
+
+1. Navigate to **Admin → Reference Datasets → Network Tariffs (NEM) → Rows → Import CSV**
+2. Upload your prepared CSV
+3. The import is an **upsert** — rows matched by `version` + all dimension columns are updated; new combinations are created; rows from previous versions are untouched
+4. Check the summary: `{ "imported": N, "errors": [] }`
+5. If there are errors, the entire import is rolled back — fix the listed rows and re-upload
+
+Alternatively, using the management command directly in the container:
+```bash
+docker-compose exec backend python manage.py load_reference_data --csv network-tariffs /path/to/tariffs_2026_27.csv
+```
+
+### Step 4 — Verify
+
+1. Navigate to **Admin → Reference Datasets → Network Tariffs (NEM) → Rows**
+2. Use the **Version** dropdown to filter to `2026-27`
+3. Confirm row counts match your source data
+
+### Step 5 — Tenant rollover
+
+Tenants with **unpinned** version assignments automatically resolve to the latest active version. No action required.
+
+Tenants with a **pinned** version (e.g. `"2025-26"`) continue using old rates until:
+- They update their assignment's `Version` field to `"2026-27"`, or
+- They clear the pin to use the latest version automatically
+
+Notify tenant admins of the new version and advise them to review their assignments.
+
+---
+
+## How-To: Add a New Reference Dataset
+
+Use this when you need a lookup table for a new type of reference data — for example, water usage tariffs, carbon credits pricing, or fuel levies.
+
+### Step 1 — Design the schema
+
+Before creating anything, decide:
+
+| Question | Example answer |
+|----------|---------------|
+| What are you looking up by? | State, zone, tariff class — these are your **dimension keys** |
+| What values do you return? | Rate per megalitre, fixed charge — these are your **value keys** |
+| Will rates change periodically? | Yes → enable `has_version` |
+| Do rates vary by time of day? | Yes → enable `has_time_of_use` |
+
+Write out the schema before touching the UI — it's much harder to change once rows are loaded.
+
+**Example schema — water usage tariffs:**
+```
+Dimension keys: state (string), utility (string), usage_tier (string)
+Value keys:     rate_cents_per_kl (numeric, c/kL), service_charge_cents_per_day (numeric, c/day)
+has_version:    true  (annual pricing schedules)
+has_time_of_use: false
+```
+
+### Step 2 — Create the dataset
+
+Navigate to **Admin → Reference Datasets → New Dataset**.
+
+Fill in the name, slug, and description, then add your dimension and value schema entries.
+
+> The slug cannot be changed once rows are added. Choose it carefully — e.g. `water-usage-tariffs`.
+
+### Step 3 — Add rows
+
+Prepare a CSV following the same format as network tariffs (see above). Every row must include all dimension keys and all value keys. Optional columns (`version`, `valid_from`, `valid_to`) can be added as needed.
+
+Upload via **Import CSV** or the management command.
+
+### Step 4 — Set up tenant assignments
+
+Once the dataset exists with rows, Tenant Admins can assign it to their sites:
+
+**Admin → Settings → Sites → [Site Name] → Dataset Assignments → Add Assignment**
+
+Advise them of:
+- The dimension filter values that apply to their site
+- Whether to pin a version or use latest
+- Which value key(s) to reference in rule conditions
+
+### Step 5 — Use in rule conditions
+
+In the rule builder, conditions of type **Reference Value** will now show the new dataset in the picker. The rule builder displays the currently resolved value next to the value key so tenants can confirm the right row is selected before saving.
 
 ---
 

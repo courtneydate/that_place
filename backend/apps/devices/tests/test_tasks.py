@@ -6,9 +6,9 @@ Tenant B's device, and vice versa.
 
 Ref: security_risks.md § SR-03 — Tenant Isolation in Celery Beat Tasks
 """
-import pytest
 from datetime import timedelta
 
+import pytest
 from django.utils import timezone
 from django.utils.text import slugify
 

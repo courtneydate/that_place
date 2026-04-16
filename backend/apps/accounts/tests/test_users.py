@@ -8,9 +8,9 @@ Covers:
 - UserViewSet.destroy: removal rules enforced, removed user loses access
 """
 import hashlib
-import pytest
 from datetime import timedelta
 
+import pytest
 from django.core import mail
 from django.utils import timezone
 from rest_framework import status
