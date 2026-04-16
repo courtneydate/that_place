@@ -16,10 +16,10 @@ from apps.ingestion.mqtt_credentials import (
     _scout_username,
 )
 
-
 # ---------------------------------------------------------------------------
 # Naming helpers
 # ---------------------------------------------------------------------------
+
 
 class TestNamingHelpers:
 
@@ -169,8 +169,11 @@ class TestProvisionCertificate:
     def test_returns_dict_with_mode_certificate(self, mock_device_cert, broker_settings):
         service = MQTTCredentialService()
         with patch.object(service, '_send_commands', return_value=True), \
-             patch('apps.ingestion.mqtt_credentials.MQTTCredentialService._provision_certificate',
-                   return_value={**_FAKE_CERT_DATA, 'mode': 'certificate', 'port': 8883, 'username': 'scout-SCOUT-CERT-01'}):
+             patch(
+                 'apps.ingestion.mqtt_credentials.MQTTCredentialService'
+                 '._provision_certificate',
+                 return_value={**_FAKE_CERT_DATA, 'mode': 'certificate', 'port': 8883},
+             ):
             result = service.provision_device(mock_device_cert)
         assert result['mode'] == 'certificate'
 

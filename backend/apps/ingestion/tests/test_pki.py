@@ -16,10 +16,10 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from apps.ingestion.pki import _CERT_VALID_DAYS, issue_device_certificate
 
-
 # ---------------------------------------------------------------------------
 # Test CA fixture — generated once per session
 # ---------------------------------------------------------------------------
+
 
 def _make_test_ca() -> tuple[str, str]:
     """Generate a minimal self-signed CA for testing. Returns (key_b64, cert_b64)."""

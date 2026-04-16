@@ -57,8 +57,8 @@ class TestJsonPathLibrarySecurity:
 
     def test_ext_module_is_not_imported_in_feeds_tasks(self):
         """The feeds tasks module must import from jsonpath_ng, not jsonpath_ng.ext."""
-        import importlib
         import inspect
+
         from apps.feeds import tasks
         source = inspect.getsource(tasks)
         assert 'from jsonpath_ng import parse' in source
@@ -67,6 +67,7 @@ class TestJsonPathLibrarySecurity:
     def test_ext_module_is_not_imported_in_integrations_tasks(self):
         """The integrations tasks module must import from jsonpath_ng, not jsonpath_ng.ext."""
         import inspect
+
         from apps.integrations import tasks
         source = inspect.getsource(tasks)
         assert 'from jsonpath_ng import parse' in source
@@ -75,6 +76,7 @@ class TestJsonPathLibrarySecurity:
     def test_ext_module_is_not_imported_in_integrations_views(self):
         """The integrations views module must import from jsonpath_ng, not jsonpath_ng.ext."""
         import inspect
+
         from apps.integrations import views
         source = inspect.getsource(views)
         assert 'from jsonpath_ng import parse' in source

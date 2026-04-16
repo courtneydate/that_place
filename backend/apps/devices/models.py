@@ -173,6 +173,7 @@ class Device(models.Model):
         blank=True,
         help_text='Auto-detected from incoming MQTT traffic. Null until first message received.',
     )
+
     class MQTTAuthMode(models.TextChoices):
         PASSWORD = 'password', 'Username / Password (port 1883)'
         CERTIFICATE = 'certificate', 'Client Certificate / mTLS (port 8883)'

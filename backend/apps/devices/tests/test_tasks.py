@@ -16,10 +16,10 @@ from apps.accounts.models import Tenant
 from apps.devices.models import Device, DeviceHealth, DeviceType, Site
 from apps.devices.tasks import check_devices_offline
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_tenant(name: str) -> Tenant:
     return Tenant.objects.create(name=name, slug=slugify(name))
@@ -108,9 +108,7 @@ class TestCheckDevicesOfflineCrossTenant:
         dev_b = make_active_device(tenant_b, 'ISO-B-001')
 
         make_health(dev_a, last_seen_minutes_ago=120)  # will go offline
-        health_b = make_health(dev_b, last_seen_minutes_ago=1)  # stays online
-
-        before_updated_at = health_b.updated_at
+        make_health(dev_b, last_seen_minutes_ago=1)  # stays online
 
         check_devices_offline()
 

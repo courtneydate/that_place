@@ -871,7 +871,7 @@ class CsvExportTest(APITestCase):
 
     def test_export_row_count_matches_db(self):
         r = self._export()
-        lines = [l for l in r.content.decode('utf-8').splitlines() if l.strip()]
+        lines = [line for line in r.content.decode('utf-8').splitlines() if line.strip()]
         # One header + two data rows
         self.assertEqual(len(lines), 3)
 

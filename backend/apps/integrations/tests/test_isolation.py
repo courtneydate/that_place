@@ -16,10 +16,10 @@ from apps.devices.models import Device, DeviceType, Site
 from apps.integrations.models import DataSource, DataSourceDevice, ThirdPartyAPIProvider
 from apps.readings.models import Stream, StreamReading
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_tenant(name: str) -> Tenant:
     return Tenant.objects.create(name=name, slug=slugify(name))
@@ -172,6 +172,7 @@ class TestPollSingleDeviceCrossTenant:
     def test_failure_on_tenant_a_does_not_affect_tenant_b(self):
         """A failed poll for Tenant A's device must not mark Tenant B's device as failed."""
         import requests as req_lib
+
         from apps.integrations.tasks import poll_single_device
 
         tenant_a = make_tenant('FailIsoA')

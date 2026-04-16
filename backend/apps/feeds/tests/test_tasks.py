@@ -7,7 +7,7 @@ Verifies that:
 
 Ref: security_risks.md § SR-03 — Tenant Isolation in Celery Beat Tasks
 """
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.utils.text import slugify
@@ -22,10 +22,10 @@ from apps.feeds.models import (
 )
 from apps.rules.models import Rule, RuleCondition, RuleConditionGroup
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_tenant(name: str) -> Tenant:
     return Tenant.objects.create(name=name, slug=slugify(name))
@@ -175,6 +175,7 @@ class TestPollSingleSubscriptionCrossTenant:
     def test_failure_on_sub_a_does_not_affect_sub_b(self):
         """An error polling sub_a must not mark sub_b as errored."""
         import requests as req_lib
+
         from apps.feeds.tasks import poll_single_subscription
 
         provider = make_tenant_feed_provider()
@@ -237,7 +238,6 @@ class TestEvaluateReferenceValueRules:
     def test_rules_without_reference_conditions_not_dispatched(self):
         """Rules that have only stream conditions must not be dispatched by this task."""
         from apps.feeds.tasks import evaluate_reference_value_rules
-        from apps.devices.models import DeviceType, Site
         from apps.readings.models import Stream
 
         tenant = make_tenant('NoRefDisp')
