@@ -97,6 +97,7 @@ cd frontend && npx eslint src/
 ---
 
 ## Things to Never Do
+- Never make git commits — always leave committing to the user
 - Never commit `.env` files or any secrets/credentials
 - Never bypass authentication on API endpoints
 - Never allow Tenant A to access Tenant B's data — every queryset must be filtered by `tenant_id`
