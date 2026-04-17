@@ -55,6 +55,12 @@ def check_devices_offline() -> None:
                     elapsed_minutes,
                     threshold,
                 )
+                from apps.notifications.tasks import create_system_notification
+                create_system_notification.delay(
+                    'device_offline',
+                    device.tenant_id,
+                    {'device_name': device.name, 'serial_number': device.serial_number},
+                )
         else:
             new_level = compute_activity_level(
                 tenant=device.tenant,

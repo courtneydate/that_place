@@ -1,3 +1,14 @@
-"""Notifications URL patterns. Implemented in Sprint 19."""
+"""Notifications URL patterns.
+
+Ref: SPEC.md § Feature: Notifications
+"""
+from rest_framework.routers import DefaultRouter
+
+from .views import NotificationViewSet
+
 app_name = 'notifications'
-urlpatterns = []
+
+router = DefaultRouter()
+router.register('notifications', NotificationViewSet, basename='notification')
+
+urlpatterns = router.urls

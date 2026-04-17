@@ -401,3 +401,13 @@ def _record_failure(dsd, poll_status: str, error_msg: str, now) -> None:
             'DataSourceDevice %d has %d consecutive failures — device health set critical',
             dsd.pk, dsd.consecutive_poll_failures,
         )
+        from apps.notifications.tasks import create_system_notification
+        create_system_notification.delay(
+            'datasource_poll_failure',
+            dsd.virtual_device.tenant_id,
+            {
+                'device_name': dsd.virtual_device.name,
+                'serial_number': dsd.virtual_device.serial_number,
+                'consecutive_failures': dsd.consecutive_poll_failures,
+            },
+        )

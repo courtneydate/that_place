@@ -66,12 +66,16 @@ def evaluate_rule(rule_id: int) -> str | None:
         outcome = run_evaluation(rule)
         if outcome == 'fired':
             from apps.alerts.models import Alert
-            Alert.objects.create(
+            from apps.notifications.tasks import create_alert_notifications
+            alert = Alert.objects.create(
                 rule=rule,
                 tenant=rule.tenant,
                 triggered_at=rule.last_fired_at,
                 status=Alert.Status.ACTIVE,
             )
+            # Dispatch notification creation after the transaction commits so
+            # the Alert row is guaranteed to exist when the task runs.
+            transaction.on_commit(lambda: create_alert_notifications.delay(alert.pk))
 
     logger.debug('evaluate_rule: rule %d → %s', rule_id, outcome)
     return outcome

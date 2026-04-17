@@ -218,7 +218,11 @@ class DeviceViewSet(viewsets.GenericViewSet):
     def destroy(self, request, pk=None):
         """DELETE /api/v1/devices/:id/ — delete a device. Tenant Admin only."""
         device = get_object_or_404(self.get_queryset(), pk=pk)
+        tenant_id = device.tenant_id
+        event_data = {'device_name': device.name, 'serial_number': device.serial_number}
         device.delete()
+        from apps.notifications.tasks import create_system_notification
+        create_system_notification.delay('device_deleted', tenant_id, event_data)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], url_path='approve')
@@ -236,6 +240,12 @@ class DeviceViewSet(viewsets.GenericViewSet):
         device.status = Device.Status.ACTIVE
         device.save(update_fields=['status'])
         logger.info('Device "%s" (id=%s) approved by %s', device.name, device.pk, request.user.email)
+        from apps.notifications.tasks import create_system_notification
+        create_system_notification.delay(
+            'device_approved',
+            device.tenant_id,
+            {'device_name': device.name, 'serial_number': device.serial_number},
+        )
         return Response(DeviceSerializer(device).data)
 
     @action(detail=True, methods=['post'], url_path='reject')
