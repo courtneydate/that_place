@@ -564,9 +564,9 @@ _Frontend:_
 
 ---
 
-### Sprint 20 — Email & SMS Notifications
+### Sprint 20 — Email, SMS & Notification Snooze
 
-**Goal:** Users receive email and SMS notifications on alert fire; opt-out is respected.
+**Goal:** Users receive email and SMS notifications on alert fire; opt-out and snooze are respected.
 
 **Deliverables:**
 - [ ] Backend: Email delivery via configured SMTP backend (AWS SES or any SMTP provider — set via `EMAIL_*` env vars)
@@ -575,13 +575,21 @@ _Frontend:_
 - [ ] Backend: SMS blocked at delivery if user has not opted in, regardless of rule action channels
 - [ ] Backend: Delivery failure logging and single retry
 - [ ] Backend: User notification preferences endpoint
-- [ ] Backend: Tests — email sent to targeted users, SMS not sent to non-opted-in user, opted-out user not emailed, failure logged, retry attempted
+- [ ] Backend: `NotificationSnooze` model — user + rule + snoozed_until; unique per (user, rule)
+- [ ] Backend: Snooze endpoint — POST /api/v1/notifications/snooze/ with rule_id and duration_minutes
+- [ ] Backend: Cancel snooze endpoint — DELETE /api/v1/notifications/snooze/:rule_id/
+- [ ] Backend: Snooze check in `create_alert_notifications` — skip writing notification for any user with an active snooze on that rule
+- [ ] Backend: Tests — email sent to targeted users, SMS not sent to non-opted-in user, opted-out user not emailed, snoozed user receives no notification during snooze window, snooze expiry restores delivery
 - [ ] Frontend: User profile / notification preferences page — email/in-app toggles (default on), SMS toggle (default off, with explanation that SMS must be explicitly enabled)
+- [ ] Frontend: Snooze button on notification panel items — duration picker (15 min / 1 hour / 4 hours / 24 hours)
+- [ ] Frontend: Snoozed indicator in notification panel (clock icon + expiry time) with cancel option
 
 **Definition of Done:**
 - Alert fires trigger in-app and email to targeted users by default
 - SMS only sent to users who have explicitly opted in
 - A user who has opted out of email does not receive email notifications
+- A user who has snoozed a rule receives no new notifications for that rule until the snooze expires
+- Snooze expiry is automatic — user receives notifications again when snoozed_until passes
 - Failed deliveries are logged with error detail and retried once
 
 ---

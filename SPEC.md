@@ -792,6 +792,14 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] App open: notification delivered as an in-app banner/toast
 - [ ] Email and SMS delivery failures are logged and retried once
 
+**Notification snooze:**
+- [ ] A user can snooze notifications for a specific rule for a configurable duration: 15 min, 1 hour, 4 hours, or 24 hours
+- [ ] While a snooze is active, the user does not receive any new notifications (in-app, email, SMS, push) when that rule fires — existing unread notifications are not affected
+- [ ] Snooze is per-user and per-rule — other users are not affected
+- [ ] Snooze expires automatically at the chosen time — no manual cancellation required, but a "Cancel snooze" option is provided
+- [ ] Snoozed rules are visually indicated in the notification panel (e.g. a clock icon with the expiry time)
+- [ ] Snooze is enforced at notification creation time — if the user has an active snooze for the rule, no notification row is written for that user
+
 **System event notifications:**
 - [ ] The following platform events trigger in-app (and optionally email) notifications to relevant tenant users:
   - Device approved by That Place Admin
@@ -915,6 +923,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | RuleAuditLog | belongs to Rule | id, rule_id, changed_by, changed_at, changed_fields (JSONB: {field: {before, after}}) |
 | Alert | belongs to Rule + Tenant | id, rule_id, tenant_id, triggered_at, status (active/acknowledged/resolved), acknowledged_by, acknowledged_at, acknowledged_note (nullable text), resolved_by, resolved_at |
 | Notification | belongs to User | id, user_id, notification_type (alert/system_event), alert_id (nullable FK → Alert — set for alert-triggered notifications), event_type (nullable — e.g. device_offline/device_approved/datasource_failure/device_deleted), event_data (nullable JSONB — context for the event), channel (in_app/email/sms/push), sent_at, read_at, delivery_status (sent/delivered/failed) |
+| NotificationSnooze | belongs to User | id, user_id, rule_id (FK → Rule), snoozed_until (datetime), created_at — unique_together: (user_id, rule_id); enforced at notification creation time to prevent writing notifications during the snooze window |
 | CommandLog | belongs to Device | id, device_id, sent_by (nullable FK → User — null if rule-triggered), triggered_by_rule_id (nullable FK → Rule), command_name, params_sent (JSONB), sent_at, ack_received_at (nullable), status (sent/acknowledged/timed_out) |
 | DataExport | belongs to Tenant + User | id, tenant_id, exported_by, stream_ids (array), date_from, date_to, exported_at |
 | Dashboard | belongs to Tenant | id, tenant_id, name, created_by, created_at |

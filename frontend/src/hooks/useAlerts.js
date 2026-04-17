@@ -50,7 +50,7 @@ export function useAcknowledgeAlert() {
   return useMutation({
     mutationFn: ({ alertId, note }) =>
       api.post(`/api/v1/alerts/${alertId}/acknowledge/`, { note }).then((r) => r.data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
     },
   });
