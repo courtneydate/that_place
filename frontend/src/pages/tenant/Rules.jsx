@@ -134,6 +134,7 @@ function Rules() {
             <tr>
               <th>Name</th>
               <th>Status</th>
+              <th>State</th>
               <th>Last fired</th>
               <th>Cooldown</th>
               {isAdmin && <th></th>}
@@ -155,6 +156,11 @@ function Rules() {
                 </td>
                 <td>
                   <ActiveToggle rule={rule} canEdit={isAdmin} />
+                </td>
+                <td>
+                  <span className={rule.current_state ? ruleStyles.stateFired : ruleStyles.stateOk}>
+                    {rule.current_state ? 'Triggered' : 'OK'}
+                  </span>
                 </td>
                 <td>{formatDateTime(rule.last_fired_at)}</td>
                 <td>{rule.cooldown_minutes ? `${rule.cooldown_minutes} min` : '—'}</td>

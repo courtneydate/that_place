@@ -220,6 +220,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'feeds.evaluate_reference_value_rules',
         'schedule': 300.0,  # every 5 minutes — catches TOU boundary transitions
     },
+    # Rules app — Sprint 17
+    'evaluate-staleness-rules': {
+        'task': 'rules.evaluate_staleness_rules',
+        'schedule': 60.0,  # every 60 seconds — staleness fires within one beat interval
+    },
 }
 
 # ---------------------------------------------------------------------------

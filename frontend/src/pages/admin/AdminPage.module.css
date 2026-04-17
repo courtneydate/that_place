@@ -166,6 +166,24 @@
   border-radius: 9999px;
 }
 
+.badgeDanger {
+  background-color: #FEF2F2;
+  color: #991B1B;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+}
+
+.badgeWarning {
+  background-color: #FFFBEB;
+  color: #92400E;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+}
+
 .mono { font-family: monospace; font-size: 0.8125rem; color: #6B7280; }
 .link { color: #1A6B4A; text-decoration: none; font-weight: 500; }
 .link:hover { text-decoration: underline; }

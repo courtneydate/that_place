@@ -785,6 +785,8 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 **Alert-triggered notifications:**
 - [ ] When a rule fires, notifications are sent via the channels and targets defined in the rule action
 - [ ] In-app notification badge shows unread count
+- [ ] Tapping a notification marks it as read and navigates to the related alert
+- [ ] "Mark all as read" button marks every unread notification for the user as read in a single action
 - [ ] Tapping a push notification deep-links directly to the alert detail screen
 - [ ] App closed: notification delivered as OS banner / lock screen notification
 - [ ] App open: notification delivered as an in-app banner/toast
@@ -1217,8 +1219,9 @@ GET    /api/v1/dataset-assignments/:id/resolve/  # returns current resolved row(
 - Acknowledge action: single tap + optional free-text "Troubleshooting explanation" field
 
 **Notifications**
-- In-app list with unread count badge
-- Tap to view the related alert
+- Dropdown panel in nav bar with unread count badge
+- Tap a notification to mark it read and navigate to the related alert
+- "Mark all as read" button in panel header clears all unread indicators
 
 **Data Export**
 - Configure: date window + stream multi-select

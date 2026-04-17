@@ -40,3 +40,28 @@
 
 .toggleActive:disabled,
 .toggleInactive:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Current state badges */
+.stateFired {
+  display: inline-block;
+  background: #FEF2F2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stateOk {
+  display: inline-block;
+  background: #F0FDF4;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

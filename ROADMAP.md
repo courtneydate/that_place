@@ -547,17 +547,20 @@ _Frontend:_
 - [ ] Backend: In-app notification creation on alert fire (per targeted user)
 - [ ] Backend: System event notifications: device approved, device offline, device deleted, DataSource poll failure
 - [ ] Backend: Unread count endpoint
-- [ ] Backend: Mark as read endpoint
-- [ ] Backend: Tests — notification created per targeted user, system events generate notifications, unread count accurate
+- [ ] Backend: Mark as read endpoint (individual notification)
+- [ ] Backend: Mark all as read endpoint (bulk — marks every unread notification for the user as read)
+- [ ] Backend: Tests — notification created per targeted user, system events generate notifications, unread count accurate, mark-all-as-read clears badge
 - [ ] Frontend: Notification bell in nav with unread badge
 - [ ] Frontend: Notification dropdown/panel — list with unread indicators, tap to navigate to related alert
-- [ ] Frontend: Mark as read on open
+- [ ] Frontend: Tapping a notification marks it as read and navigates to the related alert
+- [ ] Frontend: "Mark all as read" button in notification panel header
 
 **Definition of Done:**
 - Alert fire generates in-app notifications for all targeted users
 - Device going offline generates a system notification
 - Unread badge count is accurate
-- Tapping a notification navigates to the relevant alert
+- Tapping a notification marks it read and navigates to the relevant alert
+- "Mark all as read" clears the unread badge and all unread indicators
 
 ---
 

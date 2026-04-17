@@ -101,6 +101,10 @@ class RuleConditionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {'staleness_minutes': 'A staleness condition requires staleness_minutes.'}
                 )
+            if staleness_minutes < 2:
+                raise serializers.ValidationError(
+                    {'staleness_minutes': 'Staleness threshold must be at least 2 minutes.'}
+                )
             if not stream:
                 raise serializers.ValidationError(
                     {'stream': 'A staleness condition requires a stream to monitor.'}

@@ -6,11 +6,13 @@
  */
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useActiveAlertCount } from '../hooks/useAlerts';
 import styles from './TenantLayout.module.css';
 
 function TenantLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { data: activeAlertCount = 0 } = useActiveAlertCount();
 
   const handleLogout = async () => {
     await logout();
@@ -58,6 +60,19 @@ function TenantLayout() {
           >
             Rules
           </NavLink>
+          <div className={styles.navLinkWrap}>
+            <NavLink
+              to="/app/alerts"
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+            >
+              Alerts
+            </NavLink>
+            {activeAlertCount > 0 && (
+              <span className={styles.alertBadge}>
+                {activeAlertCount > 99 ? '99+' : activeAlertCount}
+              </span>
+            )}
+          </div>
           <NavLink
             to="/app/data-sources"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}

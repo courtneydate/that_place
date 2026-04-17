@@ -99,3 +99,30 @@
   width: 100%;
   margin: 0 auto;
 }
+
+/* Alert nav badge */
+.navLinkWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.alertBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(40%, -40%);
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}

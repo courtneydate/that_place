@@ -31,6 +31,8 @@ import DashboardDetail from './pages/tenant/DashboardDetail';
 import Rules from './pages/tenant/Rules';
 import RuleBuilder from './pages/tenant/RuleBuilder';
 import RuleDetail from './pages/tenant/RuleDetail';
+import Alerts from './pages/tenant/Alerts';
+import AlertDetail from './pages/tenant/AlertDetail';
 
 function App() {
   const { user } = useAuth();
@@ -83,6 +85,8 @@ function App() {
         <Route path="rules/new" element={<RuleBuilder />} />
         <Route path="rules/:id" element={<RuleDetail />} />
         <Route path="rules/:id/edit" element={<RuleBuilder />} />
+        <Route path="alerts" element={<Alerts />} />
+        <Route path="alerts/:id" element={<AlertDetail />} />
         <Route path="feed-subscriptions" element={<FeedSubscriptions />} />
         <Route path="dataset-assignments" element={<DatasetAssignments />} />
         <Route path="settings" element={<Settings />} />

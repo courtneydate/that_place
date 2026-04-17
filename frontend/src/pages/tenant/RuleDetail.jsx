@@ -73,6 +73,18 @@ function InfoRow({ label, value }) {
 
 InfoRow.propTypes = { label: PropTypes.string.isRequired, value: PropTypes.any };
 
+function nextEarliestFire(rule) {
+  /**
+   * Returns a formatted string for when the rule can next fire, or null
+   * if no cooldown is active (rule may fire immediately).
+   */
+  if (!rule.cooldown_minutes || !rule.last_fired_at) return null;
+  const cooldownUntil = new Date(rule.last_fired_at);
+  cooldownUntil.setMinutes(cooldownUntil.getMinutes() + rule.cooldown_minutes);
+  if (cooldownUntil <= new Date()) return null; // cooldown already expired
+  return formatDateTime(cooldownUntil.toISOString());
+}
+
 function OverviewTab({ rule }) {
   /**
    * Formatted read-only view of all rule configuration.
@@ -80,6 +92,8 @@ function OverviewTab({ rule }) {
   const dayNames = rule.active_days?.length > 0
     ? rule.active_days.map((d) => DAY_LABELS[d]).join(', ')
     : 'All days (no gate)';
+
+  const nextFire = nextEarliestFire(rule);
 
   const channelLabel = (ch) =>
     ({ in_app: 'In-app', email: 'Email', sms: 'SMS', push: 'Push' }[ch] || ch);
@@ -91,9 +105,10 @@ function OverviewTab({ rule }) {
         <h2 className={styles.sectionTitle}>General</h2>
         <div className={detailStyles.infoGrid}>
           <InfoRow label="Status" value={rule.is_active ? 'Active' : 'Inactive'} />
-          <InfoRow label="Current state" value={rule.current_state ? 'Triggered' : 'Not triggered'} />
+          <InfoRow label="Current state" value={rule.current_state ? 'Triggered' : 'OK'} />
           <InfoRow label="Last fired" value={formatDateTime(rule.last_fired_at)} />
           <InfoRow label="Cooldown" value={rule.cooldown_minutes ? `${rule.cooldown_minutes} min` : 'None'} />
+          {nextFire && <InfoRow label="Next earliest fire" value={nextFire} />}
           {rule.description && <InfoRow label="Description" value={rule.description} />}
         </div>
       </div>

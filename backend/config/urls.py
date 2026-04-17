@@ -11,4 +11,5 @@ urlpatterns = [
     path('api/v1/', include('apps.dashboards.urls')),
     path('api/v1/', include('apps.rules.urls')),
     path('api/v1/', include('apps.feeds.urls')),
+    path('api/v1/', include('apps.alerts.urls')),
 ]

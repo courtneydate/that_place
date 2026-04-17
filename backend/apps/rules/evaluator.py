@@ -190,9 +190,7 @@ def _evaluate_condition(condition, rule) -> bool:
     if ct == RuleCondition.ConditionType.STREAM:
         return _eval_stream_condition(condition)
     if ct == RuleCondition.ConditionType.STALENESS:
-        # Staleness conditions are evaluated by the beat task in Sprint 17.
-        # Point-in-time evaluation here treats them as False.
-        return False
+        return _eval_staleness_condition(condition)
     if ct == RuleCondition.ConditionType.FEED_CHANNEL:
         return _eval_feed_channel_condition(condition)
     if ct == RuleCondition.ConditionType.REFERENCE_VALUE:
@@ -232,6 +230,41 @@ def _eval_stream_condition(condition) -> bool:
         condition.threshold_value,
         condition.stream.data_type,
     )
+
+
+def _eval_staleness_condition(condition) -> bool:
+    """Evaluate a staleness condition.
+
+    Returns True (condition met — rule should fire) when the stream has not
+    reported a reading within ``condition.staleness_minutes`` minutes.
+
+    A stream that has never reported is considered stale (returns True).
+    Clearing happens automatically: when a new reading arrives the ingestion
+    path dispatches evaluate_rule via RuleStreamIndex, and this function then
+    returns False (stream is fresh), triggering a true→false clear.
+
+    Ref: SPEC.md § Feature: Rules Engine — staleness conditions
+         SPEC.md § Feature: Rule Evaluation Engine — Sprint 17
+    """
+    from apps.readings.models import StreamReading
+
+    if condition.stream_id is None or not condition.staleness_minutes:
+        return False
+
+    latest = (
+        StreamReading.objects
+        .filter(stream_id=condition.stream_id)
+        .order_by('-timestamp')
+        .values('timestamp')
+        .first()
+    )
+
+    if latest is None:
+        # Stream has never reported — treat as stale
+        return True
+
+    stale_after = timezone.now() - timedelta(minutes=condition.staleness_minutes)
+    return latest['timestamp'] < stale_after
 
 
 def _eval_feed_channel_condition(condition) -> bool:
