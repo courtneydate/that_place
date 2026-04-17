@@ -13,6 +13,12 @@
 # Dynamic Security bootstrap:
 #   On first start (no dynamic-security.json), initialises the plugin config
 #   with the admin account from MQTT_ADMIN_USERNAME / MQTT_ADMIN_PASSWORD.
+#
+# Subscriber setup:
+#   On every start, ensures MQTT_USERNAME has the 'client' role (full '#'
+#   publish/subscribe access). The bootstrap only grants dynsec-admin access
+#   to the admin user; the subscriber needs both. A temporary broker instance
+#   is started briefly so that mosquitto_ctrl can use the online dynsec API.
 set -e
 
 CERTS_DIR=/mosquitto/certs
@@ -84,6 +90,60 @@ if [ ! -f "$CONFIG" ]; then
     mosquitto_ctrl dynsec init "$CONFIG" \
         "$MQTT_ADMIN_USERNAME" "$MQTT_ADMIN_PASSWORD"
     echo "[mqtt] Dynamic Security initialised. Admin: $MQTT_ADMIN_USERNAME"
+fi
+
+# Ensure the broker process (user: mosquitto) can read and write the config.
+# mosquitto_ctrl dynsec init creates the file as root:root with mode 0640;
+# the mosquitto user cannot read it without this fix.
+chmod 660 "$CONFIG" 2>/dev/null || true
+chown mosquitto:mosquitto "$CONFIG" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Ensure backend subscriber client has the 'client' role
+#
+# mosquitto_ctrl dynsec init creates the admin with only dynsec-admin access
+# ($CONTROL/dynamic-security/#). The Django MQTT subscriber also needs the
+# 'client' role for full publish/subscribe access to '#'. We start the broker
+# briefly so the online dynsec API is available, add the role (idempotent —
+# errors are silenced), then stop the temporary instance before the final exec.
+# ---------------------------------------------------------------------------
+if [ -n "$MQTT_USERNAME" ] && [ -n "$MQTT_PASSWORD" ] && \
+   [ -n "$MQTT_ADMIN_USERNAME" ] && [ -n "$MQTT_ADMIN_PASSWORD" ]; then
+    echo "[mqtt] Ensuring subscriber client '$MQTT_USERNAME' has 'client' role..."
+
+    /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf &
+    MOSQ_PID=$!
+
+    # Wait up to 10 s for the broker to accept dynsec commands.
+    TRIES=0
+    until mosquitto_ctrl -h localhost -p 1883 \
+            -u "$MQTT_ADMIN_USERNAME" -P "$MQTT_ADMIN_PASSWORD" \
+            dynsec getDefaultACLAccess >/dev/null 2>&1; do
+        TRIES=$((TRIES + 1))
+        if [ "$TRIES" -ge 20 ]; then
+            echo "[mqtt] WARNING: broker not ready after 10 s — skipping subscriber setup."
+            break
+        fi
+        sleep 0.5
+    done
+
+    if [ "$TRIES" -lt 20 ]; then
+        # Create the client if it does not exist yet (ignore 'already exists').
+        mosquitto_ctrl -h localhost -p 1883 \
+            -u "$MQTT_ADMIN_USERNAME" -P "$MQTT_ADMIN_PASSWORD" \
+            dynsec createClient "$MQTT_USERNAME" \
+            -p "$MQTT_PASSWORD" 2>/dev/null || true
+
+        # Assign the 'client' role (full '#' access). Idempotent.
+        mosquitto_ctrl -h localhost -p 1883 \
+            -u "$MQTT_ADMIN_USERNAME" -P "$MQTT_ADMIN_PASSWORD" \
+            dynsec addClientRole "$MQTT_USERNAME" client 2>/dev/null || true
+
+        echo "[mqtt] Subscriber client '$MQTT_USERNAME' is ready."
+    fi
+
+    kill "$MOSQ_PID" 2>/dev/null
+    wait "$MOSQ_PID" 2>/dev/null || true
 fi
 
 exec /docker-entrypoint.sh /usr/sbin/mosquitto \

@@ -204,7 +204,6 @@
   border: none;
   border-bottom: 1px solid #F3F4F6;
   padding: 0.75rem 1rem;
-  cursor: pointer;
   position: relative;
   display: block;
   transition: background-color 0.1s;
@@ -245,6 +244,100 @@
   background: #1A6B4A;
   border-radius: 50%;
 }
+
+/* Notification item internal structure */
+
+/* The item is now a div; .notifBody is the clickable part */
+.notifBody {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+}
+
+/* Snooze row below the notification body */
+.notifSnoozeRow {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid #F3F4F6;
+}
+
+/* Snoozed indicator */
+.snoozedBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  color: #6B7280;
+}
+
+.cancelSnoozeBtn {
+  background: none;
+  border: none;
+  color: #EF4444;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+}
+.cancelSnoozeBtn:hover { text-decoration: underline; }
+.cancelSnoozeBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Snooze trigger button */
+.snoozeBtn {
+  background: none;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  color: #6B7280;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.1875rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+.snoozeBtn:hover { color: #111827; border-color: #9CA3AF; }
+
+/* Duration picker */
+.snoozePicker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.snoozePickerLabel {
+  font-size: 0.6875rem;
+  color: #6B7280;
+  margin-right: 0.125rem;
+}
+
+.snoozeDurationBtn {
+  background: #F3F4F6;
+  border: none;
+  border-radius: 4px;
+  color: #374151;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.1875rem 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+.snoozeDurationBtn:hover { background-color: #1A6B4A; color: #FFFFFF; }
+.snoozeDurationBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.snoozePickerCancel {
+  background: none;
+  border: none;
+  color: #9CA3AF;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  padding: 0 0.125rem;
+}
+.snoozePickerCancel:hover { color: #374151; }
 
 /* Alert nav badge */
 .navLinkWrap {

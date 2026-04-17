@@ -31,6 +31,10 @@ services:
     environment:
       MQTT_ADMIN_USERNAME: ${MQTT_ADMIN_USERNAME}
       MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD}
+      # Subscriber credentials — entrypoint creates this client in dynsec
+      # on every start so the Django MQTT subscriber can always connect.
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
       # PKI — leave blank in dev; entrypoint auto-generates self-signed certs.
       # In production, provide base64-encoded PEM values generated offline.
       MQTT_CA_CERT_B64: ${MQTT_CA_CERT_B64:-}

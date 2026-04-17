@@ -132,7 +132,7 @@ class TestCreateAlertNotifications:
     """Alert fire creates one in_app Notification per targeted user."""
 
     def test_notifies_individual_user(self):
-        """A user in user_ids receives one notification."""
+        """A user in user_ids receives one in-app notification."""
         tenant = make_tenant('NotifIndivT')
         device = make_device(tenant, 'NI-001')
         stream = make_stream(device)
@@ -142,12 +142,17 @@ class TestCreateAlertNotifications:
         _, alert = make_rule_with_notify_action(tenant, stream, user_ids=[target_tu.pk])
         create_alert_notifications(alert.pk)
 
-        notifs = Notification.objects.filter(user=target, alert=alert)
+        # Sprint 20: task now creates one row per channel (in_app + email by default).
+        # Assert the in_app row — deduplication and multi-channel counts are
+        # covered by test_sprint20.py.
+        notifs = Notification.objects.filter(
+            user=target, alert=alert, channel=Notification.Channel.IN_APP,
+        )
         assert notifs.count() == 1
         assert notifs.first().notification_type == Notification.NotificationType.ALERT
 
     def test_notifies_group_members(self):
-        """All members of a targeted group receive a notification."""
+        """All members of a targeted group receive an in-app notification."""
         tenant = make_tenant('NotifGroupT')
         device = make_device(tenant, 'NG-001')
         stream = make_stream(device)
@@ -162,11 +167,16 @@ class TestCreateAlertNotifications:
         _, alert = make_rule_with_notify_action(tenant, stream, group_ids=[group.pk])
         create_alert_notifications(alert.pk)
 
-        assert Notification.objects.filter(user=user_a, alert=alert).count() == 1
-        assert Notification.objects.filter(user=user_b, alert=alert).count() == 1
+        # Each member gets one in-app row (multi-channel totals tested in Sprint 20).
+        assert Notification.objects.filter(
+            user=user_a, alert=alert, channel=Notification.Channel.IN_APP,
+        ).count() == 1
+        assert Notification.objects.filter(
+            user=user_b, alert=alert, channel=Notification.Channel.IN_APP,
+        ).count() == 1
 
     def test_deduplication_group_and_individual(self):
-        """A user targeted via group AND user_ids gets only one notification."""
+        """A user targeted via group AND user_ids gets only one in-app notification."""
         tenant = make_tenant('NotifDedupeT')
         device = make_device(tenant, 'DD-001')
         stream = make_stream(device)
@@ -181,7 +191,10 @@ class TestCreateAlertNotifications:
         )
         create_alert_notifications(alert.pk)
 
-        assert Notification.objects.filter(user=user, alert=alert).count() == 1
+        # Deduplication: only one in_app row despite two targeting paths.
+        assert Notification.objects.filter(
+            user=user, alert=alert, channel=Notification.Channel.IN_APP,
+        ).count() == 1
 
     def test_no_notifications_without_notify_action(self):
         """A rule with only a command action creates no notifications."""

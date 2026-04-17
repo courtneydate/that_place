@@ -564,6 +564,27 @@ _Frontend:_
 
 ---
 
+### Sprint 19a — Widget Titles
+
+**Goal:** Every dashboard widget displays an editable title that defaults to the names of its bound devices.
+
+**Deliverables:**
+- [ ] Backend: `title` field added to all widget config JSONB schemas; serializer validates it is non-blank and ≤ 120 characters
+- [ ] Frontend: Widget builder modal — title field pre-populated with auto-generated device-name default for new widgets; editable for existing widgets
+- [ ] Frontend: Auto-title logic — 1 device → `"<Device Name>"`; 2 devices → `"<Device A> & <Device B>"`; 3+ devices → `"<Device A>, <Device B> + N more"` — computed at widget-creation time and saved into config
+- [ ] Frontend: Widget card — title rendered at the top of every widget; Tenant Admin / Operator can click the title to edit it inline (text input; blur or Enter saves via PUT)
+- [ ] Frontend: Inline title edit saves via the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint; optimistic update with rollback on error
+- [ ] Frontend: View-Only users see the title but cannot edit it (click is a no-op)
+
+**Definition of Done:**
+- New widgets default to a device-name-based title visible on the card
+- Inline title edit persists on blur/Enter and rolls back on API error
+- Title is shown in all widget types (line chart, gauge, value card, status indicator, health chart)
+- View-Only users cannot trigger the inline edit
+- Blank title is rejected by the backend (400) and the frontend does not save it
+
+---
+
 ### Sprint 20 — Email, SMS & Notification Snooze
 
 **Goal:** Users receive email and SMS notifications on alert fire; opt-out and snooze are respected.
@@ -614,6 +635,27 @@ _Frontend:_
 - Mock ack received — status updates to `acknowledged`
 - No ack within timeout period — status updates to `timed_out`
 - View-Only user cannot see the send command button
+
+---
+
+### Sprint 21a — 3rd Party API Provider Commands
+
+**Goal:** Extend the command infrastructure built in Sprint 21 to support control actions on virtual (3rd party API) devices. Provider commands are HTTP calls to the provider API — not MQTT — but share the same param schema, command picker UI, and `CommandLog` for history.
+
+**Deliverables:**
+- [ ] Backend: `commands` JSONB field added to `ThirdPartyAPIProvider` — same schema as `DeviceType.commands` plus `endpoint` and `method` per entry; That Place Admin can configure per provider
+- [ ] Backend: Command send endpoint extended — detects whether the target device is virtual; if so, dispatches an authenticated HTTP call to the provider API (using the DataSource credentials) instead of an MQTT publish; params substituted into the endpoint path and/or request body
+- [ ] Backend: `CommandLog` records created the same way as MQTT commands; no `ack_received_at` (HTTP commands are synchronous — a 2xx response = acknowledged, non-2xx = timed_out); status set immediately on response
+- [ ] Backend: Tests — virtual device command dispatched as HTTP not MQTT, 2xx sets acknowledged, non-2xx sets timed_out, View-Only blocked, MQTT device path unchanged
+- [ ] Frontend: Command picker on virtual device detail shows provider commands (sourced from `ThirdPartyAPIProvider.commands`) using the same auto-generated param form as MQTT device commands
+- [ ] Frontend: That Place Admin provider config form — commands JSONB editor (name, label, description, endpoint, method, params array)
+
+**Definition of Done:**
+- That Place Admin can add a command to a provider config and save it
+- Tenant Admin/Operator sees the command on the virtual device detail and can send it
+- Successful call logs as `acknowledged`; failed call logs as `timed_out` with error detail
+- MQTT device command path is entirely unaffected
+- View-Only user cannot send provider commands
 
 ---
 

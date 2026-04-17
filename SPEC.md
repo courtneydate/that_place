@@ -456,6 +456,7 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
   - Available streams (JSONB array): each stream has key, label, unit, data_type, and a JSONPath expression to extract its value from the detail endpoint response
   - Default poll interval (seconds) — minimum 30 s, default 300 s (5 minutes)
   - Max requests per second (optional) — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls are sent per second
+  - Commands (JSONB array, optional): control actions the provider supports. **Same schema as `DeviceType.commands`** (name, label, description, params array) with two additional fields per entry: `endpoint` (path template, may include `{device_id}`) and `method` (GET/POST/PUT/PATCH). Commands here are dispatched as authenticated HTTP calls to the provider API — not MQTT publishes. The command picker on the device detail screen shows these commands when the device is a virtual device; it shows `DeviceType.commands` for MQTT devices. Both share the same param schema and the same `CommandLog` record for history and audit.
 - [ ] Provider configs are visible to Tenant Admins (name + description only) — credential schemas and JSONPath internals are not exposed
 - [ ] JSONPath expressions are evaluated using `jsonpath_ng` (core module only — not `jsonpath_ng.ext`). Standard path navigation (`$.field`, `[*]`, `$.results[*].id`) is supported. Filter expressions (`?(@.price > 100)`) and arithmetic are intentionally unsupported — the parser will raise an error if a provider config contains them. This is a deliberate security constraint (SR-08).
 
@@ -658,11 +659,20 @@ The schema is defined once by That Place Admin through the admin UI. All subsequ
 - [ ] Live data refreshes automatically on a configurable polling interval (default: 30 seconds)
 - [ ] Widget config stored as JSONB — supports flexible per-widget settings without schema changes
 
+**Widget titles:**
+- [ ] Every widget has an editable title stored in the config JSONB as `"title"`
+- [ ] Default title is auto-generated from the device names bound to the widget: if one device → `"<Device Name>"`; if two devices → `"<Device A> & <Device B>"`; if three or more → `"<Device A>, <Device B> + N more"`. This default is computed on the frontend at widget-creation time and saved into the config — it is not recomputed dynamically after save.
+- [ ] The title is displayed at the top of every widget card on the dashboard
+- [ ] Tenant Admin and Operator can edit the title inline on the widget card (single click opens an editable text input; blur or Enter saves via the existing PUT endpoint)
+- [ ] Title is always shown in the widget builder modal as an editable field, pre-populated with the current value (or the auto-generated default for new widgets)
+- [ ] Title is a free-text string; maximum 120 characters; may not be blank
+
 **Widget config schemas (JSONB):**
 
 `value_card`:
 ```json
 {
+  "title": "Tank Level — Site A",
   "stream_id": 123,
   "label_override": "Tank Level"
 }
@@ -671,6 +681,7 @@ The schema is defined once by That Place Admin through the admin UI. All subsequ
 `line_chart`:
 ```json
 {
+  "title": "Sensor A & Sensor B",
   "streams": [
     { "stream_id": 123, "axis": "left", "color": "#hex" },
     { "stream_id": 456, "axis": "right", "color": "#hex" }
@@ -683,6 +694,7 @@ The schema is defined once by That Place Admin through the admin UI. All subsequ
 `gauge`:
 ```json
 {
+  "title": "Pressure — Pump House",
   "stream_id": 123,
   "min": 0,
   "max": 100,
@@ -910,7 +922,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
 | Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
 | StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
-| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password/**dual_api_key**), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), **device_detail_endpoint** (JSONB optional: path_template with {device_id}, method, name_jsonpath — called as background task after connect to populate virtual device names; leave empty when discovery already returns names), detail_endpoint (JSONB: path_template with {device_id}, method, **params** (optional dict — values may contain time tokens {from_unix}/{to_unix} for Unix timestamps or {from_iso}/{to_iso} for ISO 8601 UTC; interpolated from last_polled_at→now on each poll), **window_seconds** (int default 300 — fallback time window for first poll when last_polled_at is None)), available_streams (JSONB array: key/label/unit/data_type/jsonpath), default_poll_interval_seconds (min 30, default 300), max_requests_per_second (nullable int — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls fire per second), is_active, created_at |
+| ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password/**dual_api_key**), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), **device_detail_endpoint** (JSONB optional: path_template with {device_id}, method, name_jsonpath — called as background task after connect to populate virtual device names; leave empty when discovery already returns names), detail_endpoint (JSONB: path_template with {device_id}, method, **params** (optional dict — values may contain time tokens {from_unix}/{to_unix} for Unix timestamps or {from_iso}/{to_iso} for ISO 8601 UTC; interpolated from last_polled_at→now on each poll), **window_seconds** (int default 300 — fallback time window for first poll when last_polled_at is None)), available_streams (JSONB array: key/label/unit/data_type/jsonpath), **commands** (JSONB array, nullable — same schema as DeviceType.commands {name, label, description, params} plus {endpoint, method} per entry; dispatched as authenticated HTTP calls, not MQTT; null means the provider has no control actions), default_poll_interval_seconds (min 30, default 300), max_requests_per_second (nullable int — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls fire per second), is_active, created_at |
 | DataSource | belongs to Tenant | id, tenant_id, provider_id (FK → ThirdPartyAPIProvider), name, credentials (encrypted JSONB — filled from provider's auth_param_schema), auth_token_cache (encrypted JSONB — stores access/refresh tokens for oauth2 types), is_active, created_at |
 | DataSourceDevice | belongs to DataSource | id, datasource_id, external_device_id (device ID as returned by provider's discovery endpoint), external_device_name (nullable), virtual_device_id (FK → Device), active_stream_keys (array — subset of provider's available_streams the tenant has activated), **poll_interval_seconds** (nullable int, min 30 — overrides provider default when set; null means use provider default), last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text), consecutive_poll_failures (int, default 0), is_active |
 | NotificationGroup | belongs to Tenant | id, tenant_id, name, is_system (bool — for pre-defined groups), created_at |
@@ -923,6 +935,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | RuleAuditLog | belongs to Rule | id, rule_id, changed_by, changed_at, changed_fields (JSONB: {field: {before, after}}) |
 | Alert | belongs to Rule + Tenant | id, rule_id, tenant_id, triggered_at, status (active/acknowledged/resolved), acknowledged_by, acknowledged_at, acknowledged_note (nullable text), resolved_by, resolved_at |
 | Notification | belongs to User | id, user_id, notification_type (alert/system_event), alert_id (nullable FK → Alert — set for alert-triggered notifications), event_type (nullable — e.g. device_offline/device_approved/datasource_failure/device_deleted), event_data (nullable JSONB — context for the event), channel (in_app/email/sms/push), sent_at, read_at, delivery_status (sent/delivered/failed) |
+| UserNotificationPreference | one-to-one with User | id, user_id, in_app_enabled (bool, default true), email_enabled (bool, default true), sms_enabled (bool, default false), phone_number (text, blank — E.164 format; required for SMS delivery) — created on first GET with defaults; get_or_create always used |
 | NotificationSnooze | belongs to User | id, user_id, rule_id (FK → Rule), snoozed_until (datetime), created_at — unique_together: (user_id, rule_id); enforced at notification creation time to prevent writing notifications during the snooze window |
 | CommandLog | belongs to Device | id, device_id, sent_by (nullable FK → User — null if rule-triggered), triggered_by_rule_id (nullable FK → Rule), command_name, params_sent (JSONB), sent_at, ack_received_at (nullable), status (sent/acknowledged/timed_out) |
 | DataExport | belongs to Tenant + User | id, tenant_id, exported_by, stream_ids (array), date_from, date_to, exported_at |

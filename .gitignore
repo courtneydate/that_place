@@ -93,6 +93,10 @@ $RECYCLE.BIN/
 # Docker
 .docker/
 
+# Mosquitto Dynamic Security runtime config — generated at container start,
+# contains hashed credentials, must not be committed.
+docker/mosquitto/dynamic-security.json
+
 # Misc
 *.bak
 *.tmp

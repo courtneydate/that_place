@@ -1,15 +1,20 @@
-"""Notification model for That Place.
+"""Notification models for That Place.
 
-A Notification represents a single delivery of an event to a user's in-app
-inbox. Two notification_type values are supported:
+Notification — a single delivery of an event to a user (one row per user
+per channel). Two notification_type values are supported:
 
-  alert       — created when a rule fires; alert_id is set.
+  alert        — created when a rule fires; alert_id is set.
   system_event — created for platform events (device approved/offline/deleted,
-                 DataSource poll failure); event_type and event_data are set.
+                 DataSource poll failure).
 
-Sprint 19 creates in_app channel only. Email/SMS/push are added in Sprint 20+.
+UserNotificationPreference — per-user channel opt-in/opt-out settings and
+SMS phone number. Created on first access with default values (in-app on,
+email on, SMS off).
 
-Ref: SPEC.md § Feature: Notifications, § Data Model — Notification
+NotificationSnooze — per-user per-rule snooze window. While active,
+create_alert_notifications skips writing any notification for that user.
+
+Ref: SPEC.md § Feature: Notifications, § Data Model
 """
 from django.conf import settings
 from django.db import models
@@ -93,4 +98,84 @@ class Notification(models.Model):
             f'Notification({self.pk}) '
             f'user={self.user_id} type={self.notification_type} '
             f'read={self.read_at is not None}'
+        )
+
+
+class UserNotificationPreference(models.Model):
+    """Per-user notification channel preferences and SMS contact number.
+
+    Created on first GET with default values (in-app on, email on, SMS off).
+    get_or_create should always be used when reading to ensure a row exists.
+
+    phone_number is required for SMS delivery — if blank, SMS is skipped even
+    when sms_enabled is True.
+
+    Ref: SPEC.md § Feature: Notifications — Channels
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_preference',
+    )
+    in_app_enabled = models.BooleanField(
+        default=True,
+        help_text='Show notifications in the in-app bell/dropdown.',
+    )
+    email_enabled = models.BooleanField(
+        default=True,
+        help_text='Send email notifications. On by default — user must opt out.',
+    )
+    sms_enabled = models.BooleanField(
+        default=False,
+        help_text='Send SMS notifications. Off by default — user must opt in.',
+    )
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text='E.164 format preferred (e.g. +61412345678). Required for SMS delivery.',
+    )
+
+    def __str__(self) -> str:
+        """Return a human-readable summary of this preference record."""
+        return (
+            f'UserNotificationPreference(user={self.user_id} '
+            f'email={self.email_enabled} sms={self.sms_enabled})'
+        )
+
+
+class NotificationSnooze(models.Model):
+    """Suppresses notifications for a specific user + rule combination.
+
+    While snoozed_until is in the future, create_alert_notifications will not
+    write any Notification row for this user when the rule fires. Existing
+    notifications are unaffected.
+
+    unique_together (user, rule) ensures there is at most one active snooze
+    per pair. Re-snoozing updates snoozed_until via update_or_create.
+
+    Ref: SPEC.md § Feature: Notifications — Notification snooze
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_snoozes',
+    )
+    rule = models.ForeignKey(
+        'rules.Rule',
+        on_delete=models.CASCADE,
+        related_name='notification_snoozes',
+    )
+    snoozed_until = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'rule')]
+
+    def __str__(self) -> str:
+        """Return a human-readable description of the snooze."""
+        return (
+            f'NotificationSnooze(user={self.user_id} '
+            f'rule={self.rule_id} until={self.snoozed_until})'
         )
