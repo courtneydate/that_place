@@ -145,7 +145,22 @@ that-place/scout/{scout_serial}/{device_serial}/cmd/ack
 | `.../{device_serial}/cmd/ack` | Scout → Cloud | Confirmation that a command was received and executed |
 
 **Scout subscribes to:** `that-place/scout/{scout_serial}/#`
-**Backend subscribes to:** `that-place/scout/+/#`
+**Backend subscribes to:** `that-place/scout/+/#` and `fm/mm/+/#` (legacy)
+**Backend publishes to:** `that-place/scout/{scout_serial}/cmd/{command_name}` (Scout-direct) and `that-place/scout/{scout_serial}/{device_serial}/cmd/{command_name}` (bridged device)
+
+**Command payload format (Cloud → Scout):**
+JSON object containing the command parameters:
+```json
+{ "speed": 75 }
+```
+An empty params command sends `{}`.
+
+**Ack payload format (Scout → Cloud):**
+JSON object — must include `command` field matching the command name that is being acknowledged, plus optional `status` and `reason` fields (Phase 2):
+```json
+{ "command": "set_fan_speed" }
+```
+The backend matches the ack to the most-recent `sent` `CommandLog` for that device where `command_name` equals the `command` field value. If no match is found the ack is logged and discarded.
 
 **Telemetry payloads — stream values are sent as a JSON key-value object in a single message per device per interval:**
 
@@ -214,6 +229,36 @@ The backend subscribes to both legacy and new topic formats simultaneously to su
 - When firmware is updated and the Scout begins sending on the new prefix, `topic_format` flips to `that_place_v1` automatically — no manual intervention
 - That Place Admin can filter devices by `topic_format` to track fleet migration progress
 - Old Scouts re-registered as new Device records in That Place v1 during tenant onboarding — operate on `legacy_v1` until firmware updated, then seamlessly transition
+
+**Backend MQTT Service Identity:**
+
+The backend service connects to the broker using **mTLS (client certificate) on port 8883 only** — no username/password authentication. This applies to both the ingestion subscriber and the command publisher, which share the same persistent paho connection.
+
+| Property | Value |
+|----------|-------|
+| Client CN | `that-place-backend` |
+| Port | 8883 (TLS) |
+| Auth | Client certificate issued by the platform CA |
+| Subscribe ACLs | `fm/mm/+/#`, `that-place/scout/+/#` |
+| Publish ACLs | `that-place/scout/+/cmd/+`, `that-place/scout/+/+/cmd/+` |
+
+**Backend MQTT env vars (certificate mode):**
+
+| Var | Description |
+|-----|-------------|
+| `MQTT_BROKER_HOST` | Broker hostname (`mosquitto` for local dev) |
+| `MQTT_BROKER_PORT` | Must be `8883` |
+| `MQTT_CA_CERT_B64` | Base64-encoded PEM CA certificate (verifies broker identity) |
+| `MQTT_BACKEND_CERT_B64` | Base64-encoded PEM client certificate for the backend service (CN = `that-place-backend`) |
+| `MQTT_BACKEND_KEY_B64` | Base64-encoded PEM private key for the backend service certificate |
+
+`MQTT_USERNAME` and `MQTT_PASSWORD` are retained for local dev convenience only (e.g. running without TLS) — they must not be set in production. If `MQTT_BACKEND_CERT_B64` is present, certificate auth is used and username/password is ignored.
+
+**Publish approach:**
+The existing persistent `ThatPlaceMQTTClient` (used for ingestion) gains a `publish(topic, payload, qos=1)` method. Command publishing is dispatched as a Celery task (`devices.send_device_command`) so it is off the HTTP request path and retried on failure. The Celery task resolves the correct Scout serial from the device's `gateway_device` (or the device's own serial if it is a Scout), constructs the topic, and calls `publish` on the shared client.
+
+**Local development:**
+The Docker Compose stack generates a self-signed CA and issues a `that-place-backend` client certificate on first start. Generated certs are written to a Docker volume and the base64-encoded values are populated into `.env` automatically. Mosquitto is configured with `require_certificate true` on port 8883.
 
 **Remaining hardware team input required:**
 - ⚑ **Legacy weatherstation/tbox/abb payload format** — payload structure for these message types still required before their parsers can be built
@@ -863,9 +908,12 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] View-Only users cannot send commands
 
 **Acknowledgement:**
-- [ ] Device (via Scout) publishes acknowledgement to `.../cmd/ack` — confirms receipt only (MVP)
-- [ ] If no ack received within the device type's configured timeout: command log status set to `timed_out`
-- [ ] ⚑ **Success/failure status in ack payload** — Phase 2. Currently Scout hardware capability to confirm execution success/failure is unknown. When confirmed, ack payload should include status (ok/error) and optional reason.
+- [ ] Device (via Scout) publishes acknowledgement to `that-place/scout/{scout_serial}/{device_serial}/cmd/ack`
+- [ ] Ack payload must be JSON containing a `command` field with the command name: `{ "command": "set_fan_speed" }` — the backend uses this to match the ack to the correct `CommandLog` entry (most-recent `sent` record for that device where `command_name` matches)
+- [ ] On valid ack received: `CommandLog.status` → `acknowledged`, `ack_received_at` set to current time
+- [ ] If no ack received within the device type's configured timeout: Celery task sets `CommandLog.status` → `timed_out`
+- [ ] Ack messages where `command` field is absent or does not match any `sent` CommandLog for that device are logged as a warning and discarded
+- [ ] ⚑ **Success/failure status in ack payload** — Phase 2. When Scout hardware capability is confirmed, ack payload should also include `status` (ok/error) and optional `reason` fields.
 
 **Command history:**
 - [ ] Every command is logged: sent by, timestamp, command name, params sent, ack status (sent / acknowledged / timed_out)
@@ -1025,7 +1073,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 | Service | Purpose | Auth Method |
 |---------|---------|------------|
-| Mosquitto / AWS IoT Core | MQTT broker for Scout device comms — Mosquitto for local dev and self-hosted prod; AWS IoT Core for AWS prod | Mosquitto: username/password; IoT Core: IAM role / device certificates |
+| Mosquitto / AWS IoT Core | MQTT broker for Scout device comms — Mosquitto for local dev and self-hosted prod; AWS IoT Core for AWS prod | Mosquitto: mTLS client certificate on port 8883 (backend service); IoT Core: IAM role / device certificates |
 | SMTP provider (AWS SES, Mailgun, Postmark, or other) | Transactional email (notifications, invites) — configured via `EMAIL_*` env vars | SMTP credentials or API key (env var) |
 | Twilio (or similar — TBC) | SMS notifications | API key (env var) |
 | Expo Push Service | Mobile push notifications | Expo push token |
@@ -1413,7 +1461,7 @@ That Place is designed to run on any Linux server. All external service dependen
 ## 9. Open Questions / Flagged Items
 
 - [ ] **SMS provider** — which provider is preferred? (Twilio preferred — works on any deployment. AWS SNS as alternative for AWS-only deployments.)
-- [x] **MQTT broker** — resolved: Mosquitto for local dev and self-hosted production deployments. AWS IoT Core supported as an alternative for AWS production deployments. Both use the same ingestion code path — broker connection configured entirely via env vars (`MQTT_BROKER_HOST`, `MQTT_BROKER_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`).
+- [x] **MQTT broker** — resolved: Mosquitto for local dev and self-hosted production deployments. AWS IoT Core supported as an alternative for AWS production deployments. Both use the same ingestion code path — broker connection configured entirely via env vars. The backend service connects using **mTLS on port 8883** (`MQTT_BROKER_HOST`, `MQTT_BROKER_PORT=8883`, `MQTT_CA_CERT_B64`, `MQTT_BACKEND_CERT_B64`, `MQTT_BACKEND_KEY_B64`). Username/password (`MQTT_USERNAME`, `MQTT_PASSWORD`) is supported for local dev without TLS only and must not be set in production. See MQTT Topic Structure section for the full backend service identity, ACL, and publish approach.
 - [x] **Legacy telemetry payload format (Scout/telemetry)** — resolved: 12-value CSV string, fixed field order (4 relays, 4 analog inputs, 4 digital inputs). Stream keys match v1 Scout JSON keys. See MQTT Topic Structure section for full mapping.
 - [x] **Battery and signal as virtual streams** — resolved: `_battery` and `_signal` are reserved keys in v1 Scout telemetry. Stored as StreamReadings (virtual streams) AND update DeviceHealth. Makes them available to rule engine and dashboard without special handling. Legacy v1 devices have null battery/signal.
 - [x] **Activity level thresholds** — resolved: configurable per tenant via Tenant model fields with platform defaults (signal: -70/-85 dBm, battery: 40%/20%, offline approaching: 75%). See Feature: Device Health Monitoring for full derivation rules.

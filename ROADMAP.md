@@ -617,14 +617,18 @@ _Frontend:_
 
 ### Sprint 21 — Device Commands
 
-**Goal:** Admin and Operator can send commands to devices; commands are logged and ack tracked.
+**Goal:** Admin and Operator can send commands to devices; commands are logged and ack tracked. Rule-triggered commands are dispatched automatically on rule fire.
 
 **Deliverables:**
-- [ ] Backend: Command send endpoint — validates command and params against device type definition, publishes to MQTT
-- [ ] Backend: MQTT ack listener — receives ack, updates CommandLog
-- [ ] Backend: Timeout detection Celery task — marks CommandLog as `timed_out` after device type timeout period
-- [ ] Backend: CommandLog CRUD (history endpoint)
-- [ ] Backend: Tests — command validated against device type, ack received updates log, timeout fires correctly, View-Only blocked
+- [ ] Backend: mTLS MQTT publish capability — `ThatPlaceMQTTClient` extended with `publish(topic, payload, qos=1)` method; connects on port 8883 using `MQTT_BACKEND_CERT_B64` / `MQTT_BACKEND_KEY_B64`; Docker Compose stack generates self-signed CA and backend client cert on first start
+- [ ] Backend: `CommandLog` model (device, sent_by nullable, triggered_by_rule nullable, command_name, params_sent, sent_at, ack_received_at, status)
+- [ ] Backend: `devices.send_device_command` Celery task — resolves Scout serial from device `gateway_device` (or device own serial), constructs MQTT topic (`that-place/scout/…/cmd/{command_name}`), publishes params as JSON, creates `CommandLog` with status `sent`; new-format (`that_place_v1`) devices only
+- [ ] Backend: Command send endpoint (`POST /api/v1/devices/:id/command/`) — validates command name and params against device type `commands` JSONB definition, dispatches Celery task; Admin + Operator only
+- [ ] Backend: MQTT ack listener — ingestion router handles `cmd/ack` topic; parses `command` field from payload JSON; matches to most-recent `sent` `CommandLog` for that device with matching `command_name`; sets status `acknowledged` and `ack_received_at`; logs warning and discards if no match
+- [ ] Backend: Timeout detection Celery beat task — every 60 seconds marks `CommandLog` entries with status `sent` and `sent_at` older than `device_type.command_ack_timeout_seconds` as `timed_out`
+- [ ] Backend: Command history endpoint (`GET /api/v1/devices/:id/commands/`) — Admin + Operator only
+- [ ] Backend: Rule evaluation task updated — when a `RuleAction` with `action_type=command` fires, dispatches `devices.send_device_command` with `triggered_by_rule` set and `sent_by=None`
+- [ ] Backend: Tests — command validated against device type (invalid command name rejected, missing required param rejected), ack received updates log, ack with unknown command discarded, timeout fires correctly, View-Only blocked, rule-triggered command creates CommandLog with correct fields, cross-tenant command send rejected
 - [ ] Frontend: Send command button on device detail (Admin + Operator only)
 - [ ] Frontend: Command picker — shows commands registered for this device type
 - [ ] Frontend: Command param form — auto-generated from param schema (number input, toggle, text field per param type)
@@ -632,9 +636,11 @@ _Frontend:_
 
 **Definition of Done:**
 - Can send a command from the UI — appears in command history with status `sent`
-- Mock ack received — status updates to `acknowledged`
+- Mock ack received with correct `command` field — status updates to `acknowledged`
 - No ack within timeout period — status updates to `timed_out`
 - View-Only user cannot see the send command button
+- Rule firing with a command action creates a `CommandLog` entry with `triggered_by_rule` set
+- mTLS connection confirmed: backend connects to broker on port 8883 with client certificate
 
 ---
 
