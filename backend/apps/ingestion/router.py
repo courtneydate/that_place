@@ -187,3 +187,14 @@ router.register(TopicPattern(
     message_type='abb',
     has_device=False,
 ))
+
+# --- That Place v1: command acknowledgement ---
+# Topic: that-place/scout/{scout_serial}/{device_serial}/cmd/ack
+# Registered after telemetry patterns; more specific than the wildcard subscription.
+router.register(TopicPattern(
+    name='that_place_v1_cmd_ack',
+    regex=re.compile(r'^that-place/scout/(?P<scout>[^/]+)/(?P<device>[^/]+)/cmd/ack$'),
+    topic_format='that_place_v1',
+    message_type='cmd_ack',
+    has_device=True,
+))

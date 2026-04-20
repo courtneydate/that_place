@@ -1,7 +1,7 @@
 """Serializers for the devices app."""
 from rest_framework import serializers
 
-from .models import Device, DeviceHealth, DeviceType, Site
+from .models import CommandLog, Device, DeviceHealth, DeviceType, Site
 
 
 class SiteSerializer(serializers.ModelSerializer):
@@ -50,6 +50,7 @@ class DeviceSerializer(serializers.ModelSerializer):
     """
 
     device_type_name = serializers.CharField(source='device_type.name', read_only=True)
+    device_type_commands = serializers.JSONField(source='device_type.commands', read_only=True)
     site_name = serializers.CharField(source='site.name', read_only=True)
     tenant_name = serializers.CharField(source='tenant.name', read_only=True)
     health = serializers.SerializerMethodField()
@@ -76,6 +77,7 @@ class DeviceSerializer(serializers.ModelSerializer):
             'site_name',
             'device_type',
             'device_type_name',
+            'device_type_commands',
             'tenant_name',
             'gateway_device',
             'status',
@@ -84,7 +86,10 @@ class DeviceSerializer(serializers.ModelSerializer):
             'health',
             'created_at',
         )
-        read_only_fields = ('id', 'status', 'topic_format', 'created_at', 'tenant_name', 'health')
+        read_only_fields = (
+            'id', 'status', 'topic_format', 'created_at',
+            'tenant_name', 'health', 'device_type_commands',
+        )
 
     def validate_site(self, site):
         """Ensure the site belongs to the registering tenant."""
@@ -126,3 +131,58 @@ class DeviceHealthSerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = fields
+
+
+class CommandLogSerializer(serializers.ModelSerializer):
+    """Read-only serializer for CommandLog history entries."""
+
+    sent_by_email = serializers.CharField(source='sent_by.email', read_only=True, default=None)
+
+    class Meta:
+        model = CommandLog
+        fields = (
+            'id',
+            'command_name',
+            'params_sent',
+            'sent_at',
+            'ack_received_at',
+            'status',
+            'sent_by_email',
+            'triggered_by_rule',
+        )
+        read_only_fields = fields
+
+
+class SendCommandSerializer(serializers.Serializer):
+    """Input serializer for POST /api/v1/devices/:id/command/.
+
+    Validates that command_name exists in the device type's commands list
+    and that all required params are present with correct types.
+    """
+
+    command_name = serializers.CharField(max_length=255)
+    params = serializers.DictField(child=serializers.JSONField(), default=dict)
+
+    def validate(self, data):
+        """Verify command_name exists in device type and params satisfy the schema."""
+        device = self.context['device']
+        command_name = data['command_name']
+        params = data.get('params', {})
+
+        commands = device.device_type.commands or []
+        command_def = next((c for c in commands if c.get('name') == command_name), None)
+        if command_def is None:
+            raise serializers.ValidationError({
+                'command_name': f'Command "{command_name}" is not defined for this device type.',
+            })
+
+        # Validate required params (those without a default value)
+        for param in command_def.get('params', []):
+            key = param.get('key')
+            if key and 'default' not in param and key not in params:
+                raise serializers.ValidationError({
+                    'params': f'Required parameter "{key}" is missing.',
+                })
+
+        data['command_def'] = command_def
+        return data

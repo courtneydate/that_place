@@ -1,15 +1,18 @@
 """Celery tasks for the ingestion pipeline.
 
-Sprint 6: Route the topic, look up the device, validate status,
-          update topic_format, and discard unknown/unapproved messages.
-Sprint 7: Parse the payload and create StreamReadings. Auto-discover
-          new stream keys as Stream records.
+Sprint 6:  Route the topic, look up the device, validate status,
+           update topic_format, and discard unknown/unapproved messages.
+Sprint 7:  Parse the payload and create StreamReadings. Auto-discover
+           new stream keys as Stream records.
 Sprint 16: Dispatch rule evaluation after each StreamReading batch.
+Sprint 21: Handle cmd/ack messages — match to CommandLog and mark acknowledged.
 
 Ref: SPEC.md § Feature: MQTT Ingestion Pipeline
      SPEC.md § Feature: Stream Discovery & Configuration
      SPEC.md § Feature: Rule Evaluation Engine
+     SPEC.md § Feature: Device Control — Acknowledgement
 """
+import json
 import logging
 from typing import Any
 
@@ -18,7 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.devices.health import update_device_health
-from apps.devices.models import Device
+from apps.devices.models import CommandLog, Device
 from apps.readings.models import Stream, StreamReading
 
 from .parsers import parse_json_telemetry, parse_legacy_v1_telemetry
@@ -90,6 +93,11 @@ def process_mqtt_message(topic: str, payload: str) -> None:
             parsed.topic_format,
         )
 
+    # Command acknowledgement — handled separately, no StreamReadings produced
+    if parsed.message_type == 'cmd_ack':
+        _handle_command_ack(device, payload)
+        return
+
     # Only telemetry message types produce StreamReadings
     if parsed.message_type not in TELEMETRY_MESSAGE_TYPES:
         logger.debug(
@@ -134,6 +142,59 @@ def process_mqtt_message(topic: str, payload: str) -> None:
         len(stream_values),
         device.serial_number,
         device.tenant.name,
+    )
+
+
+def _handle_command_ack(device: Device, payload: str) -> None:
+    """Process a cmd/ack message — update the matching CommandLog to 'acknowledged'.
+
+    The ack payload must be JSON with a 'command' field naming the command.
+    Matches against the most-recent 'sent' CommandLog for this device where
+    command_name equals the payload 'command' field value.
+
+    Ref: SPEC.md § Feature: Device Control — Acknowledgement
+    """
+    try:
+        data = json.loads(payload)
+        command_name = data.get('command')
+    except (json.JSONDecodeError, AttributeError):
+        logger.warning(
+            'cmd/ack from device "%s": invalid JSON payload "%s" — discarding',
+            device.serial_number, payload,
+        )
+        return
+
+    if not command_name:
+        logger.warning(
+            'cmd/ack from device "%s": missing "command" field in payload — discarding',
+            device.serial_number,
+        )
+        return
+
+    log = (
+        CommandLog.objects
+        .filter(
+            device=device,
+            command_name=command_name,
+            status=CommandLog.Status.SENT,
+        )
+        .order_by('sent_at')
+        .first()
+    )
+
+    if log is None:
+        logger.warning(
+            'cmd/ack from device "%s": no matching sent CommandLog for command "%s" — discarding',
+            device.serial_number, command_name,
+        )
+        return
+
+    log.status = CommandLog.Status.ACKNOWLEDGED
+    log.ack_received_at = timezone.now()
+    log.save(update_fields=['status', 'ack_received_at'])
+    logger.info(
+        'CommandLog %d for device "%s" command "%s" acknowledged',
+        log.pk, device.serial_number, command_name,
     )
 
 

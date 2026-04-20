@@ -225,6 +225,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'rules.evaluate_staleness_rules',
         'schedule': 60.0,  # every 60 seconds — staleness fires within one beat interval
     },
+    # Devices app — Sprint 21
+    'check-command-timeouts': {
+        'task': 'devices.check_command_timeouts',
+        'schedule': 60.0,  # every 60 seconds — timeouts detected within one beat interval
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -284,6 +289,11 @@ MQTT_ADMIN_PASSWORD = env('MQTT_ADMIN_PASSWORD', default='')
 # MQTT_CA_KEY_B64 is highly sensitive — treat it like a root CA private key.
 MQTT_CA_KEY_B64 = env('MQTT_CA_KEY_B64', default='')
 MQTT_CA_CERT_B64 = env('MQTT_CA_CERT_B64', default='')
+# Backend service client certificate for mTLS auth to the broker (Sprint 21).
+# When set, the backend connects on port 8883 using certificate auth.
+# When absent, falls back to MQTT_USERNAME/MQTT_PASSWORD (local dev only).
+MQTT_BACKEND_CERT_B64 = env('MQTT_BACKEND_CERT_B64', default='')
+MQTT_BACKEND_KEY_B64 = env('MQTT_BACKEND_KEY_B64', default='')
 
 # ---------------------------------------------------------------------------
 # Encryption (for DataSource credentials)

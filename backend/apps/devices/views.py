@@ -7,10 +7,17 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import IsTenantAdmin, IsThatPlaceAdmin, IsViewOnly
+from apps.accounts.permissions import IsOperator, IsTenantAdmin, IsThatPlaceAdmin, IsViewOnly
 
-from .models import Device, DeviceHealth, DeviceType, Site
-from .serializers import DeviceHealthSerializer, DeviceSerializer, DeviceTypeSerializer, SiteSerializer
+from .models import CommandLog, Device, DeviceHealth, DeviceType, Site
+from .serializers import (
+    CommandLogSerializer,
+    DeviceHealthSerializer,
+    DeviceSerializer,
+    DeviceTypeSerializer,
+    SendCommandSerializer,
+    SiteSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +368,79 @@ class DeviceViewSet(viewsets.GenericViewSet):
             current += bucket_delta
 
         return Response({'timeline': timeline, 'bucket_minutes': bucket_minutes})
+
+    @action(detail=True, methods=['post'], url_path='command')
+    def command(self, request, pk=None):
+        """POST /api/v1/devices/:id/command/ — send a command to a device.
+
+        Validates command name and params against the device type definition,
+        then dispatches the send_device_command Celery task.
+        Admin and Operator only.
+
+        Ref: SPEC.md § Feature: Device Control — Sending commands
+        """
+        if not (IsOperator().has_permission(request, self)):
+            return Response(
+                {'error': {'code': 'permission_denied', 'message': 'Admin or Operator role required.'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        device = get_object_or_404(self.get_queryset(), pk=pk)
+
+        if device.topic_format != Device.TopicFormat.THAT_PLACE_V1:
+            return Response(
+                {'error': {
+                    'code': 'unsupported_format',
+                    'message': 'Commands are only supported for That Place v1 devices.',
+                }},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = SendCommandSerializer(
+            data=request.data,
+            context={'device': device},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # Call synchronously — command sends are low-frequency UI actions so
+        # blocking briefly is acceptable and avoids Celery result-backend issues.
+        from .tasks import send_device_command
+        log_id = send_device_command(
+            device_id=device.pk,
+            command_name=serializer.validated_data['command_name'],
+            params=serializer.validated_data.get('params', {}),
+            sent_by_id=request.user.pk,
+        )
+
+        if log_id is None:
+            return Response(
+                {'error': {'code': 'command_failed', 'message': 'Failed to dispatch command.'}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        log = CommandLog.objects.get(pk=log_id)
+        logger.info(
+            'Command "%s" dispatched to device "%s" by %s',
+            serializer.validated_data['command_name'], device.serial_number, request.user.email,
+        )
+        return Response(CommandLogSerializer(log).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get'], url_path='commands')
+    def commands(self, request, pk=None):
+        """GET /api/v1/devices/:id/commands/ — command history for a device.
+
+        Admin and Operator only.
+        Ref: SPEC.md § Feature: Device Control — Command history
+        """
+        if not (IsOperator().has_permission(request, self)):
+            return Response(
+                {'error': {'code': 'permission_denied', 'message': 'Admin or Operator role required.'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        device = get_object_or_404(self.get_queryset(), pk=pk)
+        logs = device.command_logs.select_related('sent_by', 'triggered_by_rule').all()
+        return Response(CommandLogSerializer(logs, many=True).data)
 
     @action(detail=True, methods=['get'], url_path='health')
     def health(self, request, pk=None):

@@ -77,8 +77,53 @@ def evaluate_rule(rule_id: int) -> str | None:
             # the Alert row is guaranteed to exist when the task runs.
             transaction.on_commit(lambda: create_alert_notifications.delay(alert.pk))
 
+            # Dispatch any command actions defined on this rule.
+            # Commands are only dispatched on false→true transition (same
+            # re-triggering suppression as the rule itself).
+            _dispatch_command_actions(rule)
+
     logger.debug('evaluate_rule: rule %d → %s', rule_id, outcome)
     return outcome
+
+
+def _dispatch_command_actions(rule) -> None:
+    """Dispatch send_device_command for each command-type action on a fired rule.
+
+    Called inside the evaluate_rule transaction after a false→true transition.
+    Each qualifying RuleAction (action_type='command') dispatches a Celery task
+    with triggered_by_rule set and sent_by=None.
+
+    Ref: SPEC.md § Feature: Device Control — Rule-triggered commands
+    """
+    from apps.devices.tasks import send_device_command
+
+    from .models import RuleAction
+
+    actions = (
+        rule.actions
+        .filter(action_type=RuleAction.ActionType.COMMAND)
+        .select_related('target_device')
+    )
+
+    for action in actions:
+        if action.target_device_id is None or not action.command:
+            logger.warning(
+                'Rule %d command action %d has no target_device or command — skipping',
+                rule.pk, action.pk,
+            )
+            continue
+
+        cmd = action.command  # {"name": "...", "params": {...}}
+        send_device_command.delay(
+            device_id=action.target_device_id,
+            command_name=cmd.get('name', ''),
+            params=cmd.get('params', {}),
+            triggered_by_rule_id=rule.pk,
+        )
+        logger.info(
+            'Rule %d triggered command "%s" on device %d',
+            rule.pk, cmd.get('name'), action.target_device_id,
+        )
 
 
 @shared_task(name='rules.evaluate_staleness_rules')

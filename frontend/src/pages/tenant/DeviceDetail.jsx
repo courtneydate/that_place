@@ -1,16 +1,18 @@
 /**
- * Device detail page — Info, Health, and Streams tabs.
+ * Device detail page — Info, Health, Streams, and Commands tabs.
  *
- * Accessible to all tenant roles. Stream label/unit/display editing
- * is available to Tenant Admins only.
+ * Accessible to all tenant roles. Stream editing and command sending
+ * are restricted to Admin and Operator roles.
  * Ref: SPEC.md § Feature: Device Health Monitoring
  * Ref: SPEC.md § Feature: Stream Discovery & Configuration
+ * Ref: SPEC.md § Feature: Device Control
  */
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDeviceHealth, useDevices, useUpdateDevice } from '../../hooks/useDevices';
+import { useCommandHistory, useSendCommand } from '../../hooks/useDeviceCommands';
 import { useDeviceStreams, useUpdateStream } from '../../hooks/useStreams';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
@@ -61,8 +63,10 @@ function formatValue(value, dataType) {
 // Tab bar
 // ---------------------------------------------------------------------------
 
-function TabBar({ active, onChange }) {
-  const tabs = ['Info', 'Health', 'Streams'];
+function TabBar({ active, onChange, canControl }) {
+  const tabs = canControl
+    ? ['Info', 'Health', 'Streams', 'Commands']
+    : ['Info', 'Health', 'Streams'];
   return (
     <div className={detailStyles.tabBar}>
       {tabs.map((tab) => (
@@ -81,6 +85,7 @@ function TabBar({ active, onChange }) {
 TabBar.propTypes = {
   active: PropTypes.string.isRequired,
   onChange: PropTypes.func.isRequired,
+  canControl: PropTypes.bool,
 };
 
 // ---------------------------------------------------------------------------
@@ -405,6 +410,239 @@ StreamsTab.propTypes = {
 };
 
 // ---------------------------------------------------------------------------
+// Commands tab
+// ---------------------------------------------------------------------------
+
+const STATUS_COLORS = { sent: '#F59E0B', acknowledged: '#22C55E', timed_out: '#EF4444' };
+
+function CommandStatus({ status: s }) {
+  return <span style={{ color: STATUS_COLORS[s] || '#9CA3AF', fontWeight: 600 }}>{s}</span>;
+}
+CommandStatus.propTypes = { status: PropTypes.string.isRequired };
+
+/**
+ * Auto-generates a form from a command's param schema.
+ * Renders number/bool/string inputs per param type.
+ */
+function CommandParamForm({ params: paramDefs, values, onChange }) {
+  if (!paramDefs || paramDefs.length === 0) {
+    return <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>No parameters required.</p>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {paramDefs.map((p) => {
+        const key = p.key;
+        const value = key in values ? values[key] : (p.default ?? '');
+        if (p.type === 'bool') {
+          return (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+              <input
+                type="checkbox"
+                checked={!!value}
+                onChange={(e) => onChange(key, e.target.checked)}
+              />
+              {p.label || key}
+            </label>
+          );
+        }
+        return (
+          <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.9rem' }}>
+            <span>{p.label || key}{!('default' in p) ? ' *' : ''}</span>
+            <input
+              type={p.type === 'int' || p.type === 'float' ? 'number' : 'text'}
+              value={value}
+              min={p.min}
+              max={p.max}
+              step={p.type === 'float' ? 'any' : undefined}
+              onChange={(e) =>
+                onChange(key, p.type === 'int' ? parseInt(e.target.value, 10) : p.type === 'float' ? parseFloat(e.target.value) : e.target.value)
+              }
+              className={styles.input}
+              style={{ width: '14rem', padding: '0.3rem 0.5rem', fontSize: '0.875rem' }}
+            />
+            {p.unit && <span style={{ color: '#6B7280', fontSize: '0.8rem' }}>Unit: {p.unit}</span>}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+CommandParamForm.propTypes = {
+  params: PropTypes.array,
+  values: PropTypes.object.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+function CommandPicker({ commands, deviceId }) {
+  const [selected, setSelected] = useState(null);
+  const [paramValues, setParamValues] = useState({});
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const sendCommand = useSendCommand(deviceId);
+
+  const handleSelect = (cmd) => {
+    setSelected(cmd);
+    // Pre-fill defaults
+    const defaults = {};
+    (cmd.params || []).forEach((p) => {
+      if ('default' in p) defaults[p.key] = p.default;
+    });
+    setParamValues(defaults);
+    setError('');
+    setSuccess('');
+  };
+
+  const handleParamChange = (key, value) => {
+    setParamValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSend = async () => {
+    setError('');
+    setSuccess('');
+    try {
+      await sendCommand.mutateAsync({ commandName: selected.name, params: paramValues });
+      setSuccess(`Command "${selected.label || selected.name}" sent.`);
+      setSelected(null);
+      setParamValues({});
+    } catch (e) {
+      const msg = e.response?.data?.error?.message || 'Failed to send command.';
+      setError(msg);
+    }
+  };
+
+  if (!commands || commands.length === 0) {
+    return <p className={styles.empty}>No commands defined for this device type.</p>;
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div>
+        <p style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>Select command</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {commands.map((cmd) => (
+            <button
+              key={cmd.name}
+              onClick={() => handleSelect(cmd)}
+              className={selected?.name === cmd.name ? styles.primaryButton : styles.secondaryButton}
+              style={{ textAlign: 'left', padding: '0.4rem 0.75rem', fontSize: '0.875rem' }}
+            >
+              {cmd.label || cmd.name}
+              {cmd.description && (
+                <span style={{ display: 'block', color: '#6B7280', fontSize: '0.75rem', fontWeight: 400 }}>
+                  {cmd.description}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selected && (
+        <div style={{ minWidth: '18rem' }}>
+          <p style={{ fontWeight: 600, marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+            {selected.label || selected.name}
+          </p>
+          <CommandParamForm
+            params={selected.params}
+            values={paramValues}
+            onChange={handleParamChange}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
+            <button
+              className={styles.primaryButton}
+              onClick={handleSend}
+              disabled={sendCommand.isPending}
+            >
+              {sendCommand.isPending ? 'Sending…' : 'Send Command'}
+            </button>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => { setSelected(null); setParamValues({}); setError(''); }}
+            >
+              Cancel
+            </button>
+          </div>
+          {error && <p className={styles.error} style={{ marginTop: '0.5rem' }}>{error}</p>}
+          {success && <p style={{ color: '#22C55E', marginTop: '0.5rem', fontSize: '0.875rem' }}>{success}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+CommandPicker.propTypes = {
+  commands: PropTypes.array,
+  deviceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+};
+
+function CommandHistoryTable({ deviceId }) {
+  const { data: logs = [], isLoading, isError } = useCommandHistory(deviceId);
+
+  if (isLoading) return <p className={styles.loading}>Loading command history…</p>;
+  if (isError) return <p className={styles.error}>Failed to load command history.</p>;
+  if (logs.length === 0) return <p className={styles.empty}>No commands sent yet.</p>;
+
+  return (
+    <table className={styles.table}>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Params</th>
+          <th>Sent</th>
+          <th>Sent by</th>
+          <th>Ack received</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {logs.map((log) => (
+          <tr key={log.id}>
+            <td className={styles.mono}>{log.command_name}</td>
+            <td className={styles.mono} style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+              {JSON.stringify(log.params_sent)}
+            </td>
+            <td>{formatDateTime(log.sent_at)}</td>
+            <td>{log.triggered_by_rule ? <em style={{ color: '#6B7280' }}>Rule #{log.triggered_by_rule}</em> : (log.sent_by_email || '—')}</td>
+            <td>{log.ack_received_at ? formatDateTime(log.ack_received_at) : '—'}</td>
+            <td><CommandStatus status={log.status} /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+CommandHistoryTable.propTypes = {
+  deviceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+};
+
+function CommandsTab({ device, deviceId }) {
+  const isLegacy = device?.topic_format === 'legacy_v1';
+  const commands = device?.device_type_commands || [];
+
+  return (
+    <div>
+      {isLegacy && (
+        <div className={styles.warning} style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#FEF3C7', borderRadius: '0.375rem', fontSize: '0.875rem', color: '#92400E' }}>
+          Commands are not available for legacy v1 devices. Update firmware to That Place v1 to enable commands.
+        </div>
+      )}
+      {!isLegacy && (
+        <>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Send Command</h3>
+          <CommandPicker commands={commands} deviceId={deviceId} />
+          <hr style={{ margin: '1.5rem 0', borderColor: '#E5E7EB' }} />
+        </>
+      )}
+      <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Command History</h3>
+      <CommandHistoryTable deviceId={deviceId} />
+    </div>
+  );
+}
+CommandsTab.propTypes = {
+  device: PropTypes.object,
+  deviceId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+};
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -412,11 +650,16 @@ function DeviceDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const isAdmin = user?.tenant_role === 'admin';
+  const isOperator = user?.tenant_role === 'operator';
+  const canControl = isAdmin || isOperator;
 
   const { data: devices = [], isLoading: devicesLoading } = useDevices();
   const device = devices.find((d) => String(d.id) === String(id));
 
   const [activeTab, setActiveTab] = useState('Info');
+
+  // device_type_commands is included in the DeviceSerializer response
+  const commands = device?.device_type_commands ?? [];
 
   return (
     <div>
@@ -427,7 +670,7 @@ function DeviceDetail() {
         </h1>
       </div>
 
-      <TabBar active={activeTab} onChange={setActiveTab} />
+      <TabBar active={activeTab} onChange={setActiveTab} canControl={canControl} />
 
       <section className={styles.section}>
         {activeTab === 'Info' && device && <InfoTab device={device} canEdit={isAdmin} />}
@@ -436,6 +679,12 @@ function DeviceDetail() {
         )}
         {activeTab === 'Health' && <HealthTab deviceId={id} />}
         {activeTab === 'Streams' && <StreamsTab deviceId={id} canEdit={isAdmin} />}
+        {activeTab === 'Commands' && canControl && (
+          <CommandsTab
+            device={device ? { ...device, device_type_commands: commands } : null}
+            deviceId={id}
+          />
+        )}
       </section>
     </div>
   );

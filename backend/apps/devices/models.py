@@ -2,6 +2,7 @@
 
 Sprint 4: Site
 Sprint 5: DeviceType, Device
+Sprint 21: CommandLog
 """
 import logging
 
@@ -267,3 +268,54 @@ class DeviceHealth(models.Model):
 
     def __str__(self):
         return f'{self.device.serial_number} — {self.activity_level} (online={self.is_online})'
+
+
+class CommandLog(models.Model):
+    """Audit record for every command sent to a device.
+
+    Created by the send_device_command Celery task. Status progresses from
+    'sent' → 'acknowledged' (on ack receipt) or 'timed_out' (on beat task).
+    Ref: SPEC.md § Feature: Device Control — Command history
+    """
+
+    class Status(models.TextChoices):
+        SENT = 'sent', 'Sent'
+        ACKNOWLEDGED = 'acknowledged', 'Acknowledged'
+        TIMED_OUT = 'timed_out', 'Timed Out'
+
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name='command_logs',
+    )
+    sent_by = models.ForeignKey(
+        'accounts.User',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='sent_commands',
+        help_text='User who sent the command. Null if triggered by a rule.',
+    )
+    triggered_by_rule = models.ForeignKey(
+        'rules.Rule',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='triggered_commands',
+        help_text='Rule that triggered this command. Null if sent manually.',
+    )
+    command_name = models.CharField(max_length=255)
+    params_sent = models.JSONField(default=dict)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    ack_received_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SENT,
+    )
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'CommandLog({self.device.serial_number} / {self.command_name} / {self.status})'

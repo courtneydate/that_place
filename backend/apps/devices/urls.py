@@ -20,8 +20,10 @@ Devices (tenant-scoped):
     PUT    /api/v1/devices/{id}/         — update device
     PATCH  /api/v1/devices/{id}/         — partial update device (e.g. name only)
     DELETE /api/v1/devices/{id}/         — delete device
-    POST   /api/v1/devices/{id}/approve/ — approve device (FM Admin only)
-    POST   /api/v1/devices/{id}/reject/  — reject device (FM Admin only)
+    POST   /api/v1/devices/{id}/approve/   — approve device (FM Admin only)
+    POST   /api/v1/devices/{id}/reject/    — reject device (FM Admin only)
+    POST   /api/v1/devices/{id}/command/   — send command (Admin + Operator)
+    GET    /api/v1/devices/{id}/commands/  — command history (Admin + Operator)
 """
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
