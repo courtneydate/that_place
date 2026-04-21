@@ -33,6 +33,7 @@ import RuleBuilder from './pages/tenant/RuleBuilder';
 import RuleDetail from './pages/tenant/RuleDetail';
 import Alerts from './pages/tenant/Alerts';
 import AlertDetail from './pages/tenant/AlertDetail';
+import Reporting from './pages/tenant/Reporting';
 
 function App() {
   const { user } = useAuth();
@@ -89,6 +90,7 @@ function App() {
         <Route path="alerts/:id" element={<AlertDetail />} />
         <Route path="feed-subscriptions" element={<FeedSubscriptions />} />
         <Route path="dataset-assignments" element={<DatasetAssignments />} />
+        <Route path="reporting" element={<Reporting />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

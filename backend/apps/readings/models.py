@@ -77,6 +77,38 @@ class StreamReading(models.Model):
         return f'{self.stream} @ {self.timestamp}: {self.value}'
 
 
+class DataExport(models.Model):
+    """Audit log for every on-demand CSV export.
+
+    Written before streaming begins so the record exists even if the client
+    disconnects mid-download.
+
+    Ref: SPEC.md § Feature: Data Export (CSV) — Export history
+    """
+
+    tenant = models.ForeignKey(
+        'accounts.Tenant',
+        on_delete=models.CASCADE,
+        related_name='exports',
+    )
+    exported_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='exports',
+    )
+    stream_ids = models.JSONField(help_text='List of Stream PKs included in this export.')
+    date_from = models.DateTimeField()
+    date_to = models.DateTimeField()
+    exported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-exported_at']
+
+    def __str__(self) -> str:
+        return f'DataExport(tenant={self.tenant_id}, streams={self.stream_ids}, at={self.exported_at})'
+
+
 class RuleStreamIndex(models.Model):
     """Index linking a Stream to a Rule for efficient rule lookup during ingestion.
 

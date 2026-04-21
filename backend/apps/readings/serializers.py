@@ -1,10 +1,10 @@
 """Serializers for the readings app.
 
-Ref: SPEC.md § Feature: Stream Discovery & Configuration
+Ref: SPEC.md § Feature: Stream Discovery & Configuration, § Feature: Data Export (CSV)
 """
 from rest_framework import serializers
 
-from .models import Stream, StreamReading
+from .models import DataExport, Stream, StreamReading
 
 
 class StreamReadingSerializer(serializers.ModelSerializer):
@@ -60,3 +60,42 @@ class StreamSerializer(serializers.ModelSerializer):
             return obj.annotated_latest_ts
         reading = obj.readings.first()
         return reading.timestamp if reading else None
+
+
+class ExportRequestSerializer(serializers.Serializer):
+    """Validates the POST body for a CSV export request.
+
+    Ref: SPEC.md § Feature: Data Export (CSV)
+    """
+
+    stream_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        help_text='One or more Stream PKs to include in the export.',
+    )
+    date_from = serializers.DateTimeField(help_text='Start of export window (exclusive).')
+    date_to = serializers.DateTimeField(help_text='End of export window (inclusive).')
+
+    def validate(self, data):
+        """Ensure date_from is before date_to."""
+        if data['date_from'] >= data['date_to']:
+            raise serializers.ValidationError('date_from must be earlier than date_to.')
+        return data
+
+
+class DataExportSerializer(serializers.ModelSerializer):
+    """Read-only serializer for export history list (Admin only).
+
+    Ref: SPEC.md § Feature: Data Export (CSV) — Export history
+    """
+
+    exported_by_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataExport
+        fields = ('id', 'exported_by', 'exported_by_email', 'stream_ids', 'date_from', 'date_to', 'exported_at')
+        read_only_fields = fields
+
+    def get_exported_by_email(self, obj) -> str | None:
+        """Return the email of the exporting user, or None if deleted."""
+        return obj.exported_by.email if obj.exported_by else None

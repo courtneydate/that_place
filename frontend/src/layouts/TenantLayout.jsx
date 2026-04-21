@@ -345,6 +345,14 @@ function TenantLayout() {
           >
             Datasets
           </NavLink>
+          {(user?.role === 'admin' || user?.role === 'operator') && (
+            <NavLink
+              to="/app/reporting"
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+            >
+              Reporting
+            </NavLink>
+          )}
           <NavLink
             to="/app/settings"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}

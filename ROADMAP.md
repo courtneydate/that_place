@@ -22,13 +22,13 @@
 **Goal:** A working local development environment and CI pipeline before any feature code is written.
 
 **Deliverables:**
-- [ ] Docker Compose stack: Django, PostgreSQL, Redis, Celery worker, Celery beat, Mosquitto (MQTT), MinIO (object storage), React dev server
-- [ ] Django project structure: apps (`accounts`, `devices`, `ingestion`, `readings`, `rules`, `alerts`, `dashboards`, `notifications`), split settings (`base`, `dev`, `prod`, `test`)
-- [ ] React (Vite) project structure: `pages/`, `components/`, `hooks/`, `services/`, `theme/`
-- [ ] `.env.example` with all required variables documented
-- [ ] GitHub Actions CI: lint (flake8, isort, eslint) + **full** test suite (pytest + jest, all apps, all sprints) on every PR — fails and blocks merge on any single test failure
-- [ ] Base test configuration: pytest-django, factory-boy for fixtures, Jest + React Testing Library
-- [ ] README.md with setup instructions
+- [x] Docker Compose stack: Django, PostgreSQL, Redis, Celery worker, Celery beat, Mosquitto (MQTT), MinIO (object storage), React dev server
+- [x] Django project structure: apps (`accounts`, `devices`, `ingestion`, `readings`, `rules`, `alerts`, `dashboards`, `notifications`), split settings (`base`, `dev`, `prod`, `test`)
+- [x] React (Vite) project structure: `pages/`, `components/`, `hooks/`, `services/`, `theme/`
+- [x] `.env.example` with all required variables documented
+- [x] GitHub Actions CI: lint (flake8, isort, eslint) + **full** test suite (pytest + jest, all apps, all sprints) on every PR — fails and blocks merge on any single test failure
+- [x] Base test configuration: pytest-django, factory-boy for fixtures, Jest + React Testing Library
+- [x] README.md with setup instructions
 
 **Definition of Done:**
 - `docker-compose up -d` brings up all services with no errors
@@ -45,13 +45,13 @@
 **Goal:** Users can log in, stay logged in, and log out securely.
 
 **Deliverables:**
-- [ ] Backend: `User` model, JWT login / token refresh / logout endpoints (SimpleJWT)
-- [ ] Backend: Token blacklist on logout
-- [ ] Backend: `IsAuthenticated` base permission class applied globally
-- [ ] Backend: Tests — login happy path, invalid credentials, expired token, logout blacklists token
-- [ ] Frontend: Login page (email + password form, validation, error states)
-- [ ] Frontend: Auth context — stores tokens, auto-refreshes before expiry, clears on logout
-- [ ] Frontend: Protected route wrapper — redirects unauthenticated users to login
+- [x] Backend: `User` model, JWT login / token refresh / logout endpoints (SimpleJWT)
+- [x] Backend: Token blacklist on logout
+- [x] Backend: `IsAuthenticated` base permission class applied globally
+- [x] Backend: Tests — login happy path, invalid credentials, expired token, logout blacklists token
+- [x] Frontend: Login page (email + password form, validation, error states)
+- [x] Frontend: Auth context — stores tokens, auto-refreshes before expiry, clears on logout
+- [x] Frontend: Protected route wrapper — redirects unauthenticated users to login
 
 **Definition of Done:**
 - Can log in with valid credentials
@@ -67,14 +67,14 @@
 **Goal:** That Place Admin can create tenants and send the first admin invite.
 
 **Deliverables:**
-- [ ] Backend: `Tenant` model (with timezone field), `TenantUser` model
-- [ ] Backend: That Place Admin guard (`IsThat PlaceAdmin` permission class)
-- [ ] Backend: Tenant CRUD endpoints (That Place Admin only)
-- [ ] Backend: Invite endpoint — generates invite token, sends email via configured email backend
-- [ ] Backend: Tests — CRUD happy path, non-admin access denied, invite sent, duplicate tenant slug rejected
-- [ ] Frontend: That Place Admin layout (separate nav from tenant user layout)
-- [ ] Frontend: Tenant list page, create tenant form, tenant detail / edit page
-- [ ] Frontend: Send invite action on tenant detail
+- [x] Backend: `Tenant` model (with timezone field), `TenantUser` model
+- [x] Backend: That Place Admin guard (`IsThat PlaceAdmin` permission class)
+- [x] Backend: Tenant CRUD endpoints (That Place Admin only)
+- [x] Backend: Invite endpoint — generates invite token, sends email via configured email backend
+- [x] Backend: Tests — CRUD happy path, non-admin access denied, invite sent, duplicate tenant slug rejected
+- [x] Frontend: That Place Admin layout (separate nav from tenant user layout)
+- [x] Frontend: Tenant list page, create tenant form, tenant detail / edit page
+- [x] Frontend: Send invite action on tenant detail
 
 **Definition of Done:**
 - That Place Admin can create, view, edit, and deactivate tenants
@@ -89,13 +89,13 @@
 **Goal:** Tenant Admin can manage their organisation's users and roles.
 
 **Deliverables:**
-- [ ] Backend: Invite accept flow (set password from invite token)
-- [ ] Backend: User list, role update, remove user endpoints — scoped to tenant
-- [ ] Backend: `IsTenantAdmin`, `IsOperator`, `IsViewOnly` permission classes
-- [ ] Backend: Tenant context middleware — resolves tenant from authenticated user
-- [ ] Backend: Tests — invite flow, role change, removal, cross-tenant access denied, View-Only blocked from write endpoints
-- [ ] Frontend: Accept invite page (set password)
-- [ ] Frontend: User management page (list, invite, change role, remove)
+- [x] Backend: Invite accept flow (set password from invite token)
+- [x] Backend: User list, role update, remove user endpoints — scoped to tenant
+- [x] Backend: `IsTenantAdmin`, `IsOperator`, `IsViewOnly` permission classes
+- [x] Backend: Tenant context middleware — resolves tenant from authenticated user
+- [x] Backend: Tests — invite flow, role change, removal, cross-tenant access denied, View-Only blocked from write endpoints
+- [x] Frontend: Accept invite page (set password)
+- [x] Frontend: User management page (list, invite, change role, remove)
 
 **Definition of Done:**
 - Invited user can accept invite and set their password
@@ -110,14 +110,14 @@
 **Goal:** Tenant Admin can configure their organisation's timezone, create sites, and manage notification groups.
 
 **Deliverables:**
-- [ ] Backend: Tenant settings endpoint (update timezone)
-- [ ] Backend: Site CRUD endpoints (scoped to tenant)
-- [ ] Backend: `NotificationGroup` + `NotificationGroupMember` models and endpoints
-- [ ] Backend: Auto-maintained system groups (All Users, All Admins, All Operators) — derived from TenantUser roles
-- [ ] Backend: Tests — site isolation, system group membership auto-updates on role change
-- [ ] Frontend: Tenant settings page (timezone picker)
-- [ ] Frontend: Site management page (list, create, edit, delete)
-- [ ] Frontend: Notification groups page (list, create, manage members)
+- [x] Backend: Tenant settings endpoint (update timezone)
+- [x] Backend: Site CRUD endpoints (scoped to tenant)
+- [x] Backend: `NotificationGroup` + `NotificationGroupMember` models and endpoints
+- [x] Backend: Auto-maintained system groups (All Users, All Admins, All Operators) — derived from TenantUser roles
+- [x] Backend: Tests — site isolation, system group membership auto-updates on role change
+- [x] Frontend: Tenant settings page (timezone picker)
+- [x] Frontend: Site management page (list, create, edit, delete)
+- [x] Frontend: Notification groups page (list, create, manage members)
 
 **Definition of Done:**
 - Tenant Admin can set timezone — persists and is returned on API responses
@@ -132,16 +132,16 @@
 **Goal:** That Place Admin can define device types; Tenant Admin can register devices and go through the approval flow.
 
 **Deliverables:**
-- [ ] Backend: `DeviceType` model (with commands JSONB, stream type definitions, offline threshold, ack timeout)
-- [ ] Backend: DeviceType CRUD (That Place Admin write, all authenticated read)
-- [ ] Backend: `Device` model (with `topic_format`, `offline_threshold_override_minutes`, `gateway_device_id`)
-- [ ] Backend: Device registration endpoint (creates device with status `pending`)
-- [ ] Backend: Device approval endpoint (That Place Admin only)
-- [ ] Backend: Tests — approval flow, pending device cannot ingest data, cross-tenant device isolation
-- [ ] Frontend: Device type library page (That Place Admin — create/edit types, define commands and stream types)
-- [ ] Frontend: Device registration form (Tenant Admin — name, serial, site, device type)
-- [ ] Frontend: Pending device indicator + That Place Admin approval action
-- [ ] Frontend: Device list page with status badges
+- [x] Backend: `DeviceType` model (with commands JSONB, stream type definitions, offline threshold, ack timeout)
+- [x] Backend: DeviceType CRUD (That Place Admin write, all authenticated read)
+- [x] Backend: `Device` model (with `topic_format`, `offline_threshold_override_minutes`, `gateway_device_id`)
+- [x] Backend: Device registration endpoint (creates device with status `pending`)
+- [x] Backend: Device approval endpoint (That Place Admin only)
+- [x] Backend: Tests — approval flow, pending device cannot ingest data, cross-tenant device isolation
+- [x] Frontend: Device type library page (That Place Admin — create/edit types, define commands and stream types)
+- [x] Frontend: Device registration form (Tenant Admin — name, serial, site, device type)
+- [x] Frontend: Pending device indicator + That Place Admin approval action
+- [x] Frontend: Device list page with status badges
 
 **Definition of Done:**
 - That Place Admin can create device types with stream type definitions and commands
@@ -166,14 +166,14 @@
 **Goal:** The backend connects to the MQTT broker and can receive messages in both legacy and new topic formats.
 
 **Deliverables:**
-- [ ] Mosquitto broker running in Docker Compose with authentication
-- [ ] Backend: Celery MQTT subscriber worker — subscribes to `fm/mm/+/#` and `that-place/scout/+/#`
-- [ ] Backend: Topic router — registered pattern matching, extracts (scout_serial, device_serial, message_type, stream_key) from any registered pattern
-- [ ] Backend: Legacy v1 patterns registered (weatherstation, relays, tbox, admin)
-- [ ] Backend: New v2 pattern registered
-- [ ] Backend: Messages from unregistered/unapproved devices logged and discarded
-- [ ] Backend: `topic_format` auto-detected and updated on Device record
-- [ ] Backend: Tests — both topic formats parsed correctly, unknown device discarded, topic_format flips on format change
+- [x] Mosquitto broker running in Docker Compose with authentication
+- [x] Backend: Celery MQTT subscriber worker — subscribes to `fm/mm/+/#` and `that-place/scout/+/#`
+- [x] Backend: Topic router — registered pattern matching, extracts (scout_serial, device_serial, message_type, stream_key) from any registered pattern
+- [x] Backend: Legacy v1 patterns registered (weatherstation, relays, tbox, admin)
+- [x] Backend: New v2 pattern registered
+- [x] Backend: Messages from unregistered/unapproved devices logged and discarded
+- [x] Backend: `topic_format` auto-detected and updated on Device record
+- [x] Backend: Tests — both topic formats parsed correctly, unknown device discarded, topic_format flips on format change
 
 **Definition of Done:**
 - MQTT worker starts with `docker-compose up` and connects to broker
@@ -188,11 +188,11 @@
 **Goal:** Incoming telemetry is stored as StreamReadings; new stream keys automatically create Stream records.
 
 **Deliverables:**
-- [ ] Backend: Telemetry message handler — creates `StreamReading` for known streams
-- [ ] Backend: Stream auto-discovery — unknown stream key on approved device creates new `Stream` record with data_type defaulting to `numeric`
-- [ ] Backend: `RuleStreamIndex` maintained on stream creation (no rules yet, but infrastructure ready)
-- [ ] Backend: Ingestion pipeline performance test — target < 5s latency from receipt to stored reading
-- [ ] Backend: Tests — happy path ingestion, stream auto-creation, duplicate reading handling, unapproved device rejected
+- [x] Backend: Telemetry message handler — creates `StreamReading` for known streams
+- [x] Backend: Stream auto-discovery — unknown stream key on approved device creates new `Stream` record with data_type defaulting to `numeric`
+- [x] Backend: `RuleStreamIndex` maintained on stream creation (no rules yet, but infrastructure ready)
+- [x] Backend: Ingestion pipeline performance test — target < 5s latency from receipt to stored reading
+- [x] Backend: Tests — happy path ingestion, stream auto-creation, duplicate reading handling, unapproved device rejected
 
 **Definition of Done:**
 - Sending a telemetry MQTT message results in a StreamReading in the database within 5 seconds
@@ -206,13 +206,13 @@
 **Goal:** Device health is tracked in real time; offline detection runs automatically.
 
 **Deliverables:**
-- [ ] Backend: `DeviceHealth` record updated on every received message (last_seen_at, signal, battery, activity_level derived from thresholds)
-- [ ] Backend: Health topic handler for Scout health messages
-- [ ] Backend: Celery beat task — checks all active devices against their offline threshold, marks offline when exceeded
-- [ ] Backend: Per-device threshold override respected
-- [ ] Backend: Tests — activity_level derivation, offline detection at threshold, override respected
-- [ ] Frontend: Device list — health status indicator (colour-coded: online/degraded/critical/offline)
-- [ ] Frontend: Device detail — health tab (battery, signal, last seen, first active, activity level)
+- [x] Backend: `DeviceHealth` record updated on every received message (last_seen_at, signal, battery, activity_level derived from thresholds)
+- [x] Backend: Health topic handler for Scout health messages
+- [x] Backend: Celery beat task — checks all active devices against their offline threshold, marks offline when exceeded
+- [x] Backend: Per-device threshold override respected
+- [x] Backend: Tests — activity_level derivation, offline detection at threshold, override respected
+- [x] Frontend: Device list — health status indicator (colour-coded: online/degraded/critical/offline)
+- [x] Frontend: Device detail — health tab (battery, signal, last seen, first active, activity level)
 
 **Definition of Done:**
 - Devices show correct health status on device list within 30 seconds of status change
@@ -226,10 +226,10 @@
 **Goal:** Tenant Admin can configure how streams are labelled and which appear on dashboards.
 
 **Deliverables:**
-- [ ] Backend: Stream label, unit override PATCH endpoint
-- [ ] Backend: Stream display enable/disable PATCH endpoint
-- [ ] Backend: Tests — label/unit updates persist, display flag does not affect data storage
-- [ ] Frontend: Streams tab on device detail — list all streams with current value, label/unit edit inline, display toggle
+- [x] Backend: Stream label, unit override PATCH endpoint
+- [x] Backend: Stream display enable/disable PATCH endpoint
+- [x] Backend: Tests — label/unit updates persist, display flag does not affect data storage
+- [x] Frontend: Streams tab on device detail — list all streams with current value, label/unit edit inline, display toggle
 
 **Definition of Done:**
 - Tenant Admin can rename streams and set units
@@ -278,14 +278,14 @@
 **Goal:** Tenant Admin can create dashboards and add value card widgets.
 
 **Deliverables:**
-- [ ] Backend: `Dashboard` + `DashboardWidget` CRUD endpoints
-- [ ] Backend: Stream readings endpoint with `?from=&to=&limit=` filtering
-- [ ] Backend: Tests — dashboard isolation per tenant, widget CRUD, time range filtering
-- [ ] Frontend: Dashboard list page (create, delete, navigate between dashboards)
-- [ ] Frontend: Dashboard canvas — fixed grid layout with column selector (1/2/3 cols)
-- [ ] Frontend: Widget builder modal — stream picker (site → device → stream)
-- [ ] Frontend: Value card widget — latest reading, trend indicator, time since last update
-- [ ] Frontend: 30-second auto-refresh
+- [x] Backend: `Dashboard` + `DashboardWidget` CRUD endpoints
+- [x] Backend: Stream readings endpoint with `?from=&to=&limit=` filtering
+- [x] Backend: Tests — dashboard isolation per tenant, widget CRUD, time range filtering
+- [x] Frontend: Dashboard list page (create, delete, navigate between dashboards)
+- [x] Frontend: Dashboard canvas — fixed grid layout with column selector (1/2/3 cols)
+- [x] Frontend: Widget builder modal — stream picker (site → device → stream)
+- [x] Frontend: Value card widget — latest reading, trend indicator, time since last update
+- [x] Frontend: 30-second auto-refresh
 
 **Definition of Done:**
 - Can create a dashboard, set column count, add a value card widget bound to a stream
@@ -299,10 +299,10 @@
 **Goal:** Tenant Admin can add line charts with multiple streams and dual Y-axes, and gauge widgets.
 
 **Deliverables:**
-- [ ] Frontend: Line chart widget — multiple streams per chart, dual Y-axis support, each stream as a separate line, configurable time range
-- [ ] Frontend: Gauge widget — single stream, configurable min/max/threshold bands
-- [ ] Frontend: Time range selector (last hour / 24h / 7d / 30d / custom)
-- [ ] Frontend: Cross-device stream selection in widget builder
+- [x] Frontend: Line chart widget — multiple streams per chart, dual Y-axis support, each stream as a separate line, configurable time range
+- [x] Frontend: Gauge widget — single stream, configurable min/max/threshold bands
+- [x] Frontend: Time range selector (last hour / 24h / 7d / 30d / custom)
+- [x] Frontend: Cross-device stream selection in widget builder
 
 **Definition of Done:**
 - Line chart renders multiple streams from different devices on the same chart
@@ -317,11 +317,11 @@
 **Goal:** All 5 widget types are complete; dashboard layout is polished.
 
 **Deliverables:**
-- [ ] Frontend: Status indicator widget — colour/label driven by stream value mapped to device type's status indicator config
-- [ ] Frontend: Health/uptime chart widget — online/offline history, battery and signal as line charts
-- [ ] Frontend: Widget drag-to-reorder within grid
-- [ ] Frontend: Responsive reflow — single column below 1024px
-- [ ] Frontend: Edit widget — each widget has an edit action (e.g. gear/pencil icon) that re-opens the widget builder modal pre-populated with the widget's current config; saving calls the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint and updates the widget in place without deleting and recreating it
+- [x] Frontend: Status indicator widget — colour/label driven by stream value mapped to device type's status indicator config
+- [x] Frontend: Health/uptime chart widget — online/offline history, battery and signal as line charts
+- [x] Frontend: Widget drag-to-reorder within grid
+- [x] Frontend: Responsive reflow — single column below 1024px
+- [x] Frontend: Edit widget — each widget has an edit action (e.g. gear/pencil icon) that re-opens the widget builder modal pre-populated with the widget's current config; saving calls the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint and updates the widget in place without deleting and recreating it
 
 **Definition of Done:**
 - All 5 widget types working: line chart, gauge, value card, status indicator, health/uptime chart
@@ -347,11 +347,11 @@
 **Goal:** Rules can be created, edited, and deleted via API with full data model in place.
 
 **Deliverables:**
-- [ ] Backend: `Rule`, `RuleConditionGroup`, `RuleCondition`, `RuleAction`, `RuleStreamIndex`, `RuleAuditLog` models
-- [ ] Backend: Rule CRUD endpoints (Tenant Admin only)
-- [ ] Backend: `RuleStreamIndex` maintained automatically on rule create/edit/delete
-- [ ] Backend: `RuleAuditLog` entry created on every rule save (before/after diff)
-- [ ] Backend: Tests — cross-tenant isolation, Admin-only rule creation, RuleStreamIndex accuracy, audit log immutability
+- [x] Backend: `Rule`, `RuleConditionGroup`, `RuleCondition`, `RuleAction`, `RuleStreamIndex`, `RuleAuditLog` models
+- [x] Backend: Rule CRUD endpoints (Tenant Admin only)
+- [x] Backend: `RuleStreamIndex` maintained automatically on rule create/edit/delete
+- [x] Backend: `RuleAuditLog` entry created on every rule save (before/after diff)
+- [x] Backend: Tests — cross-tenant isolation, Admin-only rule creation, RuleStreamIndex accuracy, audit log immutability
 
 **Definition of Done:**
 - Rules can be created with conditions and actions via API
@@ -368,11 +368,11 @@
 **Context:** Providers with large fleets (e.g. 500+ devices) make the flat discovery table unusable without filtering. This is a frontend-only improvement — the backend `POST /api/v1/data-sources/:id/discover/` endpoint already returns the full list in one response; filtering happens client-side.
 
 **Deliverables:**
-- [ ] Frontend: Search input rendered above the device table in `WizardStep2` after discovery completes — filters by device name or external ID (case-insensitive, partial match)
-- [ ] Frontend: "Select all" checkbox applies only to visible (filtered) non-connected devices
-- [ ] Frontend: Selection count label reflects filtered view ("Showing X of Y — Z selected")
-- [ ] Frontend: Existing per-device selections are preserved when the search term changes (deselecting a filter reveals previously selected devices with their state intact)
-- [ ] Frontend: Same search behaviour applied to the `AddDevicesFlow` (re-discovery on an existing DataSource)
+- [x] Frontend: Search input rendered above the device table in `WizardStep2` after discovery completes — filters by device name or external ID (case-insensitive, partial match)
+- [x] Frontend: "Select all" checkbox applies only to visible (filtered) non-connected devices
+- [x] Frontend: Selection count label reflects filtered view ("Showing X of Y — Z selected")
+- [x] Frontend: Existing per-device selections are preserved when the search term changes (deselecting a filter reveals previously selected devices with their state intact)
+- [x] Frontend: Same search behaviour applied to the `AddDevicesFlow` (re-discovery on an existing DataSource)
 
 **Definition of Done:**
 - With 500 discovered devices, typing in the search box filters the table in real time with no lag
@@ -387,14 +387,14 @@
 **Goal:** Tenant Admin can build a complete rule using the visual step-flow interface.
 
 **Deliverables:**
-- [ ] Frontend: Rule list page (list, enable/disable toggle, delete)
-- [ ] Frontend: Rule builder — step flow (name/description → schedule gate → conditions → actions → review & save)
-- [ ] Frontend: Schedule gate step — day multi-select (with Weekdays/Weekends/Every day shortcuts) + optional time window
-- [ ] Frontend: Condition builder — add/remove groups, AND/OR per group, top-level AND/OR, stream picker (site → device → stream), operator dropdown filtered by stream data type, value input adapts to type (number/toggle/text)
-- [ ] Frontend: Staleness condition option — select stream + enter threshold
-- [ ] Frontend: Action builder — notification action (channels + groups/users + message template with variable hints), device command action (device + command picker, param form)
-- [ ] Frontend: Review step — summary of all conditions and actions before saving
-- [ ] Frontend: Rule detail page with audit trail tab
+- [x] Frontend: Rule list page (list, enable/disable toggle, delete)
+- [x] Frontend: Rule builder — step flow (name/description → schedule gate → conditions → actions → review & save)
+- [x] Frontend: Schedule gate step — day multi-select (with Weekdays/Weekends/Every day shortcuts) + optional time window
+- [x] Frontend: Condition builder — add/remove groups, AND/OR per group, top-level AND/OR, stream picker (site → device → stream), operator dropdown filtered by stream data type, value input adapts to type (number/toggle/text)
+- [x] Frontend: Staleness condition option — select stream + enter threshold
+- [x] Frontend: Action builder — notification action (channels + groups/users + message template with variable hints), device command action (device + command picker, param form)
+- [x] Frontend: Review step — summary of all conditions and actions before saving
+- [x] Frontend: Rule detail page with audit trail tab
 
 **Definition of Done:**
 - Can build and save a complete rule with multiple condition groups and multiple actions
@@ -413,37 +413,37 @@
 **Deliverables:**
 
 _Backend — Feed Providers:_
-- [ ] `FeedProvider`, `FeedChannel`, `FeedReading`, `TenantFeedSubscription`, `FeedChannelRuleIndex` models + migrations
-- [ ] `FeedProvider` CRUD endpoints (That Place Admin only)
-- [ ] `FeedChannel` records auto-populated from endpoint channel config on provider create/update; dimension values discovered and created on first successful poll
-- [ ] Celery beat task: polls each active `scope=system` FeedProvider on its configured interval; iterates `response_root_jsonpath`, extracts dimension + channel values via JSONPath, stores `FeedReading` records (idempotent — duplicate `(channel_id, timestamp)` silently ignored)
-- [ ] On new `FeedReading`, dispatch rule evaluation for rules in `FeedChannelRuleIndex` for that channel
-- [ ] `TenantFeedSubscription` model + endpoints (for `scope=tenant` providers); Celery beat task polls active subscriptions
-- [ ] Poll failure logging; platform notification to That Place Admins after 3 consecutive failures
-- [ ] `FeedChannelRuleIndex` maintained on rule create/edit/delete (alongside existing `RuleStreamIndex`)
-- [ ] New `RuleCondition.condition_type = feed_channel`: evaluated against latest `FeedReading`; numeric operators only
-- [ ] AEMO NEM `FeedProvider` seeded on first deployment (see `docs/providers/aemo-nem.md`)
-- [ ] Tests: feed polling stores readings (idempotent), FeedChannelRuleIndex accurate, feed condition evaluates correctly, poll failure logged, cross-tenant isolation on subscription endpoints
+- [x] `FeedProvider`, `FeedChannel`, `FeedReading`, `TenantFeedSubscription`, `FeedChannelRuleIndex` models + migrations
+- [x] `FeedProvider` CRUD endpoints (That Place Admin only)
+- [x] `FeedChannel` records auto-populated from endpoint channel config on provider create/update; dimension values discovered and created on first successful poll
+- [x] Celery beat task: polls each active `scope=system` FeedProvider on its configured interval; iterates `response_root_jsonpath`, extracts dimension + channel values via JSONPath, stores `FeedReading` records (idempotent — duplicate `(channel_id, timestamp)` silently ignored)
+- [x] On new `FeedReading`, dispatch rule evaluation for rules in `FeedChannelRuleIndex` for that channel
+- [x] `TenantFeedSubscription` model + endpoints (for `scope=tenant` providers); Celery beat task polls active subscriptions
+- [x] Poll failure logging; platform notification to That Place Admins after 3 consecutive failures
+- [x] `FeedChannelRuleIndex` maintained on rule create/edit/delete (alongside existing `RuleStreamIndex`)
+- [x] New `RuleCondition.condition_type = feed_channel`: evaluated against latest `FeedReading`; numeric operators only
+- [x] AEMO NEM `FeedProvider` seeded on first deployment (see `docs/providers/aemo-nem.md`)
+- [x] Tests: feed polling stores readings (idempotent), FeedChannelRuleIndex accurate, feed condition evaluates correctly, poll failure logged, cross-tenant isolation on subscription endpoints
 
 _Backend — Reference Datasets:_
-- [ ] `ReferenceDataset`, `ReferenceDatasetRow`, `TenantDatasetAssignment` models + migrations
-- [ ] `ReferenceDataset` CRUD + row CRUD endpoints (That Place Admin only)
-- [ ] `TenantDatasetAssignment` CRUD endpoints (Tenant Admin; filtered by tenant)
-- [ ] `/resolve/` endpoint on assignment — returns current row(s) that would be used in evaluation (preview)
-- [ ] Row resolution logic: dimension filter match → version selection (pinned or latest active) → TOU filter in tenant timezone → return `values`; raise error if multiple rows match (misconfiguration guard)
-- [ ] New `RuleCondition.condition_type = reference_value`: resolved at evaluation time via assignment; Celery beat task re-evaluates rules with reference_value-only conditions every 5 minutes
-- [ ] `network-tariffs` dataset seeded via Django fixture (`backend/apps/feeds/fixtures/network_tariffs_2025_26.json`) — all 8 NEM DNSPs (Ausgrid, Endeavour Energy, Essential Energy, Energex, Ergon Energy, Evoenergy, SA Power Networks, TasNetworks), all published tariff codes, all TOU period rows for financial year 2025-26; rates sourced from each DNSP's published network pricing schedule (see `docs/providers/` for source links)
-- [ ] `co2-emission-factors` dataset seeded via fixture (`backend/apps/feeds/fixtures/co2_emission_factors.json`) — standard Australian grid emission factors by energy source (grid electricity, natural gas, diesel, LPG) sourced from Australian Government National Greenhouse Accounts
-- [ ] Row bulk import: That Place Admin can upload a CSV to `POST /api/v1/reference-datasets/:id/rows/bulk/` — CSV columns match the dataset's dimension schema + value schema fields + optional version/applicable_days/time_from/time_to; rows are upserted (matched on dimensions + version, updated if exists, created if not); import errors returned per row with row number and reason
-- [ ] Annual update workflow: adding a new financial year's rates requires only uploading a new CSV with `version: "2026-27"` — existing rows are untouched; tenants with `version: null` assignments automatically resolve to the new version from their effective date
-- [ ] Tests: row resolution (flat, versioned, TOU in tenant timezone), assignment override for site vs tenant-wide, reference_value condition evaluates correctly, beat task re-evaluates on schedule, bulk import upserts correctly, bulk import returns per-row errors on bad data, Tenant B cannot read Tenant A's assignments
+- [x] `ReferenceDataset`, `ReferenceDatasetRow`, `TenantDatasetAssignment` models + migrations
+- [x] `ReferenceDataset` CRUD + row CRUD endpoints (That Place Admin only)
+- [x] `TenantDatasetAssignment` CRUD endpoints (Tenant Admin; filtered by tenant)
+- [x] `/resolve/` endpoint on assignment — returns current row(s) that would be used in evaluation (preview)
+- [x] Row resolution logic: dimension filter match → version selection (pinned or latest active) → TOU filter in tenant timezone → return `values`; raise error if multiple rows match (misconfiguration guard)
+- [x] New `RuleCondition.condition_type = reference_value`: resolved at evaluation time via assignment; Celery beat task re-evaluates rules with reference_value-only conditions every 5 minutes
+- [x] `network-tariffs` dataset seeded via Django fixture (`backend/apps/feeds/fixtures/network_tariffs_2025_26.json`) — all 8 NEM DNSPs (Ausgrid, Endeavour Energy, Essential Energy, Energex, Ergon Energy, Evoenergy, SA Power Networks, TasNetworks), all published tariff codes, all TOU period rows for financial year 2025-26; rates sourced from each DNSP's published network pricing schedule (see `docs/providers/` for source links)
+- [x] `co2-emission-factors` dataset seeded via fixture (`backend/apps/feeds/fixtures/co2_emission_factors.json`) — standard Australian grid emission factors by energy source (grid electricity, natural gas, diesel, LPG) sourced from Australian Government National Greenhouse Accounts
+- [x] Row bulk import: That Place Admin can upload a CSV to `POST /api/v1/reference-datasets/:id/rows/bulk/` — CSV columns match the dataset's dimension schema + value schema fields + optional version/applicable_days/time_from/time_to; rows are upserted (matched on dimensions + version, updated if exists, created if not); import errors returned per row with row number and reason
+- [x] Annual update workflow: adding a new financial year's rates requires only uploading a new CSV with `version: "2026-27"` — existing rows are untouched; tenants with `version: null` assignments automatically resolve to the new version from their effective date
+- [x] Tests: row resolution (flat, versioned, TOU in tenant timezone), assignment override for site vs tenant-wide, reference_value condition evaluates correctly, beat task re-evaluates on schedule, bulk import upserts correctly, bulk import returns per-row errors on bad data, Tenant B cannot read Tenant A's assignments
 
 _Frontend:_
-- [ ] That Place Admin: Feed Provider management page — create/edit provider (name, base URL, auth type, scope, poll interval, endpoint builder with channel rows)
-- [ ] That Place Admin: Reference Dataset management page — create/edit dataset (schema builder for dimension + value columns, TOU and version toggles), manage rows (table with inline add/edit/delete, version filter)
-- [ ] Tenant Admin: Feed Subscriptions page — lists `scope=tenant` providers, subscribe/unsubscribe, select channels
-- [ ] Tenant Admin: Dataset Assignments page (accessible per site from site settings) — assign a dataset, enter dimension filter, pin version or use latest, set effective dates; preview resolved row(s) via `/resolve/` endpoint
-- [ ] Rule builder condition builder: feed channel picker (provider → dimension value → channel, with current reading shown as preview); reference value picker (dataset → value key, with resolved current value shown as preview)
+- [x] That Place Admin: Feed Provider management page — create/edit provider (name, base URL, auth type, scope, poll interval, endpoint builder with channel rows)
+- [x] That Place Admin: Reference Dataset management page — create/edit dataset (schema builder for dimension + value columns, TOU and version toggles), manage rows (table with inline add/edit/delete, version filter)
+- [x] Tenant Admin: Feed Subscriptions page — lists `scope=tenant` providers, subscribe/unsubscribe, select channels
+- [x] Tenant Admin: Dataset Assignments page (accessible per site from site settings) — assign a dataset, enter dimension filter, pin version or use latest, set effective dates; preview resolved row(s) via `/resolve/` endpoint
+- [x] Rule builder condition builder: feed channel picker (provider → dimension value → channel, with current reading shown as preview); reference value picker (dataset → value key, with resolved current value shown as preview)
 
 **Definition of Done:**
 - AEMO NEM spot prices are stored as `FeedReading` records every 5 minutes
@@ -461,16 +461,16 @@ _Frontend:_
 **Goal:** Rules evaluate automatically when qualifying readings arrive; firing is correct and race-condition safe.
 
 **Deliverables:**
-- [ ] Backend: Celery task dispatched on StreamReading save — looks up rules via `RuleStreamIndex`, evaluates each
-- [ ] Backend: Celery task dispatched on FeedReading save — looks up rules via `FeedChannelRuleIndex`, evaluates each (Sprint 15a must be complete)
-- [ ] Backend: Schedule gate evaluation (day of week + time window in tenant timezone)
-- [ ] Backend: Point-in-time condition evaluation (numeric/boolean/string operators) — stream, feed_channel, and reference_value condition types all supported
-- [ ] Backend: Compound condition group evaluation (AND/OR per group, top-level AND/OR)
-- [ ] Backend: Re-triggering suppression — fire only on false→true transition
-- [ ] Backend: Redis atomic flag (`SET rule:{id}:state NX`) for concurrency safety
-- [ ] Backend: Cooldown logic — respect `cooldown_minutes` before re-firing after condition clears
-- [ ] Backend: `Rule.current_state` and `last_fired_at` updated on every evaluation
-- [ ] Backend: Tests — false→true fires, true→true suppressed, true→false clears state, cooldown respected, concurrent evaluation race condition test, feed_channel condition fires on new FeedReading, reference_value condition resolves correctly
+- [x] Backend: Celery task dispatched on StreamReading save — looks up rules via `RuleStreamIndex`, evaluates each
+- [x] Backend: Celery task dispatched on FeedReading save — looks up rules via `FeedChannelRuleIndex`, evaluates each (Sprint 15a must be complete)
+- [x] Backend: Schedule gate evaluation (day of week + time window in tenant timezone)
+- [x] Backend: Point-in-time condition evaluation (numeric/boolean/string operators) — stream, feed_channel, and reference_value condition types all supported
+- [x] Backend: Compound condition group evaluation (AND/OR per group, top-level AND/OR)
+- [x] Backend: Re-triggering suppression — fire only on false→true transition
+- [x] Backend: Redis atomic flag (`SET rule:{id}:state NX`) for concurrency safety
+- [x] Backend: Cooldown logic — respect `cooldown_minutes` before re-firing after condition clears
+- [x] Backend: `Rule.current_state` and `last_fired_at` updated on every evaluation
+- [x] Backend: Tests — false→true fires, true→true suppressed, true→false clears state, cooldown respected, concurrent evaluation race condition test, feed_channel condition fires on new FeedReading, reference_value condition resolves correctly
 
 **Definition of Done:**
 - A rule with `temp > 30` fires exactly once when temperature crosses 30
@@ -488,13 +488,13 @@ _Frontend:_
 **Goal:** Staleness conditions work; rule engine handles all edge cases.
 
 **Deliverables:**
-- [ ] Backend: Celery beat task (60s interval) — evaluates all active staleness conditions across all tenants
-- [ ] Backend: Staleness condition fires when stream has not reported within `staleness_minutes`
-- [ ] Backend: Staleness condition clears when stream reports again
-- [ ] Backend: Minimum staleness threshold enforcement (2 minutes minimum)
-- [ ] Backend: Tests — staleness fires after threshold, clears on new reading, 2min minimum enforced
-- [ ] Frontend: Rule list page shows last fired time and current state badge
-- [ ] Frontend: Rule detail shows current state, last fired, next earliest fire (if cooldown active)
+- [x] Backend: Celery beat task (60s interval) — evaluates all active staleness conditions across all tenants
+- [x] Backend: Staleness condition fires when stream has not reported within `staleness_minutes`
+- [x] Backend: Staleness condition clears when stream reports again
+- [x] Backend: Minimum staleness threshold enforcement (2 minutes minimum)
+- [x] Backend: Tests — staleness fires after threshold, clears on new reading, 2min minimum enforced
+- [x] Frontend: Rule list page shows last fired time and current state badge
+- [x] Frontend: Rule detail shows current state, last fired, next earliest fire (if cooldown active)
 
 **Definition of Done:**
 - A staleness condition fires within 60 seconds of the threshold being exceeded
@@ -508,15 +508,15 @@ _Frontend:_
 **Goal:** Rule firings create alerts; operators can manage alert status.
 
 **Deliverables:**
-- [ ] Backend: `Alert` record created atomically with rule firing (same Celery task as evaluation)
-- [ ] Backend: Alert acknowledge endpoint (Admin + Operator) — accepts optional `acknowledged_note`
-- [ ] Backend: Alert resolve endpoint (Admin + Operator)
-- [ ] Backend: Alert list endpoint — active alerts and history, filterable by site/device/rule/status
-- [ ] Backend: Tests — alert created on fire, duplicate alert prevention (one active per rule), acknowledge/resolve transitions, View-Only cannot acknowledge
-- [ ] Frontend: Alert feed — active alert view (what is wrong right now)
-- [ ] Frontend: Alert history tab — all past firings, filterable
-- [ ] Frontend: Alert detail — rule name, triggered at, device/site, acknowledge action (single tap + optional note field), resolve action
-- [ ] Frontend: Alert badge in navigation (count of active alerts)
+- [x] Backend: `Alert` record created atomically with rule firing (same Celery task as evaluation)
+- [x] Backend: Alert acknowledge endpoint (Admin + Operator) — accepts optional `acknowledged_note`
+- [x] Backend: Alert resolve endpoint (Admin + Operator)
+- [x] Backend: Alert list endpoint — active alerts and history, filterable by site/device/rule/status
+- [x] Backend: Tests — alert created on fire, duplicate alert prevention (one active per rule), acknowledge/resolve transitions, View-Only cannot acknowledge
+- [x] Frontend: Alert feed — active alert view (what is wrong right now)
+- [x] Frontend: Alert history tab — all past firings, filterable
+- [x] Frontend: Alert detail — rule name, triggered at, device/site, acknowledge action (single tap + optional note field), resolve action
+- [x] Frontend: Alert badge in navigation (count of active alerts)
 
 **Definition of Done:**
 - Rule firing creates exactly one Alert record
@@ -543,17 +543,17 @@ _Frontend:_
 **Goal:** Users receive in-app notifications for alerts and system events.
 
 **Deliverables:**
-- [ ] Backend: `Notification` model — supports both alert-triggered and system event types
-- [ ] Backend: In-app notification creation on alert fire (per targeted user)
-- [ ] Backend: System event notifications: device approved, device offline, device deleted, DataSource poll failure
-- [ ] Backend: Unread count endpoint
-- [ ] Backend: Mark as read endpoint (individual notification)
-- [ ] Backend: Mark all as read endpoint (bulk — marks every unread notification for the user as read)
-- [ ] Backend: Tests — notification created per targeted user, system events generate notifications, unread count accurate, mark-all-as-read clears badge
-- [ ] Frontend: Notification bell in nav with unread badge
-- [ ] Frontend: Notification dropdown/panel — list with unread indicators, tap to navigate to related alert
-- [ ] Frontend: Tapping a notification marks it as read and navigates to the related alert
-- [ ] Frontend: "Mark all as read" button in notification panel header
+- [x] Backend: `Notification` model — supports both alert-triggered and system event types
+- [x] Backend: In-app notification creation on alert fire (per targeted user)
+- [x] Backend: System event notifications: device approved, device offline, device deleted, DataSource poll failure
+- [x] Backend: Unread count endpoint
+- [x] Backend: Mark as read endpoint (individual notification)
+- [x] Backend: Mark all as read endpoint (bulk — marks every unread notification for the user as read)
+- [x] Backend: Tests — notification created per targeted user, system events generate notifications, unread count accurate, mark-all-as-read clears badge
+- [x] Frontend: Notification bell in nav with unread badge
+- [x] Frontend: Notification dropdown/panel — list with unread indicators, tap to navigate to related alert
+- [x] Frontend: Tapping a notification marks it as read and navigates to the related alert
+- [x] Frontend: "Mark all as read" button in notification panel header
 
 **Definition of Done:**
 - Alert fire generates in-app notifications for all targeted users
@@ -569,12 +569,12 @@ _Frontend:_
 **Goal:** Every dashboard widget displays an editable title that defaults to the names of its bound devices.
 
 **Deliverables:**
-- [ ] Backend: `title` field added to all widget config JSONB schemas; serializer validates it is non-blank and ≤ 120 characters
-- [ ] Frontend: Widget builder modal — title field pre-populated with auto-generated device-name default for new widgets; editable for existing widgets
-- [ ] Frontend: Auto-title logic — 1 device → `"<Device Name>"`; 2 devices → `"<Device A> & <Device B>"`; 3+ devices → `"<Device A>, <Device B> + N more"` — computed at widget-creation time and saved into config
-- [ ] Frontend: Widget card — title rendered at the top of every widget; Tenant Admin / Operator can click the title to edit it inline (text input; blur or Enter saves via PUT)
-- [ ] Frontend: Inline title edit saves via the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint; optimistic update with rollback on error
-- [ ] Frontend: View-Only users see the title but cannot edit it (click is a no-op)
+- [x] Backend: `title` field added to all widget config JSONB schemas; serializer validates it is non-blank and ≤ 120 characters
+- [x] Frontend: Widget builder modal — title field pre-populated with auto-generated device-name default for new widgets; editable for existing widgets
+- [x] Frontend: Auto-title logic — 1 device → `"<Device Name>"`; 2 devices → `"<Device A> & <Device B>"`; 3+ devices → `"<Device A>, <Device B> + N more"` — computed at widget-creation time and saved into config
+- [x] Frontend: Widget card — title rendered at the top of every widget; Tenant Admin / Operator can click the title to edit it inline (text input; blur or Enter saves via PUT)
+- [x] Frontend: Inline title edit saves via the existing `PUT /api/v1/dashboards/:id/widgets/:widget_id/` endpoint; optimistic update with rollback on error
+- [x] Frontend: View-Only users see the title but cannot edit it (click is a no-op)
 
 **Definition of Done:**
 - New widgets default to a device-name-based title visible on the card
@@ -590,20 +590,20 @@ _Frontend:_
 **Goal:** Users receive email and SMS notifications on alert fire; opt-out and snooze are respected.
 
 **Deliverables:**
-- [ ] Backend: Email delivery via configured SMTP backend (AWS SES or any SMTP provider — set via `EMAIL_*` env vars)
-- [ ] Backend: SMS delivery via chosen provider
-- [ ] Backend: Per-channel user preferences — in-app and email on by default, SMS off by default (opt-in)
-- [ ] Backend: SMS blocked at delivery if user has not opted in, regardless of rule action channels
-- [ ] Backend: Delivery failure logging and single retry
-- [ ] Backend: User notification preferences endpoint
-- [ ] Backend: `NotificationSnooze` model — user + rule + snoozed_until; unique per (user, rule)
-- [ ] Backend: Snooze endpoint — POST /api/v1/notifications/snooze/ with rule_id and duration_minutes
-- [ ] Backend: Cancel snooze endpoint — DELETE /api/v1/notifications/snooze/:rule_id/
-- [ ] Backend: Snooze check in `create_alert_notifications` — skip writing notification for any user with an active snooze on that rule
-- [ ] Backend: Tests — email sent to targeted users, SMS not sent to non-opted-in user, opted-out user not emailed, snoozed user receives no notification during snooze window, snooze expiry restores delivery
-- [ ] Frontend: User profile / notification preferences page — email/in-app toggles (default on), SMS toggle (default off, with explanation that SMS must be explicitly enabled)
-- [ ] Frontend: Snooze button on notification panel items — duration picker (15 min / 1 hour / 4 hours / 24 hours)
-- [ ] Frontend: Snoozed indicator in notification panel (clock icon + expiry time) with cancel option
+- [x] Backend: Email delivery via configured SMTP backend (AWS SES or any SMTP provider — set via `EMAIL_*` env vars)
+- [x] Backend: SMS delivery via chosen provider
+- [x] Backend: Per-channel user preferences — in-app and email on by default, SMS off by default (opt-in)
+- [x] Backend: SMS blocked at delivery if user has not opted in, regardless of rule action channels
+- [x] Backend: Delivery failure logging and single retry
+- [x] Backend: User notification preferences endpoint
+- [x] Backend: `NotificationSnooze` model — user + rule + snoozed_until; unique per (user, rule)
+- [x] Backend: Snooze endpoint — POST /api/v1/notifications/snooze/ with rule_id and duration_minutes
+- [x] Backend: Cancel snooze endpoint — DELETE /api/v1/notifications/snooze/:rule_id/
+- [x] Backend: Snooze check in `create_alert_notifications` — skip writing notification for any user with an active snooze on that rule
+- [x] Backend: Tests — email sent to targeted users, SMS not sent to non-opted-in user, opted-out user not emailed, snoozed user receives no notification during snooze window, snooze expiry restores delivery
+- [x] Frontend: User profile / notification preferences page — email/in-app toggles (default on), SMS toggle (default off, with explanation that SMS must be explicitly enabled)
+- [x] Frontend: Snooze button on notification panel items — duration picker (15 min / 1 hour / 4 hours / 24 hours)
+- [x] Frontend: Snoozed indicator in notification panel (clock icon + expiry time) with cancel option
 
 **Definition of Done:**
 - Alert fires trigger in-app and email to targeted users by default
@@ -620,19 +620,19 @@ _Frontend:_
 **Goal:** Admin and Operator can send commands to devices; commands are logged and ack tracked. Rule-triggered commands are dispatched automatically on rule fire.
 
 **Deliverables:**
-- [ ] Backend: mTLS MQTT publish capability — `ThatPlaceMQTTClient` extended with `publish(topic, payload, qos=1)` method; connects on port 8883 using `MQTT_BACKEND_CERT_B64` / `MQTT_BACKEND_KEY_B64`; Docker Compose stack generates self-signed CA and backend client cert on first start
-- [ ] Backend: `CommandLog` model (device, sent_by nullable, triggered_by_rule nullable, command_name, params_sent, sent_at, ack_received_at, status)
-- [ ] Backend: `devices.send_device_command` Celery task — resolves Scout serial from device `gateway_device` (or device own serial), constructs MQTT topic (`that-place/scout/…/cmd/{command_name}`), publishes params as JSON, creates `CommandLog` with status `sent`; new-format (`that_place_v1`) devices only
-- [ ] Backend: Command send endpoint (`POST /api/v1/devices/:id/command/`) — validates command name and params against device type `commands` JSONB definition, dispatches Celery task; Admin + Operator only
-- [ ] Backend: MQTT ack listener — ingestion router handles `cmd/ack` topic; parses `command` field from payload JSON; matches to most-recent `sent` `CommandLog` for that device with matching `command_name`; sets status `acknowledged` and `ack_received_at`; logs warning and discards if no match
-- [ ] Backend: Timeout detection Celery beat task — every 60 seconds marks `CommandLog` entries with status `sent` and `sent_at` older than `device_type.command_ack_timeout_seconds` as `timed_out`
-- [ ] Backend: Command history endpoint (`GET /api/v1/devices/:id/commands/`) — Admin + Operator only
-- [ ] Backend: Rule evaluation task updated — when a `RuleAction` with `action_type=command` fires, dispatches `devices.send_device_command` with `triggered_by_rule` set and `sent_by=None`
-- [ ] Backend: Tests — command validated against device type (invalid command name rejected, missing required param rejected), ack received updates log, ack with unknown command discarded, timeout fires correctly, View-Only blocked, rule-triggered command creates CommandLog with correct fields, cross-tenant command send rejected
-- [ ] Frontend: Send command button on device detail (Admin + Operator only)
-- [ ] Frontend: Command picker — shows commands registered for this device type
-- [ ] Frontend: Command param form — auto-generated from param schema (number input, toggle, text field per param type)
-- [ ] Frontend: Command history tab on device detail
+- [x] Backend: mTLS MQTT publish capability — `ThatPlaceMQTTClient` extended with `publish(topic, payload, qos=1)` method; connects on port 8883 using `MQTT_BACKEND_CERT_B64` / `MQTT_BACKEND_KEY_B64`; Docker Compose stack generates self-signed CA and backend client cert on first start
+- [x] Backend: `CommandLog` model (device, sent_by nullable, triggered_by_rule nullable, command_name, params_sent, sent_at, ack_received_at, status)
+- [x] Backend: `devices.send_device_command` Celery task — resolves Scout serial from device `gateway_device` (or device own serial), constructs MQTT topic (`that-place/scout/…/cmd/{command_name}`), publishes params as JSON, creates `CommandLog` with status `sent`; new-format (`that_place_v1`) devices only
+- [x] Backend: Command send endpoint (`POST /api/v1/devices/:id/command/`) — validates command name and params against device type `commands` JSONB definition, dispatches Celery task; Admin + Operator only
+- [x] Backend: MQTT ack listener — ingestion router handles `cmd/ack` topic; parses `command` field from payload JSON; matches to most-recent `sent` `CommandLog` for that device with matching `command_name`; sets status `acknowledged` and `ack_received_at`; logs warning and discards if no match
+- [x] Backend: Timeout detection Celery beat task — every 60 seconds marks `CommandLog` entries with status `sent` and `sent_at` older than `device_type.command_ack_timeout_seconds` as `timed_out`
+- [x] Backend: Command history endpoint (`GET /api/v1/devices/:id/commands/`) — Admin + Operator only
+- [x] Backend: Rule evaluation task updated — when a `RuleAction` with `action_type=command` fires, dispatches `devices.send_device_command` with `triggered_by_rule` set and `sent_by=None`
+- [x] Backend: Tests — command validated against device type (invalid command name rejected, missing required param rejected), ack received updates log, ack with unknown command discarded, timeout fires correctly, View-Only blocked, rule-triggered command creates CommandLog with correct fields, cross-tenant command send rejected
+- [x] Frontend: Send command button on device detail (Admin + Operator only)
+- [x] Frontend: Command picker — shows commands registered for this device type
+- [x] Frontend: Command param form — auto-generated from param schema (number input, toggle, text field per param type)
+- [x] Frontend: Command history tab on device detail
 
 **Definition of Done:**
 - Can send a command from the UI — appears in command history with status `sent`
@@ -644,7 +644,9 @@ _Frontend:_
 
 ---
 
-### Sprint 21a — 3rd Party API Provider Commands
+### Sprint 21a — 3rd Party API Provider Commands _(Deferred)_
+
+> **Deferred to a later phase** — no virtual devices currently require this infrastructure. Revisit when a provider with control capability is onboarded.
 
 **Goal:** Extend the command infrastructure built in Sprint 21 to support control actions on virtual (3rd party API) devices. Provider commands are HTTP calls to the provider API — not MQTT — but share the same param schema, command picker UI, and `CommandLog` for history.
 
@@ -670,14 +672,15 @@ _Frontend:_
 **Goal:** Admin and Operator can export stream data as a streaming CSV download.
 
 **Deliverables:**
-- [ ] Backend: `StreamingHttpResponse` CSV export endpoint — queries readings in batches, streams rows to client
-- [ ] Backend: CSV format: one row per timestamp, wide format with value+unit column pairs per stream
-- [ ] Backend: `DataExport` log entry created on each export
-- [ ] Backend: Export history endpoint (Admin only)
-- [ ] Backend: Tests — CSV format correct, multi-stream export correct, large dataset does not timeout, non-Admin cannot view history
-- [ ] Frontend: Data export page — date range picker + multi-stream selector
-- [ ] Frontend: Download CSV button — triggers streaming download
-- [ ] Frontend: Export history table (Admin only)
+- [x] Backend: `StreamingHttpResponse` CSV export endpoint — queries readings in batches, streams rows to client
+- [x] Backend: CSV format: one row per reading (long format), columns: timestamp, site_name, device_name, device_id, device_serial, stream_label, value, unit
+- [x] Backend: `DataExport` log entry created before streaming begins (captures intent even on client disconnect)
+- [x] Backend: Export history endpoint (Admin only)
+- [x] Backend: Tests — CSV format correct, multi-stream export correct, streaming response confirmed, View-Only blocked, cross-tenant streams rejected, non-Admin cannot view history
+- [x] Frontend: "Reporting" nav item (Admin + Operator only) with Export and History tabs
+- [x] Frontend: Export tab — date/time range pickers (from exclusive, to inclusive) + cross-device stream picker (expand per device, checkbox per stream)
+- [x] Frontend: Download CSV button — triggers streaming blob download via Axios
+- [x] Frontend: Export history tab (Admin only) — table of past exports with exporter email, stream count, date range
 
 **Definition of Done:**
 - Export with 3 streams over 30 days downloads as a single correctly formatted CSV
