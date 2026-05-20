@@ -237,6 +237,129 @@ or frequency.** Best for billing integrations, energy budgets, and consumption a
 
 ---
 
+#### Option D — Modbus data (cloud, via 6M+One + CETA PMC billing meter)
+
+The **Watt Watchers 6M+One** connects to a **CETA PMC-220 or PMC-340B** pattern-approved billing
+meter via RS-485 and relays its register data to the Watt Watchers cloud. The cloud exposes this
+via a dedicated `/modbus/` endpoint — same Bearer Token auth as Options A and B.
+
+> **Different from Options A/B.** The `/modbus/` endpoint reads the downstream billing meter
+> (cumulative kWh, reactive energy, 3-phase voltage/current/PF). It does not read the
+> 6M+One's own CT-based channels. Use Options A or B for the 6M+One's own circuit monitoring.
+
+> **Cumulative reads, not interval.** All energy fields are cumulative meter totals, not
+> per-interval consumption. To get interval consumption, calculate the delta between
+> consecutive readings in the platform's rules engine or a downstream analytics tool.
+
+| Field | Value |
+|-------|-------|
+| Path template | `/modbus/{device_id}/latest` |
+| Method | `GET` |
+
+**Example response (CETA PMC-340B — 3-phase):**
+```json
+{
+  "timestamp": 1711234800,
+  "kWh_Import": 123456,
+  "kWh_Export": 45678,
+  "kWh_Net": 77778,
+  "kWh_Total": 169134,
+  "kVARh_Q1": 8200,
+  "kVARh_Q2": 150,
+  "kVARh_Q3": 210,
+  "kVARh_Q4": 90,
+  "kVAh": 132000,
+  "Voltage_a": 239.4,
+  "Voltage_b": 238.9,
+  "Voltage_c": 240.1,
+  "Current_a": 14.2,
+  "Current_b": 13.8,
+  "Current_c": 14.5,
+  "Power_Factor_a": 0.97,
+  "Power_Factor_b": 0.96,
+  "Power_Factor_c": 0.97,
+  "Frequency": 49.98
+}
+```
+
+> **Energy scaling.** The raw Modbus registers from the PMC meter return energy in
+> 0.01 kWh units; Watt Watchers converts these before returning them via the API,
+> so the values you receive are already in whole kWh. Verify against a live device
+> if the scale looks off — CET firmware versions can affect this.
+
+> **Single-phase devices (PMC-220).** Only `Voltage_a`, `Current_a`, and `Power_Factor_a`
+> will be populated. The `_b` and `_c` variants will be absent or null.
+
+**Streams — Modbus cloud (3-phase PMC-340B):**
+
+##### Cumulative energy (kWh)
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_kwh_import` | `Energy Import` | `kWh` | `numeric` | `$.kWh_Import` |
+| `modbus_kwh_export` | `Energy Export` | `kWh` | `numeric` | `$.kWh_Export` |
+| `modbus_kwh_net` | `Energy Net` | `kWh` | `numeric` | `$.kWh_Net` |
+| `modbus_kwh_total` | `Energy Total` | `kWh` | `numeric` | `$.kWh_Total` |
+
+##### Reactive energy (kVArh) — by quadrant (optional)
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_kvarh_q1` | `Reactive Energy Q1` | `kVArh` | `numeric` | `$.kVARh_Q1` |
+| `modbus_kvarh_q2` | `Reactive Energy Q2` | `kVArh` | `numeric` | `$.kVARh_Q2` |
+| `modbus_kvarh_q3` | `Reactive Energy Q3` | `kVArh` | `numeric` | `$.kVARh_Q3` |
+| `modbus_kvarh_q4` | `Reactive Energy Q4` | `kVArh` | `numeric` | `$.kVARh_Q4` |
+
+##### Apparent energy (kVAh)
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_kvah` | `Apparent Energy` | `kVAh` | `numeric` | `$.kVAh` |
+
+##### Voltage (V) — per phase
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_voltage_a` | `Voltage — Phase A` | `V` | `numeric` | `$.Voltage_a` |
+| `modbus_voltage_b` | `Voltage — Phase B` | `V` | `numeric` | `$.Voltage_b` |
+| `modbus_voltage_c` | `Voltage — Phase C` | `V` | `numeric` | `$.Voltage_c` |
+
+##### Current (A) — per phase
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_current_a` | `Current — Phase A` | `A` | `numeric` | `$.Current_a` |
+| `modbus_current_b` | `Current — Phase B` | `A` | `numeric` | `$.Current_b` |
+| `modbus_current_c` | `Current — Phase C` | `A` | `numeric` | `$.Current_c` |
+
+##### Power factor — per phase
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_pf_a` | `Power Factor — Phase A` | `` | `numeric` | `$.Power_Factor_a` |
+| `modbus_pf_b` | `Power Factor — Phase B` | `` | `numeric` | `$.Power_Factor_b` |
+| `modbus_pf_c` | `Power Factor — Phase C` | `` | `numeric` | `$.Power_Factor_c` |
+
+##### Device-wide
+
+| key | label | unit | data type | JSONPath |
+|-----|-------|------|-----------|----------|
+| `modbus_frequency` | `Frequency` | `Hz` | `numeric` | `$.Frequency` |
+
+**Supported meters:**
+
+| Meter model | Phases | Notes |
+|-------------|--------|-------|
+| CETA PMC-220 | 1 | NMI pattern-approved; only `_a` fields populated |
+| CETA PMC-340B | 3 | NMI pattern-approved; full 3-phase register set |
+
+> **Modbus register detail (for direct RS-485 integration not via Watt Watchers cloud).**
+> See Option C below. The full CETA PMC-340B register map is published in the
+> CET PMC-340 Series User Manual V1.2A — request from CET Global or Watt Watchers support.
+> Key RS-485 settings: baud rate 9600, 8E1, slave ID 100.
+
+---
+
 #### Option C — Modbus TCP (direct device connection)
 
 Some Watt Watchers hardware (6M and select other models) exposes a **Modbus TCP server**

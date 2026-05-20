@@ -1,7 +1,7 @@
 # PROJECT SPEC — That Place
 
-> **Version:** 5.1
-> **Last Updated:** 2026-03-19
+> **Version:** 5.3
+> **Last Updated:** 2026-05-20
 > **Author:** Courtney
 > **Status:** Active — do not modify without discussion
 
@@ -10,17 +10,17 @@
 ## 1. Project Identity
 
 ### What is this?
-That Place is an IoT monitoring, control, and automation platform. It ingests multiple data streams — from smart sensors, dumb field hardware, and third-party APIs — and turns them into intelligent, automated decisions.
+That Place is an IoT monitoring, control, automation, and metering platform. It ingests multiple data streams — from smart sensors, dumb field hardware, and third-party APIs — and turns them into intelligent, automated decisions. On top of that stack it provides a metering & billing engine that turns interval energy data into per-customer invoices — for commercial & industrial solar PPA asset owners, embedded-network operators, and billing-SaaS channel partners.
 
-**Core platform capabilities: Monitor · Control · Automate**
+**Core platform capabilities: Monitor · Control · Automate · Meter & Bill**
 
 ### What problem does it solve?
 Asset and operations teams managing distributed physical infrastructure (irrigation systems, environmental sensors, utility assets) need a single platform to see what's happening, respond to it, and automate repetitive decisions. The current solution is a clunky .NET system with hardcoded limitations — That Place v1 is the modern rebuild.
 
 ### Who is it for?
-- **Primary:** Local councils and managers of green spaces
-- **Secondary:** Agriculture — irrigation, soil monitoring, livestock
-- **Tertiary:** Industries with distributed asset monitoring needs, environmental monitoring organisations
+- **Primary:** Commercial & industrial solar (and solar+BESS) PPA developers and asset owners; embedded-network operators (multi-tenant sites with shared on-site generation and behind-the-meter retail billing)
+- **Secondary:** Billing SaaS partners reselling metering-as-a-service to their own end customers
+- **Also supported:** Local councils and managers of green spaces; agriculture (irrigation, soil monitoring, livestock); environmental monitoring; any organisation with distributed asset monitoring needs
 
 ### Business Model
 B2B — sold to organisations on a subscription basis. Hardware (That Place Scout and other gateway devices) also sold on subscription.
@@ -274,17 +274,13 @@ The Docker Compose stack generates a self-signed CA and issues a `that-place-bac
 - Every field, stream, command, and integration must be configurable — nothing hardcoded
 
 ### Explicitly Excluded (MVP)
-- No webhook, Slack, or Teams notification channels
 - No alert escalation policies
-- No downsampled or aggregated historical data (raw values only)
 - No real-time WebSocket push to frontend (polling acceptable for MVP)
 - No ML/AI rule conditions (future)
 - No rule approval workflows
-- No PDF report builder (Phase 2)
 - No Runner device support (Phase 4)
 - No React Native mobile app in MVP — Phase 6
 - No GraphQL — REST only
-- No scheduled/email data exports (on-demand CSV only for MVP)
 
 ---
 
@@ -954,6 +950,195 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 
 ---
 
+### Feature: Derived / Computed Streams
+
+**User Story:** As a Tenant Admin, I want to configure streams whose values are computed from other streams so that billing-grade quantities (interval kWh from a cumulative counter, consumed-from-solar) are first-class streams — usable by dashboards, rules, alerts, exports, and billing without downstream calculation.
+
+**Design principle:** A derived stream is configured once and writes regular `StreamReading` records on a virtual stream. From that point on every consumer treats it as just another stream — the same pattern as the `_battery` / `_signal` virtual streams. Adding a derived stream requires no code.
+
+**Acceptance Criteria:**
+
+**Configuration:**
+- [ ] A `DerivedStream` is configured on a `Device` with: key, label, unit, formula type, source stream(s), params (JSONB), is_active
+- [ ] v1 formula types: `delta` (current − previous source reading; negative deltas dropped as counter resets; `max_gap_minutes` param), `sum` (Σ source streams at the same timestamp), `difference` (source A − source B at the same timestamp), `scale` (source × factor), `window_min` / `window_max` (rolling min/max over N minutes — shares its implementation with windowed-aggregate rule conditions)
+- [ ] `product`, `quotient`, and `piecewise` formulas are deferred to v1.1
+- [ ] The derived stream is a normal `Stream` record with `stream_type = derived` so the UI can show provenance
+- [ ] Single-source derived streams (e.g. cumulative→interval `delta`) live on their source `Device`
+- [ ] Cross-device derived streams (e.g. `consumption_from_solar` = generation − grid_export) live on a per-site virtual `Device` with role `site_composite`, auto-created on the first cross-device derived stream at the site
+
+**Evaluation:**
+- [ ] A derived stream is evaluated when a source-stream `StreamReading` is saved — dispatched via the same Celery path as rule evaluation; a `DerivedStreamSourceIndex` maps source streams to derived streams (analogous to `RuleStreamIndex`)
+- [ ] Output is a `StreamReading` whose `quality` is inherited from the worst-quality input (measured + estimated → estimated; any gap → gap)
+- [ ] Evaluation is idempotent on `(stream_id, timestamp)` — re-running on the same inputs produces the same reading
+- [ ] A derived stream can be recomputed (backfilled) over a date range on demand
+- [ ] `DerivedStreamSourceIndex` is maintained on derived-stream create / edit / delete — same responsibility as `RuleStreamIndex`
+
+---
+
+### Feature: Interval Aggregation Engine
+
+**User Story:** As the platform, I want rolling aggregates of stream readings at fixed periods so that billing runs, dashboards, and reports do not recompute over raw readings every time — which scales badly for embedded networks with thousands of child meters.
+
+**Design principle:** Raw is the source of truth; aggregates are derived and reproducible. Aggregates are maintained by a Celery beat task and are backfillable on demand.
+
+**Acceptance Criteria:**
+- [ ] `IntervalAggregate` records hold the aggregate of a stream over a fixed period: 5 min, 30 min, 1 hour, 1 day, 1 month
+- [ ] Aggregation kinds: `sum` (energy streams), `mean` (instantaneous streams — voltage, power), `min` / `max` (peak demand), `last` (cumulative counters)
+- [ ] Default aggregation kind per stream via `Stream.aggregation_kind_default`: `sum` for energy, `mean` for power / voltage / current, `last` for cumulative; multiple aggregations per stream are allowed
+- [ ] Aggregates are maintained by a Celery beat task and are backfillable on demand over a date range (admin only)
+- [ ] Each aggregate carries a `quality_breakdown` (JSONB — counts of source readings by quality) plus a single derived aggregate quality (worst-input rule)
+- [ ] All aggregate periods are retained forever in v1, mirroring raw-reading retention — no rollup or downsampling
+
+---
+
+### Feature: Data Quality Flags
+
+**User Story:** As a billing operator, I want every interval reading to carry a data-quality flag so that invoices can identify and disclose intervals that were not directly measured.
+
+**Design principle:** Flagging is in scope and lands before billing. A regulator-grade substitution algorithm is out of v1 scope — v1 flags gaps; it does not fill them.
+
+**Acceptance Criteria:**
+
+**Schema & propagation:**
+- [ ] `StreamReading.quality` enum: `measured` / `estimated` / `substituted` / `gap`; default `measured`
+- [ ] Raw readings from the ingestion path are `measured`; derived streams inherit worst-input quality; an interval-fill task may set `gap` (no data)
+- [ ] Quality rolls up: `IntervalAggregate.quality_breakdown` → `BillingLineItem.quality_summary`
+
+**v1 stance on estimation:**
+- [ ] v1 leaves gap intervals unfilled — they remain `gap`. The billing run flags them on the affected invoice line item via `quality_summary`; the operator decides the cycle-close response (investigate comms, re-run with recovered data, hold the account, or enter a manual adjustment line before finalizing)
+- [ ] v1 ships no automated estimation algorithm — linear-interpolation / prior-period / weather-normalised substitution are deferred to v1.1
+- [ ] AER-compliant settlement substitution rules are out of scope — the platform produces invoice-grade output, not AEMO-MDP-accredited settlement data
+- [ ] Operators are responsible for cycle-close gap resolution in v1 — explicit in the operator contract
+- [ ] The v1 data plane is LGC-claim-ready: per-NMI generation totals are filterable to `quality=measured` intervals with a full audit trail back to raw readings — any future estimation work must preserve `quality` provenance
+
+---
+
+### Feature: Metering Model — Meter Profiles
+
+**User Story:** As a Tenant Admin, I want to flag a device as a billing meter and record its metering attributes (NMI, role, phases) so that the billing engine knows which devices and streams carry billable energy.
+
+**Design principle:** A meter is a `Device` with a `MeterProfile` — not a parallel `Meter` entity. Devices without a profile are unaffected. A billable quantity is a `Stream` with a `billing_role`. Billing rides on the existing model.
+
+**Acceptance Criteria:**
+
+**Meter profile:**
+- [ ] `MeterProfile` is one-to-one optional with `Device`: nmi, meter_role, parent_meter_id, pattern_approval, phases, install_date, serial_number_secondary
+- [ ] `meter_role` enum: `gate` (parent of an embedded network) / `child` (tenant meter) / `generation` (solar revenue meter) / `storage` (BESS — bidirectional) / `consumption` (single-tier host meter) / `common_area` (landlord / common services) / `sub_check` (informational, not billed)
+- [ ] `Device.serial_number` remains the primary identifier; `serial_number_secondary` records the CET PMC serial in a bundled WW 6M+One case
+- [ ] `pattern_approval` (e.g. `NMI-M6`) is informational — used in invoice footers and audit reports. Note: meter pattern approval (the hardware) is distinct from AEMO-MDP accreditation (the data pathway, not pursued — see Data Quality Flags)
+
+**Stream billing role:**
+- [ ] `Stream.billing_role` (nullable enum): `grid_import` / `grid_export` / `generation` / `bess_charge` / `bess_discharge` / `consumption` / `consumption_from_solar` / `net`
+- [ ] `bess_charge` and `bess_discharge` are emitted as an unsigned pair from a `storage` meter — kept distinct so LGC / STC accounting and reconciliation arithmetic stay clean (LGCs attach to `generation`, not `bess_discharge`)
+- [ ] The billing engine bills streams with a non-null `billing_role` on meters in a billing account's scope
+
+**Hierarchical sites:**
+- [ ] A site is hierarchical when at least one meter has `meter_role = gate` (`Site.is_hierarchical`)
+- [ ] Write-time enforcement: a `gate` meter has no `parent_meter_id`; a `child` / `common_area` meter at a hierarchical site must have a non-null `parent_meter_id` pointing to a `gate` meter on the same site; at most one `gate` meter per site in v1; deactivating a `gate` meter is blocked while child meters are active
+- [ ] Meter profiles can be bulk-imported from CSV (same pattern as reference-dataset CSV import)
+
+---
+
+### Feature: Billing Accounts & Tariffs
+
+**User Story:** As a billing operator, I want to model the end customers I bill (PPA hosts, embedded-network tenants) and assign tariffs to them so that a billing run can produce per-customer invoices.
+
+**Design principle:** The platform Tenant is the operator; the end customer is a `BillingAccount`. Tariffs reuse the existing `ReferenceDataset` engine with `scope=tenant` — no new tariff entity.
+
+**Acceptance Criteria:**
+
+**Billing accounts:**
+- [ ] `BillingAccount` belongs to a Tenant: name, customer_reference, contact details, billing_address, abn, account_type (`ppa_host` / `en_tenant` / `internal`), optional parent_account_id, invoice_email_recipients, floor_area_sqm (NLA), lifecycle dates (activated_at / deactivated_at)
+- [ ] `BillingAccountMeter` links an account to specific billed `Stream`s with `effective_from` / `effective_to` — linking is at stream level because one meter carries several billing-role streams that may bill to different accounts
+- [ ] Mid-cycle onboarding / offboarding is supported — `deactivated_at` drives a pro-rata final invoice
+- [ ] Billing accounts can be bulk-imported from CSV (embedded-network operators have hundreds per site)
+- [ ] `account_type = internal` accounts (e.g. common-area services) are not invoiced externally
+
+**Tariffs:**
+- [ ] Tariffs are `ReferenceDataset`s with `scope=tenant`: PPA generation tariffs, PPA consumption-from-solar tariffs, embedded-network retail tariffs, solar feed-in / buyback tariffs
+- [ ] `BillingAccountTariffAssignment` bridges an account to a tariff dataset: optional stream scope, dimension_filter, version pin, effective_from / effective_to — reuses `TenantDatasetAssignment` row-resolution logic
+- [ ] v1 tariff shapes: flat rate, time-of-use (peak / off-peak / shoulder), daily fixed supply charge, annual versioning, solar feed-in / buyback (applied to a `grid_export` stream, emits a `credit` line item)
+- [ ] Block tariffs and demand charges are deferred to v1.1
+- [ ] A "Tariffs" navigation item presents a billing-relevant filtered view of `scope=tenant` Reference Datasets
+
+---
+
+### Feature: Billing Runs & Invoicing
+
+**User Story:** As a billing operator, I want to run a billing period over a set of accounts and produce reconciled, auditable per-customer invoices with PDF output and email delivery.
+
+**Design principle:** Raw is the source of truth; a billing run snapshots exactly which readings it used and is reproducible. A finalized run is immutable — correct it by voiding and re-running, the same pattern as accounting systems.
+
+**Acceptance Criteria:**
+
+**Billing run:**
+- [ ] A `BillingRun` carries period_start / period_end, a timezone snapshot, scope (a site or an account set), status (`draft` / `computing` / `review` / `finalized` / `voided` / `failed`), and — for hierarchical sites — reconciliation_status
+- [ ] A `BillingRunSnapshot` records the exact `StreamReading` / `IntervalAggregate` IDs and computed kWh per stream — the audit answer to "where did this kWh come from?"
+- [ ] The run executes as an idempotent Celery task chain dispatched on creation; only one in-flight run per `(site, period_start, period_end)` (Redis `SET NX`); a failed step records the failing step and restarts from the last successful one
+- [ ] `BillingSchedule` generates recurring runs via a Celery beat task: cadence (`monthly_calendar` / `monthly_anchor` / `quarterly` / `custom_cron`), period_offset_days, `auto_finalize`
+
+**Line items & invoices:**
+- [ ] The run computes `BillingLineItem`s per account: line_kind (`energy` / `supply` / `discount` / `adjustment` / `credit` / `common_area_share`), TOU period_name, kWh, rate, amounts, quality_summary
+- [ ] GST = subtotal × `Tenant.gst_rate` (default 0.10, configurable per tenant)
+- [ ] One `BillingInvoice` per account; invoice number drawn from the tenant's atomic per-tenant sequence (`SELECT FOR UPDATE`); `invoice_number_format` configurable
+- [ ] Invoice PDF rendered server-side with WeasyPrint from a per-tenant HTML/CSS template, stored in object storage at `invoices/{tenant_slug}/{YYYY}/{invoice_number}.pdf`; in-app preview uses signed short-lived URLs
+- [ ] A configurable settlement-grade disclaimer footer renders by default on `en_tenant` invoices (off for `ppa_host`) — keeps the invoice-grade-not-settlement-grade boundary visible to end customers
+
+**Finalize, delivery & void:**
+- [ ] On finalize the run locks (run + line items + invoices + snapshot all immutable) and each invoice is emailed to its recipients as its own Celery task (PDF attached + a 14-day signed URL) so one bad address does not fail the run
+- [ ] Manual resend is available per invoice
+- [ ] A `draft` / `review` run can be recomputed; a `finalized` run can only be voided (Tenant Admin only) and re-run — voided runs and their line items, invoices, and allocations are retained immutably
+- [ ] On void, invoices already `delivered` get an automatic void-notification email unless a `silent_void` flag is set; there is no formal credit-note entity in v1
+- [ ] CSV export of all line items in a run
+
+---
+
+### Feature: Embedded-Network Billing (Hierarchical Metering)
+
+**User Story:** As an embedded-network operator, I want a billing run over a hierarchical site to allocate on-site solar across tenants, apportion common-area cost, and reconcile the whole run back to the gate meter.
+
+**Design principle:** Solar allocation and reconciliation are computed per interval and are reproducible from raw readings — both the regulator and tenants scrutinise the method.
+
+**Acceptance Criteria:**
+
+**Solar allocation:**
+- [ ] For each interval the run computes the solar pool = Σ generation − gate_export (kWh that stayed inside the network), excluding `bess_discharge`
+- [ ] The pool is allocated across active child accounts pro-rata by each child's `grid_import` interval value; a `SolarAllocationRecord` is written per (interval, child account)
+- [ ] Each tenant invoice carries two `energy` line items — solar-allocated kWh at the solar rate, remaining consumption at the grid rate — preserving the solar-share / grid-share split verbatim for AER reporting
+
+**Common-area apportionment:**
+- [ ] Common-area meter energy accumulates on an `internal` billing account, is costed at the EN tariff, then apportioned across tenant accounts as a `common_area_share` line item (`source_account_id` links back to the internal account)
+- [ ] Per-site `Site.common_area_apportionment_method`: `pro_rata_consumption` (default), `equal_share`, or `by_floor_area` (reads `BillingAccount.floor_area_sqm`)
+
+**Reconciliation:**
+- [ ] At run finalize, per period: `gate_import + Σ generation − gate_export` vs `Σ child_grid_import + common_area + losses`; the result is stored on a `ReconciliationReport`
+- [ ] Variance beyond `Site.reconciliation_tolerance_percent` (default 1.5%) sets the run to `review` for operator investigation
+- [ ] A per-period, per-site compliance data export surfaces the data operators need for AER reporting (per-account energy, solar-allocation totals, reconciliation status, comms-loss stats, disconnections, billing disputes) — not AER-format submission templates, which are deferred until an operator names a specific format
+
+---
+
+### Feature: Outbound Metering API
+
+**User Story:** As a billing-SaaS channel partner, I want a normalised, scoped, read-only feed of meter data so that I can drive my own billing engine without using the platform's.
+
+**Design principle:** Separate auth from the platform JWT — the consumer is a service account that lives outside the operator's tenant. Output is normalised: kWh, UTC ISO 8601, NMI preserved, a quality flag on every interval.
+
+**Acceptance Criteria:**
+
+**Data consumers:**
+- [ ] A `DataConsumer` is an outbound API credential belonging to a Tenant: name, api_key_hash (SHA-256; the raw key is shown once on creation), allowed_meter_ids, allowed_billing_account_ids, allowed_scopes (`intervals` / `daily` / `billing_runs` / `webhooks`), rate_limit_per_minute (default 60)
+- [ ] Auth via an `X-Consumer-Key` header — distinct from the JWT `Authorization` header so the two cannot be confused
+- [ ] Rate limiting is per-consumer; per-consumer metrics are emitted via Prometheus; a runaway key is revoked rather than tenant-capped
+- [ ] API keys can be rotated — rotation issues a new key and invalidates the old one
+
+**Endpoints & webhooks:**
+- [ ] Read-only endpoints under `/api/v1/external/`: meters list, interval kWh, daily-close kWh, finalized billing runs + detail + snapshot
+- [ ] Responses are normalised: units kWh, UTC ISO 8601 timestamps, NMI on every row, `quality` on every interval; opaque base64 cursor pagination, max 1,000 rows per page
+- [ ] A `DataConsumerWebhook` subscribes to event types (`daily_close` / `billing_run_finalized` / `billing_run_voided` / `billing_account_lifecycle`), posts to an https `target_url`, and signs payloads with HMAC-SHA256 in an `X-That-Place-Signature` header
+- [ ] Delivery is at-least-once with exponential-backoff retries (1m, 5m, 30m, 4h, 24h); a `WebhookDelivery` record holds the delivery log
+
+---
+
 ## 4. Data Model
 
 ### Entities & Relationships
@@ -961,15 +1146,15 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | Entity | Relationships | Key Fields |
 |--------|--------------|------------|
 | User | base auth | id, email, password, is_that_place_admin, created_at |
-| Tenant | has many Sites, TenantUsers | id, name, slug, timezone (IANA tz string, e.g. "Australia/Brisbane"), is_active, signal_degraded_threshold (int dBm, default -70), signal_critical_threshold (int dBm, default -85), battery_degraded_threshold (int %, default 40), battery_critical_threshold (int %, default 20), offline_approaching_percent (int %, default 75), created_at |
+| Tenant | has many Sites, TenantUsers | id, name, slug, timezone (IANA tz string, e.g. "Australia/Brisbane"), is_active, signal_degraded_threshold (int dBm, default -70), signal_critical_threshold (int dBm, default -85), battery_degraded_threshold (int %, default 40), battery_critical_threshold (int %, default 20), offline_approaching_percent (int %, default 75), invoice_number_format (string, default `INV-{YYYY}-{seq:06d}`), invoice_number_sequence (int, default 0 — atomic increment per issued invoice), invoice_pdf_template_id (FK to a stored HTML/CSS template, nullable), gst_rate (decimal, default 0.10), invoice_settlement_disclaimer (text, nullable — editable boilerplate, rendered by default on en_tenant invoices), created_at |
 | TenantUser | links User ↔ Tenant | id, user_id, tenant_id, role (admin/operator/viewer), joined_at |
 | TenantInvite | belongs to Tenant | id, tenant_id, email, role (admin/operator/viewer), token_hash (SHA-256 hex of raw token — raw token never stored), created_by (FK → User, nullable), expires_at (72 hours from creation), used_at (nullable — set on acceptance; null = not yet used), created_at |
-| Site | belongs to Tenant | id, tenant_id, name, description, latitude, longitude, created_at |
+| Site | belongs to Tenant | id, tenant_id, name, description, latitude, longitude, is_hierarchical (bool, default false), reconciliation_tolerance_percent (decimal, default 1.5), embedded_network_exemption_id (string, nullable — AER registration reference), common_area_apportionment_method (enum: pro_rata_consumption/equal_share/by_floor_area, default pro_rata_consumption), created_at |
 | DeviceType | platform library | id, name, slug, description, connection_type, is_push, default_offline_threshold_minutes (int), command_ack_timeout_seconds (int), commands (JSONB array — each entry: name, label, description, params array), is_active, created_at |
 | Device | belongs to Site + Tenant | id, tenant_id, site_id, device_type_id, name, serial_number, gateway_device_id (nullable FK → Device), status (pending/active/deactivated), offline_threshold_override_minutes (nullable int — if set, overrides device type default), topic_format (legacy_v1/that_place_v1 — auto-detected from incoming MQTT traffic), mqtt_auth_mode (password/certificate — selected at registration; determines credential type provisioned on approval), mqtt_password (encrypted text, nullable — provisioned on approval for password mode), mqtt_certificate (text, nullable — PEM client cert for certificate mode), mqtt_private_key (encrypted text, nullable — PEM private key for certificate mode; cleared after operator confirms loading), created_at |
 | DeviceHealth | one-to-one with Device | id, device_id, is_online, last_seen_at, first_active_at, signal_strength, battery_level, activity_level, updated_at |
-| Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), display_enabled, created_at |
-| StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at |
+| Stream | belongs to Device | id, device_id, key, label, unit, data_type (numeric/boolean/string — declared at device type registration, inherited by all stream instances of that type), stream_type (standard/derived — default standard), billing_role (nullable enum: grid_import/grid_export/generation/bess_charge/bess_discharge/consumption/consumption_from_solar/net), aggregation_kind_default (enum: sum/mean/min/max/last), display_enabled, created_at |
+| StreamReading | belongs to Stream | id, stream_id, value (JSONB), timestamp, ingested_at, quality (enum: measured/estimated/substituted/gap — default measured) |
 | ThirdPartyAPIProvider | platform library | id, name, slug, description, logo (file — stored in S3/MinIO), base_url, auth_type (api_key_header/api_key_query/bearer_token/basic_auth/oauth2_client_credentials/oauth2_password/**dual_api_key**), auth_param_schema (JSONB — credential fields tenant must supply), discovery_endpoint (JSONB: path, method, device_id_jsonpath, device_name_jsonpath), **device_detail_endpoint** (JSONB optional: path_template with {device_id}, method, name_jsonpath — called as background task after connect to populate virtual device names; leave empty when discovery already returns names), detail_endpoint (JSONB: path_template with {device_id}, method, **params** (optional dict — values may contain time tokens {from_unix}/{to_unix} for Unix timestamps or {from_iso}/{to_iso} for ISO 8601 UTC; interpolated from last_polled_at→now on each poll), **window_seconds** (int default 300 — fallback time window for first poll when last_polled_at is None)), available_streams (JSONB array: key/label/unit/data_type/jsonpath), **commands** (JSONB array, nullable — same schema as DeviceType.commands {name, label, description, params} plus {endpoint, method} per entry; dispatched as authenticated HTTP calls, not MQTT; null means the provider has no control actions), default_poll_interval_seconds (min 30, default 300), max_requests_per_second (nullable int — provider API rate limit; when set, poll dispatch is staggered so no more than this many device polls fire per second), is_active, created_at |
 | DataSource | belongs to Tenant | id, tenant_id, provider_id (FK → ThirdPartyAPIProvider), name, credentials (encrypted JSONB — filled from provider's auth_param_schema), auth_token_cache (encrypted JSONB — stores access/refresh tokens for oauth2 types), is_active, created_at |
 | DataSourceDevice | belongs to DataSource | id, datasource_id, external_device_id (device ID as returned by provider's discovery endpoint), external_device_name (nullable), virtual_device_id (FK → Device), active_stream_keys (array — subset of provider's available_streams the tenant has activated), **poll_interval_seconds** (nullable int, min 30 — overrides provider default when set; null means use provider default), last_polled_at, last_poll_status (ok/error/auth_failure), last_poll_error (nullable text), consecutive_poll_failures (int, default 0), is_active |
@@ -982,7 +1167,8 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | RuleAction | belongs to Rule | id, rule_id, action_type (notify/command), notification_channels (array: in_app/email/sms/push), group_ids (array), user_ids (array), message_template, target_device_id (nullable), command (nullable) |
 | RuleAuditLog | belongs to Rule | id, rule_id, changed_by, changed_at, changed_fields (JSONB: {field: {before, after}}) |
 | Alert | belongs to Rule + Tenant | id, rule_id, tenant_id, triggered_at, status (active/acknowledged/resolved), acknowledged_by, acknowledged_at, acknowledged_note (nullable text), resolved_by, resolved_at |
-| Notification | belongs to User | id, user_id, notification_type (alert/system_event), alert_id (nullable FK → Alert — set for alert-triggered notifications), event_type (nullable — e.g. device_offline/device_approved/datasource_failure/device_deleted), event_data (nullable JSONB — context for the event), channel (in_app/email/sms/push), sent_at, read_at, delivery_status (sent/delivered/failed) |
+| Notification | belongs to User | id, user_id, notification_type (alert/system_event), alert_id (nullable FK → Alert — set for alert-triggered notifications), event_type (nullable string — references NotificationEventType.key for system/platform events), event_data (nullable JSONB — context for the event), channel (in_app/email/sms/push), sent_at, read_at, delivery_status (sent/delivered/failed) |
+| NotificationEventType | platform registry | id, key (unique slug), label, description, severity (info/warning/critical), audience (platform_admin/tenant), default_channels (array: in_app/email), metadata_schema (JSONB — the event_data keys this event carries), message_template, is_active, created_at — DB-backed registry of system-event and platform-event types (resolved §9; That Place Admin manages) |
 | UserNotificationPreference | one-to-one with User | id, user_id, in_app_enabled (bool, default true), email_enabled (bool, default true), sms_enabled (bool, default false), phone_number (text, blank — E.164 format; required for SMS delivery) — created on first GET with defaults; get_or_create always used |
 | NotificationSnooze | belongs to User | id, user_id, rule_id (FK → Rule), snoozed_until (datetime), created_at — unique_together: (user_id, rule_id); enforced at notification creation time to prevent writing notifications during the snooze window |
 | CommandLog | belongs to Device | id, device_id, sent_by (nullable FK → User — null if rule-triggered), triggered_by_rule_id (nullable FK → Rule), command_name, params_sent (JSONB), sent_at, ack_received_at (nullable), status (sent/acknowledged/timed_out) |
@@ -997,6 +1183,24 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | ReferenceDataset | platform library | id, name, slug, description, dimension_schema (JSONB array: [{key, label, type}] — lookup key columns), value_schema (JSONB array: [{key, label, type, unit}] — value columns), has_time_of_use (bool), has_version (bool), scope (system/tenant), is_active, created_at |
 | ReferenceDatasetRow | belongs to ReferenceDataset | id, dataset_id, version (nullable string — e.g. "2025-26"; required when dataset.has_version is true), dimensions (JSONB — values matching dimension_schema), values (JSONB — values matching value_schema), applicable_days (int array, nullable — 0=Mon…6=Sun), time_from (time, nullable), time_to (time, nullable), valid_from (date, nullable), valid_to (date, nullable), is_active |
 | TenantDatasetAssignment | belongs to Tenant + Site (optional) + ReferenceDataset | id, tenant_id, site_id (nullable — null = tenant-wide), dataset_id, dimension_filter (JSONB — identifies applicable rows for this tenant/site, e.g. {distributor_slug: "ausgrid", tariff_code: "RES_TOU"}), version (nullable string — pinned version; null = always use latest active), effective_from (date), effective_to (date, nullable), created_at |
+| MeterProfile | one-to-one with Device | id, device_id, nmi (nullable string — 10/11-digit NEM NMI), meter_role (gate/child/generation/storage/consumption/common_area/sub_check), parent_meter_id (nullable self-FK via Device — required for child/common_area at a hierarchical site; must point to a gate meter on the same site), pattern_approval (nullable string — e.g. NMI-M6), phases (int — 1 or 3), install_date (date, nullable), serial_number_secondary (nullable) |
+| DerivedStream | belongs to Device (physical or site_composite virtual) | id, device_id, key, label, unit, formula_type (delta/sum/difference/scale/window_min/window_max), source_stream_ids (int array), params (JSONB), is_active, created_at |
+| DerivedStreamSourceIndex | links Stream ↔ DerivedStream | id, derived_stream_id, source_stream_id — auto-maintained on derived-stream create/edit/delete; analogous to RuleStreamIndex |
+| IntervalAggregate | belongs to Stream | id, stream_id, period (5m/30m/1h/1d/1mo), period_start (UTC), value (numeric), aggregation_kind (sum/mean/min/max/last), quality_breakdown (JSONB — source-reading counts by quality), computed_at |
+| BillingAccount | belongs to Tenant; optional parent_account_id self-FK | id, tenant_id, name, customer_reference (nullable), contact_email, contact_phone (nullable), billing_address (JSONB), abn (nullable), account_type (ppa_host/en_tenant/internal), parent_account_id (nullable self-FK — grouping only, informational in v1), invoice_email_recipients (email array), floor_area_sqm (decimal, nullable — NLA, for by_floor_area apportionment), is_active, activated_at, deactivated_at (nullable — move-out; drives a pro-rata final invoice), created_at |
+| BillingAccountMeter | belongs to BillingAccount; refs Stream | id, billing_account_id, stream_id, effective_from, effective_to (nullable) |
+| BillingAccountAuditLog | belongs to BillingAccount; refs User | id, billing_account_id, actor_user_id, action (created/viewed/updated/deactivated), changed_fields (JSONB — before/after), occurred_at — PII access log; immutable; analogous to RuleAuditLog |
+| BillingAccountTariffAssignment | belongs to BillingAccount; refs ReferenceDataset | id, billing_account_id, stream_id (nullable — null = all billing-role streams on the account), dataset_id, dimension_filter (JSONB), version (nullable string — null = latest active), effective_from (date), effective_to (date, nullable) |
+| BillingRun | belongs to Tenant | id, tenant_id, site_id (nullable), billing_account_ids (int array — empty = all active accounts in scope), period_start (UTC), period_end (UTC), timezone (snapshot of tenant tz at run time), status (draft/computing/review/finalized/voided/failed), created_by (FK → User), created_at, computed_at (nullable), finalized_at (nullable), finalized_by (nullable FK → User), reconciliation_status (nullable — ok/variance_within_tolerance/variance_exceeded), notes (text) |
+| BillingRunSnapshot | belongs to BillingRun; refs Stream + StreamReading | id, billing_run_id, stream_id, period_start_reading_id (nullable FK → StreamReading), period_end_reading_id (FK → StreamReading), interval_aggregate_ids (int array), computed_kwh (numeric), quality_summary (JSONB) |
+| BillingLineItem | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, stream_id (nullable — for supply/common-area/adjustment lines), line_kind (energy/supply/discount/adjustment/credit/common_area_share), period_name (peak/off_peak/flat/...), kwh (nullable for non-energy lines), rate_cents_per_kwh (nullable for non-energy lines), amount_cents, gst_cents, quality_summary (JSONB), source_account_id (nullable — set when apportioned from another account, e.g. common-area share) |
+| BillingInvoice | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, invoice_number (unique per tenant), period_start, period_end, subtotal_cents, gst_cents, total_cents, pdf_object_key (S3/MinIO path), issued_at, delivered_at (nullable), delivery_status (pending/sent/delivered/failed) |
+| SolarAllocationRecord | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, interval_start (UTC), allocated_kwh (numeric), allocation_method (pro_rata_consumption/equal_share/fixed_proportion) |
+| ReconciliationReport | belongs to BillingRun | id, billing_run_id, site_id, gate_import_kwh, gate_export_kwh, generation_kwh, sum_child_import_kwh, common_area_kwh, computed_loss_kwh, variance_percent, status (ok/within_tolerance/exceeded) |
+| BillingSchedule | belongs to Tenant | id, tenant_id, name, site_id (nullable), billing_account_ids (int array), cadence (monthly_calendar/monthly_anchor/quarterly/custom_cron), anchor_day (nullable int 1–31), period_offset_days (int), auto_finalize (bool), is_active |
+| DataConsumer | belongs to Tenant | id, tenant_id, name, api_key_hash (SHA-256 of the raw key — raw never stored), allowed_meter_ids (int array), allowed_billing_account_ids (int array, nullable — null = all), allowed_scopes (string array — intervals/daily/billing_runs/webhooks), rate_limit_per_minute (int, default 60), is_active, created_at, last_used_at (nullable) |
+| DataConsumerWebhook | belongs to DataConsumer | id, data_consumer_id, event_types (string array — subset of daily_close/billing_run_finalized/billing_run_voided/billing_account_lifecycle), target_url (https only), secret (HMAC-SHA256 signing key), is_active |
+| WebhookDelivery | belongs to DataConsumerWebhook | id, webhook_id, event_type, payload (JSONB), attempt_count, last_attempt_at, status (pending/delivered/failed/abandoned), response_code (nullable) |
 
 ### Key Business Rules
 - Every queryset must be filtered by `tenant_id` — no cross-tenant data leakage
@@ -1014,6 +1218,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - Schedule gate (active_days / active_from / active_to) is evaluated in the tenant's timezone — all times stored as wall-clock time, not UTC
 - A RuleCondition with condition_type = staleness does not use operator or threshold_value — only staleness_minutes
 - Pre-defined NotificationGroups (All Users, All Admins, All Operators) are maintained automatically by the system — membership derived from TenantUser roles, not manually managed
+- System-event and platform-event notifications are dispatched through the `NotificationEventType` registry — `Notification.event_type` holds the registry entry's `key`; a new event type is added as a `NotificationEventType` record (severity, channels, template all editable), with only the condition-detecting emitter requiring code
 - DataSource credentials must be stored encrypted
 - Virtual devices (created from 3rd-party API connection) are created with `status=active` — no That Place Admin approval required (the provider itself is pre-approved)
 - Virtual device `serial_number` is generated as `api-{provider_slug}-{tenant_id}-{external_device_id}` — guaranteed unique across all tenants
@@ -1028,6 +1233,24 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - `ReferenceDatasetRow` resolution order: filter by `dimension_filter` (merged with any `dimension_overrides`) → filter by version (pinned or latest active) → if `has_time_of_use`, filter by current day/time in tenant timezone → if multiple rows match, raise a configuration error (admin must ensure rows are non-overlapping)
 - `TenantDatasetAssignment` with `site_id=null` applies tenant-wide; a site-specific assignment (non-null `site_id`) overrides the tenant-wide assignment for that site
 - A `TenantDatasetAssignment` must have `effective_to=null` (currently active) for its rows to be used in rule evaluation; expired assignments are retained for audit but not evaluated
+
+**Metering & billing:**
+- Every billing entity is filtered by `tenant_id` — the standard tenant-isolation rule applies to billing data unchanged
+- A meter is a `Device` with a `MeterProfile`; a billable quantity is a `Stream` with a non-null `billing_role` — there is no parallel metering data plane
+- A site has at most one `gate` meter in v1; a `child` / `common_area` meter at a hierarchical site must reference a `gate` meter on the same site via `parent_meter_id`
+- Deactivating a `gate` meter is blocked while any child meter at the site is still active
+- Derived-stream evaluation is idempotent on `(stream_id, timestamp)`; output `quality` is the worst of its inputs
+- `DerivedStreamSourceIndex` is maintained on every derived-stream create / edit / delete — same responsibility as `RuleStreamIndex`
+- All `IntervalAggregate` periods are retained forever — mirrors the raw-reading retention policy
+- A `BillingRun` is immutable once `finalized` — its run, line items, invoices, and snapshot cannot be edited; the correction path is void + new run
+- Only one in-flight `BillingRun` is allowed per `(site_id, period_start, period_end)` — enforced via a Redis `SET NX` flag
+- A `BillingRun` is reproducible: rerunning from the same `BillingRunSnapshot` inputs must produce the same outputs
+- Voiding a `finalized` run is Tenant Admin only; voided runs and their line items, invoices, and allocations are retained immutably for audit
+- Invoice numbers are allocated from the tenant's `invoice_number_sequence` via `SELECT FOR UPDATE` — unique per tenant
+- GST on an invoice = subtotal × `Tenant.gst_rate`
+- `BillingAccountAuditLog` entries are immutable — no update or delete (same as `RuleAuditLog`)
+- Outbound API requests authenticate with the `X-Consumer-Key` header, never the platform JWT; a `DataConsumer` may only see its `allowed_meter_ids` / `allowed_billing_account_ids`
+- The platform produces invoice-grade billing output, not AEMO-MDP-accredited settlement data
 
 ---
 
@@ -1238,6 +1461,82 @@ GET    /api/v1/dataset-assignments/:id/
 PUT    /api/v1/dataset-assignments/:id/
 DELETE /api/v1/dataset-assignments/:id/
 GET    /api/v1/dataset-assignments/:id/resolve/  # returns current resolved row(s) for this assignment — useful for previewing what value a rule would see
+
+# Meters (helper view over Device with MeterProfile populated)
+GET    /api/v1/meters/                          # ?site=, ?role=, ?nmi=
+GET    /api/v1/meters/:id/
+PUT    /api/v1/meters/:id/meter-profile/        # set/update NMI, role, parent, etc.
+
+# Derived streams
+GET    /api/v1/devices/:id/derived-streams/
+POST   /api/v1/devices/:id/derived-streams/
+PUT    /api/v1/derived-streams/:id/
+DELETE /api/v1/derived-streams/:id/
+POST   /api/v1/derived-streams/:id/backfill/    # recompute over a date range
+
+# Interval aggregates (read-only — maintained by the engine)
+GET    /api/v1/streams/:id/aggregates/          # ?period=&from=&to=
+POST   /api/v1/streams/:id/aggregates/backfill/ # admin only
+
+# Billing accounts (Tenant Admin)
+GET    /api/v1/billing-accounts/                # ?type=, ?site=, ?active=
+POST   /api/v1/billing-accounts/
+GET    /api/v1/billing-accounts/:id/
+PUT    /api/v1/billing-accounts/:id/
+DELETE /api/v1/billing-accounts/:id/            # soft delete = deactivate
+POST   /api/v1/billing-accounts/:id/meters/     # link a stream
+DELETE /api/v1/billing-accounts/:id/meters/:link_id/
+POST   /api/v1/billing-accounts/:id/tariff-assignments/
+PUT    /api/v1/billing-accounts/:id/tariff-assignments/:assign_id/
+
+# Billing runs (Tenant Admin)
+GET    /api/v1/billing-runs/                    # ?site=, ?status=, ?period_start=
+POST   /api/v1/billing-runs/                    # create + dispatch computation
+GET    /api/v1/billing-runs/:id/
+POST   /api/v1/billing-runs/:id/recompute/      # only if status in (draft, review)
+POST   /api/v1/billing-runs/:id/finalize/       # locks the run + sends invoices
+POST   /api/v1/billing-runs/:id/void/           # only if status = finalized — Tenant Admin only
+GET    /api/v1/billing-runs/:id/line-items/
+GET    /api/v1/billing-runs/:id/snapshot/
+GET    /api/v1/billing-runs/:id/reconciliation/ # hierarchical sites only
+GET    /api/v1/billing-runs/:id/allocations/    # hierarchical sites only
+GET    /api/v1/billing-runs/:id/export.csv      # streaming CSV of all line items
+
+# Compliance data export (embedded-network operators)
+GET    /api/v1/sites/:id/compliance-export/     # ?period_start=&period_end= — per-account energy, solar allocation, reconciliation, comms-loss, disconnections, disputes
+
+# Invoices
+GET    /api/v1/invoices/                        # ?billing_account=, ?run=
+GET    /api/v1/invoices/:id/
+GET    /api/v1/invoices/:id/pdf/                # signed short-lived URL
+POST   /api/v1/invoices/:id/resend/             # re-email to recipients
+
+# Billing schedules (Tenant Admin)
+GET    /api/v1/billing-schedules/
+POST   /api/v1/billing-schedules/
+PUT    /api/v1/billing-schedules/:id/
+DELETE /api/v1/billing-schedules/:id/
+POST   /api/v1/billing-schedules/:id/run-now/   # manual trigger of a scheduled cadence
+
+# Data consumers (channel-partner credentials — Tenant Admin)
+GET    /api/v1/data-consumers/
+POST   /api/v1/data-consumers/                  # returns raw key once; hash stored
+GET    /api/v1/data-consumers/:id/
+PUT    /api/v1/data-consumers/:id/
+DELETE /api/v1/data-consumers/:id/              # deactivates
+POST   /api/v1/data-consumers/:id/rotate-key/   # issues new key, invalidates old
+GET    /api/v1/data-consumers/:id/webhooks/
+POST   /api/v1/data-consumers/:id/webhooks/
+DELETE /api/v1/data-consumers/:id/webhooks/:wh_id/
+GET    /api/v1/data-consumers/:id/webhook-deliveries/
+
+# OUTBOUND METERING API (X-Consumer-Key auth, separate namespace — no JWT)
+GET    /api/v1/external/metering/meters/
+GET    /api/v1/external/metering/intervals/     # ?meters=&from=&to=&period=30m
+GET    /api/v1/external/metering/daily/         # ?meters=&from=&to=
+GET    /api/v1/external/metering/billing-runs/  # finalized only
+GET    /api/v1/external/metering/billing-runs/:id/
+GET    /api/v1/external/metering/billing-runs/:id/snapshot/
 ```
 
 ---
@@ -1297,6 +1596,45 @@ GET    /api/v1/dataset-assignments/:id/resolve/  # returns current resolved row(
 - Configure: date window + stream multi-select
 - "Download CSV" triggers immediate streaming download
 - Export history list (Admin only): exported by, exported at, streams, date range — no download link (re-export to get data again)
+
+**Meter Configuration** (Tenant Admin)
+- Device-list filter for "meters only"; flag a device as a meter by attaching a meter profile (NMI, role, phases, optional parent meter)
+- Bulk import of meter profiles from CSV (matches the reference-dataset CSV import pattern)
+
+**Derived Streams** (Tenant Admin)
+- Per-device tab — list, create, edit, backfill
+- Formula picker + source-stream picker reuses the rule builder's stream picker
+
+**Billing Accounts** (Tenant Admin)
+- List with filters (site, type, status); count of meters and active tariffs per account
+- Detail tabs: meters (link/unlink streams), tariffs (assignment timeline), invoices (history), lifecycle (activated/deactivated dates)
+- Bulk import from CSV (embedded-network operators have hundreds of accounts per site)
+
+**Tariffs** (Tenant Admin)
+- A "Tariffs" navigation item — a filtered view of Reference Datasets showing only `scope=tenant` billing-relevant datasets; hides system-scope datasets
+- Built-in editors for the standard PPA + EN tariff shapes, layered over the existing ReferenceDataset row editor
+
+**Billing Runs** (Tenant Admin)
+- List: status badges (draft/computing/review/finalized/voided/failed), period, scope, totals
+- Detail: line-items table, invoices, reconciliation panel (hierarchical sites), allocations panel (hierarchical sites), snapshot drill-down, recompute / finalize / void actions
+- "New billing run" wizard: scope (site or accounts), period, dry-run preview
+
+**Billing Schedules** (Tenant Admin)
+- List + create/edit; cadence picker, scope, auto-finalize toggle; next-run / last-run shown inline
+
+**Reconciliation Dashboard** (Tenant Admin, hierarchical sites)
+- Per-site card: latest reconciliation status, variance trend, last billing run
+- Drill-down: per-interval breakdown, child-meter health
+
+**Compliance Data Export** (Tenant Admin, embedded-network sites)
+- Per-period, per-site export of AER-reporting data: per-account energy, solar-allocation totals, reconciliation status, comms-loss stats, disconnections, billing disputes — CSV + on-screen view
+
+**Invoice Template Manager** (Tenant Admin)
+- Upload / preview / activate an HTML invoice template; sample render against the most recent finalized run
+
+**Data Consumers** (Tenant Admin — channel-partner integration)
+- List, create (returns the raw API key once for copy), rotate, deactivate
+- Per-consumer: allowed meters, allowed accounts, allowed scopes, rate limit, recent request log, webhook config, delivery log
 
 ### Design Constraints
 - Desktop-first — minimum supported width 1024px; responsive down to 768px (tablet browser)
@@ -1434,6 +1772,38 @@ That Place is designed to run on any Linux server. All external service dependen
 ### Phase 5b — Notification Enhancements
 - [ ] Per-channel opt-out per rule (in addition to global per-channel opt-out)
 
+### Phase 4c — Metering & Billing
+
+A four-part arc (~11 sprints). Each part ships independent value. Promoted from `docs/billing-module.md`, which is now a historical design artifact.
+
+**B1 — Foundations** (~3 sprints)
+- [ ] Derived / Computed Streams (`delta`, `sum`, `difference`, `scale`, `window_min` / `window_max`) with `DerivedStreamSourceIndex`
+- [ ] Interval Aggregation Engine (`IntervalAggregate`, Celery beat maintenance, on-demand backfill)
+- [ ] Data Quality Flags (`StreamReading.quality`, roll-up to aggregate `quality_breakdown` and line-item `quality_summary`)
+- [ ] `MeterProfile` (NMI, meter role, phases, parent meter) + `Stream.billing_role`
+
+**B2 — Single-tier PPA Billing** (~3 sprints)
+- [ ] `BillingAccount`, `BillingAccountMeter`, `BillingAccountTariffAssignment`
+- [ ] PPA tariff datasets (generation, consumption-from-solar, feed-in) as `scope=tenant` Reference Datasets
+- [ ] `BillingRun` + billing-run algorithm for non-hierarchical sites; `BillingRunSnapshot`, `BillingLineItem`
+- [ ] `BillingInvoice` + WeasyPrint PDF rendering + invoice email delivery on finalize
+- [ ] `BillingSchedule` recurring runs; void + recompute workflow
+- [ ] `BillingAccountAuditLog` access logging
+
+**B3 — Embedded-Network Billing** (~3 sprints)
+- [ ] Hierarchical metering (`gate` / `child` / `common_area` roles, `parent_meter_id`)
+- [ ] Per-interval solar allocation (`SolarAllocationRecord`) and split-rate tenant invoices
+- [ ] Parent-meter reconciliation (`ReconciliationReport`, variance tolerance)
+- [ ] Common-area apportionment (`pro_rata_consumption` / `equal_share` / `by_floor_area`)
+- [ ] EN retail tariffs, EN-specific invoice template, compliance data export, bulk billing-account CSV import
+- [ ] B3-readiness security review (at-rest encryption verified, NDB runbook, APP 12/13 tooling scope, Privacy Impact Assessment) — gate before the first embedded network goes live
+
+**B4 — Outbound Metering API** (~2 sprints)
+- [ ] `DataConsumer` + `/api/v1/external/` namespace (`X-Consumer-Key` auth, per-consumer rate limiting)
+- [ ] Normalised interval / daily / billing-run endpoints with opaque cursor pagination
+- [ ] `DataConsumerWebhook` + HMAC-signed payloads + at-least-once delivery with retry; `WebhookDelivery` log
+- [ ] Channel-partner onboarding documentation
+
 ### Phase 6 — React Native Mobile App
 - [ ] React Native (Expo) mobile app — field operator focused
 - [ ] Key screens: dashboard viewer, device list + detail, alert feed, acknowledge alert, send command
@@ -1475,7 +1845,8 @@ That Place is designed to run on any Linux server. All external service dependen
 - [x] **3rd party API — bulk device management UX** — resolved: two-phase wizard. Phase A: tenant sets a default site for all discovered devices with per-device site override, selects devices via checkboxes (select-all supported). Phase B: stream activation configured as a batch across all selected devices; per-device overrides available later via the device detail Streams tab. Post-connection management page shows all connected devices with add/deactivate actions. See Feature: Data Ingestion — 3rd Party APIs for full detail.
 - [ ] ⚑ **3rd party API — history endpoint** — some providers offer a date-range endpoint for historical data (e.g. `/history/?from=&to=`). Phase 2 item: design a backfill polling pattern that does not conflict with the regular detail endpoint polling.
 - [ ] ⚑ **3rd party API — poll dispatch race condition** — the Celery beat task checks `last_polled_at` from the DB to decide if a device is due, but `last_polled_at` is only written back after `poll_single_device` completes. If a poll task runs longer than the beat interval (30 s) — possible under provider slowness or network stalls (worst case: `REQUEST_TIMEOUT × MAX_AUTH_RETRIES = 45 s`) — the next beat tick will see the stale `last_polled_at`, consider the device overdue, and dispatch a second concurrent task. This produces duplicate `StreamReading` rows for that cycle. Mitigations to consider: (a) set a `dispatched_at` sentinel field in the beat task before dispatching so subsequent ticks skip it, (b) use `select_for_update()` on the due-check query, or (c) add a DB unique constraint on `(stream_id, timestamp)` in `StreamReading` to make duplicates a no-op. Address before scaling to large fleets or short poll intervals.
-- [ ] ⚑ **Notification event registry** — system event notifications should be registered centrally rather than hardcoded. Architectural design required during Phase 5 implementation — how event types are registered, what metadata they carry, and how they map to notification templates.
-- [ ] ⚑ **That Place Admin notification channel** — delivery mechanism (in-app, email, external alerting tool) and full platform event list to be defined in a dedicated deep dive before Phase 5.
+- [x] **Notification event registry** — resolved (Sprint 23 deep dive, 2026-05-20): a DB-backed `NotificationEventType` registry. Each record carries key, label, description, severity, audience, default channels, metadata schema, and an editable message template — event types are data, only the condition-detecting emitter is code. The Sprint 19 system events and the Sprint 15a feed-poll-failure notification are retrofitted onto it. See §4 `NotificationEventType` and ROADMAP Sprint 23.
+- [x] **That Place Admin notification channel** — resolved (Sprint 23 deep dive, 2026-05-20): delivery via in-app + email (email reuses the Sprint 20 SMTP backend); outbound webhook delivery (Slack / PagerDuty / ops tooling) flagged for future development. v1 platform event list: pending device approval, MQTT broker connectivity failure, multi-tenant 3rd-party API provider failure, feed provider poll failure, tenant lifecycle (created / deactivated), certificate / credential expiry, backend pipeline failure.
 - [ ] ⚑ **Notification retention at scale** — currently retained forever consistent with raw data policy. Revisit if notification volume becomes a storage concern.
 - [ ] ⚑ **Redis atomic flag deep dive** — before implementing the rule evaluation engine, review how `SET NX` works in practice: key naming, TTL/expiry strategy to prevent stale locks if a worker crashes mid-evaluation, how the Redis flag stays in sync with `Rule.current_state` in the DB, and degraded behaviour if Redis is temporarily unavailable.
+- [ ] ⚑ **AER embedded-network report format (v1.1)** — Phase 4c B3 ships a compliance data export, not AER-format submission templates. Which AER report format v1.1 implements first is parked until a real embedded-network operator names a specific report / exemption class. (Promoted from `docs/billing-module.md` §18 Q21.)
