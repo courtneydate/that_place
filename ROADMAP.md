@@ -703,17 +703,18 @@ _Frontend:_
 **Deliverables:**
 
 _Backend:_
-- [ ] `NotificationEventType` model + migration — key, label, description, severity (info/warning/critical), audience (platform_admin/tenant), default_channels (array: in_app/email), metadata_schema (JSONB), message_template, is_active
-- [ ] `NotificationEventType` CRUD endpoints (That Place Admin only); v1 event types seeded via fixture
-- [ ] Central dispatch helper — `emit(event_key, metadata)` resolves the registry entry, renders the template, and creates `Notification` records for the resolved recipients on each enabled channel
-- [ ] Retrofit existing system-event notifications onto the registry — Sprint 19 device events and the Sprint 15a feed-poll-failure notification — no parallel notification paths
-- [ ] Platform-event emitters: pending device approval, MQTT broker connectivity failure (broker-disconnect detection on the shared `ThatPlaceMQTTClient`), multi-tenant 3rd-party API provider failure, feed provider poll failure, tenant created / deactivated, certificate / credential expiry (Celery beat check), backend pipeline failure
-- [ ] Email delivery of platform notifications via the Sprint 20 SMTP backend
-- [ ] Tests — each event emits correct notifications, only the resolved audience receives them, registry-driven template rendering, retrofitted events still fire, cross-tenant isolation on tenant-audience events
+- [x] `NotificationEventType` model + migration — key, label, description, severity (info/warning/critical), audience (platform_admin/tenant), default_channels (array: in_app/email), metadata_schema (JSONB), message_template, is_active
+- [x] `NotificationEventType` CRUD endpoints (That Place Admin only); v1 event types seeded via a `post_migrate` handler (works under the `--no-migrations` test runner, unlike a data migration)
+- [x] Central dispatch helper — `emit_event(event_key, metadata, tenant_id)` resolves the registry entry, renders the template, and creates `Notification` records for the resolved recipients on each enabled channel
+- [x] Retrofit existing system-event notifications onto the registry — Sprint 19 device events and the Sprint 15a feed-poll-failure notification — no parallel notification paths
+- [x] Platform-event emitters (view-detected): pending device approval, feed provider poll failure, tenant created / deactivated
+- [x] Platform-event emitters (infrastructure-detected): MQTT broker connectivity failure (paho `on_disconnect`, cooldown-suppressed); third-party API provider-wide outage (every active data source for the provider in `error` / `auth_failure`, cooldown-suppressed per provider); certificate expiry (daily Celery beat — MQTT backend cert + all device mTLS certs, warn at 30 / 14 / 7 days); backend pipeline failure (Celery `task_failure` signal, deduped per task / hour)
+- [x] Email delivery of platform notifications via the Sprint 20 SMTP backend
+- [x] Tests — registry rendering, audience resolution, channel fan-out, retrofit, all seven emitters, CRUD permissions (29 Sprint 23 tests; full backend + frontend suites green)
 
 _Frontend:_
-- [ ] That Place Admin notification panel — mirrors the Sprint 19 tenant panel (unread badge, read/unread, mark-all-read, click-to-navigate to the relevant record)
-- [ ] That Place Admin `NotificationEventType` management page — list, edit severity / channels / message template, enable/disable
+- [x] That Place Admin notification panel — mirrors the Sprint 19 tenant panel (unread badge, read/unread, mark-all-read, click-to-navigate to the relevant record)
+- [x] That Place Admin `NotificationEventType` management page — list, edit severity / channels / message template, enable/disable
 
 **Definition of Done:**
 - A pending device creates an in-app + email notification for all That Place Admins
@@ -722,6 +723,42 @@ _Frontend:_
 - The Sprint 19 tenant system events and the Sprint 15a feed-poll-failure notification flow through the registry — no duplicate paths remain
 - The That Place Admin panel has unread/read state, mark-all-read, and navigation parity with the tenant panel
 - A certificate / credential expiry warning fires ahead of expiry
+
+> **Status (2026-05-22):** ✅ Complete. Registry, dispatch, retrofit, CRUD, all seven
+> platform emitters (3 view-detected + 4 infrastructure-detected), and both frontend
+> surfaces are implemented and tested — 670 backend + 43 frontend tests green.
+
+---
+
+### Sprint 23b — That Place Admin Hardening
+
+**Goal:** Close three gaps surfaced while reviewing the That Place Admin console —
+protect in-use Reference Datasets from deletion, give the Admin per-tenant user
+visibility, and guard against duplicate-email invites across tenants.
+
+**Context:** All three are flagged items in SPEC.md §9. The duplicate-email guard here
+is an interim safety net — the full fix (one login spanning multiple tenants) is the
+separate **Multi-Tenant User Accounts** sprint (see Backlog), which would supersede it.
+
+**Deliverables:**
+
+_Backend:_
+- [ ] Reference Dataset delete guard — `DELETE /api/v1/reference-datasets/:id/` returns **409** listing the affected tenants/sites when active `TenantDatasetAssignment` records reference the dataset; the delete proceeds only when none exist
+- [ ] `GET /api/v1/tenants/:id/users/` — That Place Admin only; returns the tenant's `TenantUser`s (email, role, joined date) plus outstanding unexpired `TenantInvite`s (email, role, invited date, expiry); read-only
+- [ ] Duplicate-email invite guard — both invite endpoints (`POST /api/v1/tenants/:id/invite/`, `POST /api/v1/users/invite/`) reject with a clear error when the email already belongs to a `TenantUser` in another tenant, or has an active invite to another tenant
+- [ ] Accept-invite integrity guard — the accept-invite flow rejects with a clear error if the email gained a tenant membership after the invite was sent (backstop for the one-tenant-per-user rule)
+- [ ] Tests — delete blocked with 409 when in use and allowed when not; tenant-users endpoint scoping (That Place Admin only, cross-tenant denied); duplicate invite rejected at creation; acceptance guard rejects
+
+_Frontend:_
+- [ ] Reference Datasets page — surface the 409 on delete by naming the tenants/sites still using the dataset, instead of a generic error
+- [ ] That Place Admin Tenant detail — a read-only "Users" section listing members and pending invites
+- [ ] Invite forms (tenant-detail invite and tenant-user invite) — show the duplicate-email rejection message clearly
+
+**Definition of Done:**
+- Deleting an in-use Reference Dataset is blocked with a 409 that names the dependent tenants/sites; deleting an unused one still works
+- A That Place Admin can open any tenant and see its members and pending invites
+- Inviting an email that already belongs to another tenant is rejected with a clear message at invite time; acceptance is guarded as a backstop
+- All new endpoints pass cross-tenant / permission tests; full backend + frontend suites green
 
 ---
 
@@ -798,6 +835,7 @@ _Frontend:_
 - **Windowed aggregate rule conditions** (avg / max / min over a rolling window) — SPEC §3 Rules Engine, deferred from Phase 4 to Phase 5 in SPEC §8. Shares the `window_min` / `window_max` implementation with Phase B1 derived streams — best scheduled alongside or just after B1.
 - **3rd-party API history / backfill endpoint** — SPEC §8 Phase 2 (deferred to Phase 3) and SPEC §9 ⚑. A date-range backfill polling pattern that does not collide with regular detail-endpoint polling.
 - **Legacy weatherstation / tbox / abb payload parsers** — SPEC §2 & §9 ⚑. Blocked on hardware-team payload-format input. Topic patterns are registered (Sprint 6); the parsers cannot be built until the formats are confirmed.
+- **Multi-Tenant User Accounts** (dedicated sprint — needs a pre-sprint design deep dive). Allow one email / login to belong to multiple tenants and switch between them via a personal settings page. Requires: `TenantUser.user` `OneToOneField` → `ForeignKey`; an "active tenant" concept (a JWT claim re-issued on switch); reworking the tenant-context middleware and every permission class to resolve the *active* `TenantUser`; a tenant switcher in the UI; and full re-verification of cross-tenant isolation. Reverses the SPEC §4 "a user belongs to at most one tenant" rule — an auth-core change, so it warrants its own deep dive before being slotted. Resolving it fully supersedes the Sprint 23b interim duplicate-email guard. (SPEC §9 ⚑.)
 
 ---
 

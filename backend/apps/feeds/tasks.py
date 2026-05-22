@@ -455,13 +455,17 @@ def _build_auth_headers(provider, credentials: dict | None = None) -> dict:
 
 
 def _notify_admin_feed_failure(provider) -> None:
-    """Log a warning when a provider fails all endpoints on a poll cycle.
+    """Notify That Place Admins when a provider fails all endpoints on a poll cycle.
 
-    Full platform notification (to That Place Admins) will be wired up in
-    Sprint 23 when the notification event registry is built.
+    Emits the ``feed_provider_poll_failure`` platform event through the
+    notification registry (Sprint 23).
     """
     logger.error(
-        'FeedProvider "%s" (pk=%d) failed on all endpoints. '
-        'That Place Admins should be notified.',
+        'FeedProvider "%s" (pk=%d) failed on all endpoints.',
         provider.name, provider.pk,
+    )
+    from apps.notifications.tasks import emit_event
+    emit_event.delay(
+        'feed_provider_poll_failure',
+        {'provider_name': provider.name, 'provider_id': provider.pk},
     )

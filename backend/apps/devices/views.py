@@ -195,6 +195,16 @@ class DeviceViewSet(viewsets.GenericViewSet):
             request.user.email,
             tenant.name,
         )
+        # Notify That Place Admins that a device is awaiting approval.
+        from apps.notifications.tasks import emit_event
+        emit_event.delay(
+            'device_pending_approval',
+            {
+                'device_name': device.name,
+                'serial_number': device.serial_number,
+                'tenant_name': tenant.name,
+            },
+        )
         return Response(DeviceSerializer(device).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):

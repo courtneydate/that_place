@@ -411,3 +411,44 @@ def _record_failure(dsd, poll_status: str, error_msg: str, now) -> None:
                 'consecutive_failures': dsd.consecutive_poll_failures,
             },
         )
+        # If every active data source for this provider is failing, the
+        # provider is down platform-wide — notify That Place Admins.
+        _maybe_notify_provider_outage(dsd.datasource.provider)
+
+
+def _maybe_notify_provider_outage(provider) -> None:
+    """Emit third_party_api_provider_failure when a provider is down platform-wide.
+
+    A platform-wide outage means every active ``DataSourceDevice`` for the
+    provider — across all tenants — is in ``error`` / ``auth_failure``. This is
+    distinct from a single tenant's ``datasource_poll_failure`` (usually a
+    credential issue). Re-emission is cooldown-suppressed per provider so a
+    sustained outage does not flood That Place Admins. Ref: ROADMAP Sprint 23.
+    """
+    from django.core.cache import cache
+
+    from .models import DataSourceDevice
+
+    devices = DataSourceDevice.objects.filter(
+        datasource__provider_id=provider.pk, is_active=True,
+    )
+    statuses = set(devices.values_list('last_poll_status', flat=True))
+    failing = {'error', 'auth_failure'}
+    if not statuses or not statuses.issubset(failing):
+        # At least one data source is healthy or not yet polled — not an outage.
+        return
+
+    if not cache.add(f'provider_outage_notified_{provider.pk}', True, timeout=3600):
+        return  # already notified within the cooldown window
+
+    tenant_count = devices.values('datasource__tenant_id').distinct().count()
+    from apps.notifications.tasks import emit_event
+    emit_event.delay(
+        'third_party_api_provider_failure',
+        {'provider_name': provider.name, 'tenant_count': tenant_count},
+    )
+    logger.warning(
+        'ThirdPartyAPIProvider "%s" (pk=%d) appears down platform-wide '
+        '— %d tenant(s) affected',
+        provider.name, provider.pk, tenant_count,
+    )

@@ -278,8 +278,46 @@ class ReferenceDatasetViewSet(viewsets.GenericViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, pk=None):
-        """Delete a reference dataset (That Place Admin only)."""
-        self.get_object().delete()
+        """Delete a reference dataset (That Place Admin only).
+
+        Blocked with 409 while any `TenantDatasetAssignment` references the
+        dataset — deleting an in-use dataset would break the dependent tenant
+        rule conditions (and billing tariff lookups). The response lists the
+        affected tenant/site assignments so the admin can reassign or remove
+        them first.
+
+        Ref: SPEC.md §9; ROADMAP Sprint 23b
+        """
+        dataset = self.get_object()
+        assignments = (
+            dataset.tenant_assignments
+            .select_related('tenant', 'site')
+            .order_by('tenant__name')
+        )
+        if assignments.exists():
+            in_use = [
+                {
+                    'tenant': a.tenant.name,
+                    'site': a.site.name if a.site_id else None,
+                    'active': a.effective_to is None,
+                }
+                for a in assignments
+            ]
+            return Response(
+                {
+                    'error': {
+                        'code': 'dataset_in_use',
+                        'message': (
+                            f'This dataset is in use by {len(in_use)} '
+                            f'assignment(s) and cannot be deleted. Reassign or '
+                            f'remove them first.'
+                        ),
+                        'details': {'assignments': in_use},
+                    },
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        dataset.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

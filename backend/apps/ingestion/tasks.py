@@ -326,3 +326,76 @@ def _dispatch_stream_rule_evaluation(stream_id: int) -> None:
 
     for rule_id in rule_ids:
         evaluate_rule.delay(rule_id)
+
+
+# ---------------------------------------------------------------------------
+# Certificate expiry monitoring — Sprint 23
+# ---------------------------------------------------------------------------
+
+# Days-before-expiry at which a certificate_expiry_warning is emitted. The
+# daily beat schedule means each threshold fires exactly once per certificate.
+CERT_EXPIRY_WARN_DAYS = {30, 14, 7}
+
+
+def _certificate_days_remaining(pem_bytes: bytes) -> int:
+    """Return whole days until the PEM certificate in ``pem_bytes`` expires."""
+    from datetime import timezone as dt_timezone
+
+    from cryptography import x509
+
+    cert = x509.load_pem_x509_certificate(pem_bytes)
+    try:
+        not_after = cert.not_valid_after_utc
+    except AttributeError:  # cryptography < 42 — not_valid_after is naive UTC
+        not_after = cert.not_valid_after.replace(tzinfo=dt_timezone.utc)
+    return (not_after - timezone.now()).days
+
+
+@shared_task(name='ingestion.check_certificate_expiry')
+def check_certificate_expiry() -> None:
+    """Warn That Place Admins about MQTT/device certificates nearing expiry.
+
+    Runs daily (Celery beat). Checks the MQTT backend client certificate and
+    every device mTLS certificate, emitting ``certificate_expiry_warning`` at
+    30, 14, and 7 days before a certificate expires.
+
+    Ref: SPEC.md § Feature: Notifications; ROADMAP Sprint 23
+    """
+    import base64
+
+    from django.conf import settings
+
+    from apps.notifications.tasks import emit_event
+
+    def _check(cert_name: str, pem_bytes: bytes) -> None:
+        try:
+            days = _certificate_days_remaining(pem_bytes)
+        except Exception:
+            logger.warning('check_certificate_expiry: could not parse %s', cert_name)
+            return
+        if days in CERT_EXPIRY_WARN_DAYS:
+            emit_event.delay(
+                'certificate_expiry_warning',
+                {'cert_name': cert_name, 'days_remaining': days},
+            )
+
+    # MQTT backend client certificate (base64-encoded PEM in settings)
+    cert_b64 = getattr(settings, 'MQTT_BACKEND_CERT_B64', '')
+    if cert_b64:
+        try:
+            _check('MQTT backend client certificate', base64.b64decode(cert_b64))
+        except Exception:
+            logger.warning('check_certificate_expiry: invalid MQTT_BACKEND_CERT_B64')
+
+    # Device mTLS certificates
+    devices = (
+        Device.objects
+        .exclude(mqtt_certificate='')
+        .exclude(mqtt_certificate__isnull=True)
+    )
+    for device in devices.iterator():
+        _check(
+            f'Device {device.name} ({device.serial_number})',
+            device.mqtt_certificate.encode(),
+        )
+    logger.info('check_certificate_expiry: completed')

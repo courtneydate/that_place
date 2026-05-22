@@ -353,6 +353,7 @@ function ReferenceDatasets() {
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [formError, setFormError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const datasets = Array.isArray(data) ? data : (data?.results ?? []);
 
@@ -376,7 +377,20 @@ function ReferenceDatasets() {
 
   const handleDelete = (id) => {
     if (!window.confirm('Delete this dataset and all its rows?')) return;
-    deleteMutation.mutate(id);
+    setDeleteError('');
+    deleteMutation.mutate(id, {
+      onError: (err) => {
+        const error = err.response?.data?.error;
+        if (error?.code === 'dataset_in_use') {
+          const where = (error.details?.assignments ?? [])
+            .map((a) => `${a.tenant}${a.site ? ` / ${a.site}` : ''}${a.active ? '' : ' (expired)'}`)
+            .join(', ');
+          setDeleteError(`${error.message} In use by: ${where}`);
+        } else {
+          setDeleteError(error?.message ?? 'Failed to delete dataset.');
+        }
+      },
+    });
   };
 
   if (isLoading) return <p className={styles.loading}>Loading reference datasets…</p>;
@@ -392,6 +406,8 @@ function ReferenceDatasets() {
           </button>
         )}
       </div>
+
+      {deleteError && <p className={styles.error}>{deleteError}</p>}
 
       {creating && (
         <div className={styles.section}>

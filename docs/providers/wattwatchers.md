@@ -237,7 +237,7 @@ or frequency.** Best for billing integrations, energy budgets, and consumption a
 
 ---
 
-#### Option D — Modbus data (cloud, via 6M+One + CETA PMC billing meter)
+#### Option C — Modbus data (cloud, via 6M+One + CETA PMC billing meter)
 
 The **Watt Watchers 6M+One** connects to a **CETA PMC-220 or PMC-340B** pattern-approved billing
 meter via RS-485 and relays its register data to the Watt Watchers cloud. The cloud exposes this
@@ -296,10 +296,11 @@ via a dedicated `/modbus/` endpoint — same Bearer Token auth as Options A and 
 
 | key | label | unit | data type | JSONPath |
 |-----|-------|------|-----------|----------|
-| `modbus_kwh_import` | `Energy Import` | `kWh` | `numeric` | `$.kWh_Import` |
-| `modbus_kwh_export` | `Energy Export` | `kWh` | `numeric` | `$.kWh_Export` |
+| `modbus_kwh_import` | `Energy Import` | `kWh` | `numeric` | `$.kWh_Imp` |
+| `modbus_kwh_export` | `Energy Export` | `kWh` | `numeric` | `$.kWh_Exp` |
 | `modbus_kwh_net` | `Energy Net` | `kWh` | `numeric` | `$.kWh_Net` |
-| `modbus_kwh_total` | `Energy Total` | `kWh` | `numeric` | `$.kWh_Total` |
+| `modbus_kwh_total` | `Energy Total` | `kWh` | `numeric` | `$.kWh_To
+` |
 
 ##### Reactive energy (kVArh) — by quadrant (optional)
 

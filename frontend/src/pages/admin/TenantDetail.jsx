@@ -4,7 +4,12 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useTenant, useUpdateTenant, useSendInvite } from '../../hooks/useTenants';
+import {
+  useTenant,
+  useUpdateTenant,
+  useSendInvite,
+  useTenantUsers,
+} from '../../hooks/useTenants';
 import styles from './AdminPage.module.css';
 
 const TIMEZONES = [
@@ -18,6 +23,11 @@ function TenantDetail() {
   const { data: tenant, isLoading, isError } = useTenant(id);
   const { mutateAsync: updateTenant, isPending: isSaving } = useUpdateTenant(id);
   const { mutateAsync: sendInvite, isPending: isInviting } = useSendInvite(id);
+  const {
+    data: tenantUsers,
+    isLoading: usersLoading,
+    isError: usersError,
+  } = useTenantUsers(id);
 
   const [name, setName] = useState('');
   const [timezone, setTimezone] = useState('Australia/Sydney');
@@ -141,6 +151,60 @@ function TenantDetail() {
             {isInviting ? 'Sending…' : 'Send invite'}
           </button>
         </form>
+      </section>
+
+      {/* Users — read-only view of members and pending invites */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Users</h2>
+        {usersLoading && <p className={styles.loading}>Loading users…</p>}
+        {usersError && <p className={styles.error}>Failed to load users.</p>}
+        {tenantUsers && (
+          <>
+            {tenantUsers.members.length === 0 ? (
+              <p className={styles.empty}>This tenant has no users yet.</p>
+            ) : (
+              <table className={styles.table}>
+                <thead>
+                  <tr><th>Email</th><th>Role</th><th>Joined</th></tr>
+                </thead>
+                <tbody>
+                  {tenantUsers.members.map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.email}</td>
+                      <td className={styles.mono}>{m.role}</td>
+                      <td className={styles.mono}>
+                        {new Date(m.joined_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {tenantUsers.pending_invites.length > 0 && (
+              <>
+                <h3 className={styles.label} style={{ margin: '1.25rem 0 0.5rem' }}>
+                  Pending invites
+                </h3>
+                <table className={styles.table}>
+                  <thead>
+                    <tr><th>Email</th><th>Role</th><th>Expires</th></tr>
+                  </thead>
+                  <tbody>
+                    {tenantUsers.pending_invites.map((inv) => (
+                      <tr key={inv.id}>
+                        <td>{inv.email}</td>
+                        <td className={styles.mono}>{inv.role}</td>
+                        <td className={styles.mono}>
+                          {new Date(inv.expires_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </>
+        )}
       </section>
     </div>
   );

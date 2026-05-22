@@ -1,5 +1,5 @@
 {
-	"changeIndex":	964,
+	"changeIndex":	1106,
 	"defaultACLAccess":	{
 		"publishClientSend":	false,
 		"publishClientReceive":	true,
@@ -2198,6 +2198,20 @@
 				}],
 			"encoded_password":	"$7$1000$qMdGPbtqIuiewLwPgZMIFqIFID+BVrXjY9gOzPRI+NA8GFZ+QjQzeOlTbppuIEPriK7EKQ1B8vKqaxkhOCUfvQ==$uB1LDTrRFRqbQGVi9njCpZzvgTQD1A/vlw8IQFV1XXZEAWxBp6iG8jI31yFq6s1Q4saHWlgFWme8NibTB5qfwg=="
 		}, {
+			"username":	"scout-DEV-402-temperature",
+			"textname":	"Scout DEV-402-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-402-temperature"
+				}],
+			"encoded_password":	"$7$1000$MbwtQ+nEL60+gKnsVUQOqLsEfqEYEINDSpbANAgDtYRbAaM9AuJ7qF7aYTCz7Hiy1l6fKQcemZStQ51eSwZAzQ==$fcJISFmFj2DSktsbyaNXVUTp/E/hZYnRC9dIEPy+7LzUJXok7RuKVMhCDbE5bVxHSZqAICEof6cW/86jJ5jERw=="
+		}, {
+			"username":	"scout-DEV-403-humidity",
+			"textname":	"Scout DEV-403-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-403-humidity"
+				}],
+			"encoded_password":	"$7$1000$mW4YU6tns/sI3KRCsf9DDBPmmaCzOBu8bp5rHJ9rdjaTbt7nMaa7Pr/3L0hVhx83C29APcgbELE0TxMdmvPU3g==$WyMsm83/QS1tN2+/wZg7gFyqylhZjbrQILLfOJvKwgMnQ1gG+6V7tkZtdv9OEvz1SD17MI74x3RQfA3p9u9Jkw=="
+		}, {
 			"username":	"scout-DEV-403-temperature",
 			"textname":	"Scout DEV-403-temperature",
 			"roles":	[{
@@ -2205,12 +2219,47 @@
 				}],
 			"encoded_password":	"$7$1000$72oWQ3BnDtiiqEXjtdxImwvzFpnl8z/qBoYxcc92QHl0NPru0mA6WIEw1cDmaeYRHQ5lo5fRV1Y7PL0EQKYP/Q==$J7O7HNfXKZIz5MQdYjFENpPucX6VeCGvY8U6f1QMWgn/nE8vHOUvvs5urIewk9HSVoHJYU7tsDE75bG562sYtQ=="
 		}, {
+			"username":	"scout-DEV-404-humidity",
+			"textname":	"Scout DEV-404-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-404-humidity"
+				}],
+			"encoded_password":	"$7$1000$KBpfS0+NeNg+6UD8dUzeHXA5CaUTwf6m9uweAIAiRU1DkbjhONeE13cSCncgLrZFU3fP1WjaukIvwHaihrscNw==$WoeHKmAbN4gFOQxNulLYL8EOfgfl1OHhTsQ0PV2YHDcJk+EOIfvUX52AT32fD892+2eR9+d38Gx2PD2Cst7QZg=="
+		}, {
+			"username":	"scout-DEV-404-temperature",
+			"textname":	"Scout DEV-404-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-404-temperature"
+				}],
+			"encoded_password":	"$7$1000$b1gowTmlJUqsTo1A5sUy7QExlnj/9Uocu1PhPkdEyiTkVa4nGJl8TMOQgjGcOqikLAE+t4sgt6EFmhlRcgqmyA==$XGZkmCxdeaCwtVhxdy1OmKvPc9ZNGvGYonQ23tEA2iJh5yBrs4IHjlbdp+6KvGTnI+5uyv/JzFD460cN34xwyA=="
+		}, {
+			"username":	"scout-DEV-405-humidity",
+			"textname":	"Scout DEV-405-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-405-humidity"
+				}],
+			"encoded_password":	"$7$1000$1XKFNHCvf66OF8n9g+4epZAjIzfyeNJ5mQXsrlCKRI9UfEkl24FUyus/1jR9oaWBK3Hw+mXZOM8L/yOuC8c6jg==$pi16ZyGKYLfnu4RiN9Yl2ey6VxC0SX8pVLchhB3bY1BxLT6wOqBTAKBugCH3W5fqvqKwj/hsyqk+XJJ5LKN88A=="
+		}, {
 			"username":	"scout-DEV-405-temperature",
 			"textname":	"Scout DEV-405-temperature",
 			"roles":	[{
 					"rolename":	"scout-DEV-405-temperature"
 				}],
 			"encoded_password":	"$7$1000$MCh+gIRtuWmF5060dVPktE6iJDJeKg9iVGtxTfT+rn5+La0gk37X5Ycu8hmsMasNc3zfKZoHSgp9R/rYlnaAeA==$H3+K5XfCSJMnPTmffw9MbMq4+hyeTjCvaIBVDwj6eRrb3TIjKMzZvkUa7jYBoEPGXKWGxALrJBZcy68yu9SUtQ=="
+		}, {
+			"username":	"scout-DEV-406-humidity",
+			"textname":	"Scout DEV-406-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-406-humidity"
+				}],
+			"encoded_password":	"$7$1000$yoaY6/lgN84jLwwmi3p/h4OZd4gWSKfzyGgOwyXzzudB59c5S0lZli1S20dXciVxcwORsVZItifY5oJixXDkoQ==$Lzwnhs0ilwA6kqmnGeBiGWx+I3Izl1BWXftjzWV8O9EyK1BOnCuK9oh09EpiklvWEYbK7a56Th+54XAWduTq/A=="
+		}, {
+			"username":	"scout-DEV-406-temperature",
+			"textname":	"Scout DEV-406-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-406-temperature"
+				}],
+			"encoded_password":	"$7$1000$E+xuK/MOR5a/DkEhRSPfu1/MklYUboxZg3/0npJs/agd3tPtw2sjbKtkOIy4EFb4NODNs6c3MHYuizpOgqhgqg==$6/cW+qNUoKNJdKrlM/miPIP2BAxG8yJSOVGcAE9K/4MzKDmA8PUiwowy7362FQ6HFxa7auzLJRExrV+DuDkHVw=="
 		}, {
 			"username":	"scout-DEV-407-temperature",
 			"textname":	"Scout DEV-407-temperature",
@@ -2233,12 +2282,26 @@
 				}],
 			"encoded_password":	"$7$1000$+6eMLXGmaPvqKMfZxeyl0SoLkjWNTlhBBAvQf21+BeWPQMbhHgeKeQgi5xm/vrVvJqPwoiDcJqNCBOrvcCxbjQ==$h+XFQsv4DN41OWGCNoXlwBmQxFmkw3ab3lk1c9BmeDNiqznotNvp6jX4Yyf/FsbmKmzUuhrerMQsrxbKdLbzYA=="
 		}, {
+			"username":	"scout-DEV-410-temperature",
+			"textname":	"Scout DEV-410-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-410-temperature"
+				}],
+			"encoded_password":	"$7$1000$uKnplhZPKGPG9Gh9T/+cVlXxw/LcKX396LaRMlr+fnr8hhvB6knYMVU+euDNMd1maqlAZLpzlQLvSN6svfgKJg==$rEmdmSvKyZGpt+t0yDV9+tuE1I8mT+DBc041UHnRd3zPkJIWl0ya4CBY1A9fzxV1WqfBcEeeXOLiEcEDqrZuHw=="
+		}, {
 			"username":	"scout-DEV-411-temperature",
 			"textname":	"Scout DEV-411-temperature",
 			"roles":	[{
 					"rolename":	"scout-DEV-411-temperature"
 				}],
 			"encoded_password":	"$7$1000$EJJUjCS2w3pmq5EZtbOx4/t/SVszfInSb28SHUYIpu7bKPAq5UxOVT/D/sz8gfG/DEqGjCmBo6419NMz6LAOVg==$u4H8BN0Gtr6frhVMFAT8OW6j28FvVApnUZzJUjw7C7t+JcvNg/qlv/tjYE0owM0bDweTo8jHWq8RyK1PRS2Z7g=="
+		}, {
+			"username":	"scout-DEV-412-humidity",
+			"textname":	"Scout DEV-412-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-412-humidity"
+				}],
+			"encoded_password":	"$7$1000$h6UsT0MzI5TDVtrDmokQ4ccIzWCAh7VFQCiNOalXyIwpW9roY9ZliWMdNZPp8cLMX463ztY3puMNQeLzgfKn3Q==$kaaMBKPzg0Tmym8vUwOKBkdY7Ua1WWu58oLgir9lZary7CbdTdtO6uQttdOpAHTV8TLAUa9N6yk6wemAywY0zw=="
 		}, {
 			"username":	"scout-DEV-412-temperature",
 			"textname":	"Scout DEV-412-temperature",
@@ -2247,6 +2310,13 @@
 				}],
 			"encoded_password":	"$7$1000$MPvTY+8B4eNMWLAoOEXdVsq+RUueC0R9FzZUshMW6KNptYs4Xgk13EYtGsKtQEo2LkZ19jfYWAsmzvVh3PlKrA==$tmmfjbEGnJM4u/PAhTN45G3+1wm1qTF3HCt0o0RWjHEJ9gUvldsjIWwaKaDhypxD3zyCe6yWQSprPjK5Ma3/TA=="
 		}, {
+			"username":	"scout-DEV-413-humidity",
+			"textname":	"Scout DEV-413-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-413-humidity"
+				}],
+			"encoded_password":	"$7$1000$bhEVJtdJvY/+2CnuKz1FY9OpJ5+MZlbeihMWbSAGnNm1Z4Qowe0pQajwzU4OA0prCRa23VXAY3vXF2sxtzhuMw==$smyxdoZ2VwABAU3EKTp3S+lqx9eQ8BnAgMcIb2Nq+QcpFMeJesnMyVKVeeBhLKWXFZRjWMgpoKvrnPuWsum0gA=="
+		}, {
 			"username":	"scout-DEV-413-temperature",
 			"textname":	"Scout DEV-413-temperature",
 			"roles":	[{
@@ -2254,12 +2324,26 @@
 				}],
 			"encoded_password":	"$7$1000$MOYHZipeqaENjvPeBrrQNex05t5xu+LuVQNC+OkpQBvDyT2qQ0/hDjj8iSfx8KILO0edm6sfn+5ZP316rj0N4Q==$zl6xsKD9go9KUr0LfYDPxfy5ZXxsx2U616neomSjzjkTEcyl2JMJT0HRNOwhudvWEs5aAKrzcphJIDNHRTry+w=="
 		}, {
+			"username":	"scout-DEV-414-humidity",
+			"textname":	"Scout DEV-414-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-414-humidity"
+				}],
+			"encoded_password":	"$7$1000$q1GKlP8kvUrsf6wYx6zjcOFNi8YG2QzxnXYJiuIgTM4NGnTUnBuCWMAUkM5Cw8xe7i9ROVHH2anzmBZDG03W7w==$QZvl5yiLMhfjrENPD2lazDPBGk1lf7iRIiSW70T3J6FV5hJwAMFbrTqZ+6mBTE8TSwlFC5F/h2rdE9stTMBPDw=="
+		}, {
 			"username":	"scout-DEV-414-temperature",
 			"textname":	"Scout DEV-414-temperature",
 			"roles":	[{
 					"rolename":	"scout-DEV-414-temperature"
 				}],
 			"encoded_password":	"$7$1000$iMHzCkluccqSdP9eA+AIz5eL/0JVqznW2m15B4hOMV7xMoVibEhdboc0q/bE15iExJTdcWkSVBJ53faKvbc/OA==$l/2yHAJSUyL7AE+OGYnGyh0O2pssIoG++DHeSB2luPWsqv1oQF1P2u8l8iwrz6r66nuN6i+h0gddhtEkBIohsg=="
+		}, {
+			"username":	"scout-DEV-415-humidity",
+			"textname":	"Scout DEV-415-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-415-humidity"
+				}],
+			"encoded_password":	"$7$1000$2cUVN8VwQmGK07JUU1Jvdk4fO7vGcLG05wzj15p/eynG+U75JoMxka5v58m4AJujuQ2A7wKGqSWhgDomWaqBtA==$nMq2kqBlyjmDP5HZJg5+8+26fe/f0DKp1GGfmucvPgP7HNYY2InYSLmb4hgvuITr/RFY/PYcW651ioG7bqpPQg=="
 		}, {
 			"username":	"scout-DEV-415-temperature",
 			"textname":	"Scout DEV-415-temperature",
@@ -2274,6 +2358,13 @@
 					"rolename":	"scout-DEV-416-door_open"
 				}],
 			"encoded_password":	"$7$1000$BTj1ISLG6GEWvzjFyiHT5kdTS4hlDSUgqLajkvPRMcO6ifNhmywBb0Vqd+5127q0lfAQPtJBg3LpcU9BO2kVHw==$qh4/P0mZodcClffrRmeKr1knFRogW35akozhTjI7RnBvUqEuS8wBo9acs7DTy4ZLy2vtGr9fid9SEweDtV/AJw=="
+		}, {
+			"username":	"scout-DEV-416-temp_b",
+			"textname":	"Scout DEV-416-temp_b",
+			"roles":	[{
+					"rolename":	"scout-DEV-416-temp_b"
+				}],
+			"encoded_password":	"$7$1000$JE/VVrw4HUDf2qb6iH5Z07f02ait1AYJbVckfy+85Fk34OLXMDd1rK1dvL2CZ4EYXRs0+o4Mo2YWveOG0FiHCQ==$eB+do2res+acEkYqyzcmUVU3/2ziPkwoW+HdFfsQZgg8JLfYVqjveF3GzwwdU6PvkTU+hLkWV9HvU9nqRCakog=="
 		}, {
 			"username":	"scout-DEV-416-temperature",
 			"textname":	"Scout DEV-416-temperature",
@@ -2303,6 +2394,13 @@
 				}],
 			"encoded_password":	"$7$1000$DCbKykmZDR/DvgkxfJiKXb9FIlmWw4HifIaaodOBTsRKUmJ/k1THlcL3n1MfQDElR1CGEgjH62vhisYLnIIrYA==$nHabsoeKOFlm/hA8wjycXUIWi/Yt/Fn6NaTGwCxbjDCoprzIo1+vybbuDRLuo5cMHars5HkdH3UWn8S2RbGJ8A=="
 		}, {
+			"username":	"scout-DEV-418-humidity",
+			"textname":	"Scout DEV-418-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-418-humidity"
+				}],
+			"encoded_password":	"$7$1000$JVt9v8T1c6abEQxjRdkVK58nCz7ZUkmo0YHVoJT9RYw8HwYo5jFiuWZnvNP0DyLpBjZECaKjZtkj7WfciR7qnQ==$Wv2aWwccwKxcFh40/TdcgJegmlTQRUh5AQPx1WhofnzNBfbpnGrVg9W9XVwQrbc4IJrpl8PsUh/3O/GVN0nj2g=="
+		}, {
 			"username":	"scout-DEV-418-temperature",
 			"textname":	"Scout DEV-418-temperature",
 			"roles":	[{
@@ -2316,6 +2414,13 @@
 					"rolename":	"scout-DEV-419-door_open"
 				}],
 			"encoded_password":	"$7$1000$taPBI8E/JRTLUyvtmwE6LD3MBcD3dtx4Ma5zBIkyw59UyqPJ9Pse/HpHIiLGP7DCb2OGONo6knHWPnWHMH5rhQ==$CHfvtLVJ1LXAP2AdGy7ZqWXlpA9F0MBJHYWDTYDwR75Pl5c6LlJ/i1yLHA2QBHdotRAq0uKVUgHRln7elui0kw=="
+		}, {
+			"username":	"scout-DEV-419-humidity",
+			"textname":	"Scout DEV-419-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-419-humidity"
+				}],
+			"encoded_password":	"$7$1000$C1YW+Fa5cKdxN2crJI084+CufnUgT3KFPawAcV5EAqaYjT8UdgQHKCis7U75fzG711aWH0zecp+mUjg8/vzcAQ==$SxsnJtM/rkOdu+ruNLFfhQW4WLEtSBXRMrOdawObbBVQPBVP2RU0KBM+xVPhhWQ0ZAS5eRjMGIRJZT+LB2yG3w=="
 		}, {
 			"username":	"scout-DEV-419-temperature",
 			"textname":	"Scout DEV-419-temperature",
@@ -2331,6 +2436,13 @@
 				}],
 			"encoded_password":	"$7$1000$T34cvNWJiYjNxQNLEN5+0cFWPKAXsU1/aFe3d4g8lDD3ZFwGSuJMJk+uF0yxGOJarbxooNDiLPckNF4aKsHiaQ==$X9skr1gfk25B7Sfp6+4+eQAmDAcwhEJLFC1TXdrnxVxw8BQ2vIdqAaGPMKsXOn9QhLZCdwJqe7l79GW2cNhmbA=="
 		}, {
+			"username":	"scout-DEV-420-humidity",
+			"textname":	"Scout DEV-420-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-420-humidity"
+				}],
+			"encoded_password":	"$7$1000$uSdrUlbL+VFOJNV9McNWIiFUJVphUtKtk9ChmpaIqegayx11rO7IFxVJN8ANr/+HpCFmtE2FiS6RAPP7gjIJNw==$/l7zHRP3s9wnuYw53Mdun9kBuegE+9PvOOb8w3fuujzRcyyuG5tQajNurKh9W3ofO9sdVBb2mvQkEL60lH8OEg=="
+		}, {
 			"username":	"scout-DEV-420-temperature",
 			"textname":	"Scout DEV-420-temperature",
 			"roles":	[{
@@ -2338,12 +2450,341 @@
 				}],
 			"encoded_password":	"$7$1000$Okx07spP3vytUwPmCU42GgxvX+JCY14YMeU3SJzx6n/ON27pg/jHnCSu/cccpkiWT6LUd2Xca/mM0CCji6S5uw==$pEHymZ2ZCbLIOpHEvU8WV9F31EpJP2fAoq4/4+dPJcatBDStIOhfTV3T2qxJV/HgXbSrqLkAvirWZCD/HxuW0g=="
 		}, {
+			"username":	"scout-DEV-421-humidity",
+			"textname":	"Scout DEV-421-humidity",
+			"roles":	[{
+					"rolename":	"scout-DEV-421-humidity"
+				}],
+			"encoded_password":	"$7$1000$3i/cpAPUQqj7DL5Qp1U2dfIyU6FBg6C7OG7aUubS+8i55ostLmO0IBxi3rW3U67S1QdkKxaFLSyEkFOlkzvISA==$kCi5Kp6aL1xslEiDXGiE6bRRndet3yO6GZLtHH2ROFw9w3ZBRO85MOhImNIDOC1buadOVQSttSkHTWW9/wSmYw=="
+		}, {
+			"username":	"scout-DEV-421-temperature",
+			"textname":	"Scout DEV-421-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-421-temperature"
+				}],
+			"encoded_password":	"$7$1000$Gd98ip4sQK8RxDsdXk7obbMmTd6A1v9j7Kl1PNksQikEX3aY/Pxec1fDbFnS/Wsx2SXyPrcBuHsMvztTGk3uLA==$NHN0AdJStIIH1txuiqkGuYgLKqBDYrMGkkenUuz7Kx+ty739FigYq74/5FpjFUkcAIWFLNrXd27PjRG8fMX8Rg=="
+		}, {
+			"username":	"scout-DEV-422-temperature",
+			"textname":	"Scout DEV-422-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-422-temperature"
+				}],
+			"encoded_password":	"$7$1000$XF4sYxmw1m23sPHfDAWtvaFBo2uoPm4KpmhNaR02IAuoh83iBf280NJtSEJKcKdoCZpW2il088GLanUWvPMNpQ==$y3OAWteo2zWpgBGPKx1i9pMCWR6k2eg1LHM7sRvk3eB8SXJZuuLVqjQycIroPPs3F29S2wNc5vXptZkMoNpomg=="
+		}, {
+			"username":	"scout-DEV-423-temperature",
+			"textname":	"Scout DEV-423-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-423-temperature"
+				}],
+			"encoded_password":	"$7$1000$dyHy5FiW7pm24WUHlbqw0/Odfd+EBuqxvsRAmjEl5CQuL/ql9jH9HyEjnqQagaW2F/1aVpUhL/0Riqx/NLPlzQ==$EbLfY1f0MXI5AGMumSe/RSb4ZVlXSyQqkXeXNPMN/vkxCsAWR0gfKPrSbgUl5VcqgqOXhVJqmmUQqDl/akk8Mg=="
+		}, {
+			"username":	"scout-DEV-424-temperature",
+			"textname":	"Scout DEV-424-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-424-temperature"
+				}],
+			"encoded_password":	"$7$1000$h3CPNZzrgs/BFpCZ0uQGwDquFhjjhIW+9yw7S/9SsbWoTtiUqn1xJsy3JjyxqbYBowtwRove2vXDO6+Ujg/lQg==$P8FgwR+tgYg9ivWo4ySq7pi8u/Kt9E4hhZeM7fZIMFclAMlfYmzbf3m99JS5Iw2XPZ5q3yLMmM+WCd3q2/YVnw=="
+		}, {
+			"username":	"scout-DEV-425-temp_b",
+			"textname":	"Scout DEV-425-temp_b",
+			"roles":	[{
+					"rolename":	"scout-DEV-425-temp_b"
+				}],
+			"encoded_password":	"$7$1000$EKvlClipD/GH6Bd7T/iFFgL1oYWzAvx9SvW5c1XiTHVSdizrn1Ssa5iQ3oZVEXJKDkL3l7ne54tWS8fxuN0xJw==$4bTL71LMCHsvc1B5J+kuOYeFnjmmFS30RFvb0PMFFmm4DBoOWnziV5S+tN+F78n5RSJjq+LJE7dWvDqzXKAO9w=="
+		}, {
+			"username":	"scout-DEV-425-temperature",
+			"textname":	"Scout DEV-425-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-425-temperature"
+				}],
+			"encoded_password":	"$7$1000$2us9ZeWixWtel3FzCwn6LOhlp9ilegg1DonquqQKguuJ7P41dccWN9A6CkMtKz8aaETBVa9BWuiN0cm9kjReYg==$wk4DqUkC9H9FuDHca8v4x8MFibKhkcuA/ZKnbRnOnB14U6jArEWZiIUXB1oQ4cDHFo+zyEpl8SEscvA4kV4YFg=="
+		}, {
+			"username":	"scout-DEV-426-temperature",
+			"textname":	"Scout DEV-426-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-426-temperature"
+				}],
+			"encoded_password":	"$7$1000$kVQdYdt5CDb7ZyD6BTMnKrbWFLi4lYwQVkHB4tY/ZlbMTWW4yb+HBuaqdKCBSfYK73365OtXXfkQpBNU0QewoA==$OO6mcJgtO0fwux3CHAVvBDgoQsoYiHXa7jHjdKBD92q6w3R5gq0wF4wX4S1Q2HBDqtCdhAc3Pd6+S7PTMgaHfg=="
+		}, {
+			"username":	"scout-DEV-427-temperature",
+			"textname":	"Scout DEV-427-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-427-temperature"
+				}],
+			"encoded_password":	"$7$1000$YBFizWyJy7s5wNft0LxAS9NGxmN164JbNlXTb8qeIyoC29l/PcH+oi2PKjo8vhVbzOQVwmXpM8y127hOv8HNwQ==$5zgDnODcc5wTyIBtbLC2tz8JM6DqXC74/A/r92bfUcTVrKEVWkphD+D3zQ4lOlK5HmqSVcOrWJf5LWt6gcEYAQ=="
+		}, {
+			"username":	"scout-DEV-428-temperature",
+			"textname":	"Scout DEV-428-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-428-temperature"
+				}],
+			"encoded_password":	"$7$1000$rYZmy95Fm+F7x2qMvTNBKKCTD1b8gkN3F5W9eoFCKLDneAKkz63ZOURznNIBJvSvauB51h7/Pwiu/eNt6lioNw==$7JPRY60vcigEDZ6mjt08CtcBF2kWdsTRd3wlMHXs+RNHlxQls3HPsMym05PGYWQGoHzbYX37JMtzl0Z+NsNVoA=="
+		}, {
+			"username":	"scout-DEV-429-temperature",
+			"textname":	"Scout DEV-429-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-429-temperature"
+				}],
+			"encoded_password":	"$7$1000$g4PuUi4D7WNruiOsjZQfmgfswRtRWNWedxUZVeEEIMnJFNAl3mLM2ri9Z1VauE72FABzcy9iJPTgSMcWNUyONg==$//WprZ4fqbBj5UbNNBKmBsAFGc64AdqS0qJpbITEGRzVvOQ9L/G/NsuNtClE+UYC56GFOoOcZQ9Y8Xx621Jr1A=="
+		}, {
 			"username":	"scout-DEV-43-temperature",
 			"textname":	"Scout DEV-43-temperature",
 			"roles":	[{
 					"rolename":	"scout-DEV-43-temperature"
 				}],
 			"encoded_password":	"$7$1000$jn4fbT/lSRXQzJFhSR64uCcuAlC3T5VquTCKoo+Te2+00/aqJ/h42/jP7n628SVxVQBjKjNItmYjcRF80djsAg==$WoB3RkAJcaeizdPRJTdPpcYfztUdnI9nK2q6YWPvJ+Dgof++2KhpOpzjFxJr4WLzESkMziOnRT0YXit8AE5a8A=="
+		}, {
+			"username":	"scout-DEV-430-door_open",
+			"textname":	"Scout DEV-430-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-430-door_open"
+				}],
+			"encoded_password":	"$7$1000$FK2+9VHFpHRRZa+vfzKijXuLCDbZcyLKEEw49hH96xWW2rmES4rQopEJKQfigrDlR8fNPZ2P/IrxhC+twsm9tA==$wrMGTs7ZDmXAW/R2TLrsD4Wk4IYkHjh6Ewby5GOnIbRKa4pEKpf+Dv1bfPVLRRykwhe2qm7icRwrHnJpGXM6cA=="
+		}, {
+			"username":	"scout-DEV-430-temperature",
+			"textname":	"Scout DEV-430-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-430-temperature"
+				}],
+			"encoded_password":	"$7$1000$PzCMN6UejmbKewe24gx31FnjtQYWKL5vlTtP52Pcpb5XA7ZgbSp3VU5MCH98TEqXvXC/Id86xYmJzx5iWtjLPA==$QGSh24YwgXDH3ZtjsiE4jtY4PDX/wvATJWFQpYHOhAILZUJjtMXiVb2QMd7sWtSDm2AXw8FP8H+Ku0ZMJC6p8w=="
+		}, {
+			"username":	"scout-DEV-431-door_open",
+			"textname":	"Scout DEV-431-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-431-door_open"
+				}],
+			"encoded_password":	"$7$1000$5NKo93QyN5p/suS18w+KEd47U4o3PV3RHSr510iZr3BrkNR61MN5spX2bDFMTUKOif26vQhnyErO7P4R2I2h8g==$vlN8RsA0d80cMt5hMI1kdeW0l9YoUeI2ZE3yfdwCgsSwSHdnhNK6n46V2O2AFyaiPjBF91InpnHokMmiXM86BA=="
+		}, {
+			"username":	"scout-DEV-431-temp_b",
+			"textname":	"Scout DEV-431-temp_b",
+			"roles":	[{
+					"rolename":	"scout-DEV-431-temp_b"
+				}],
+			"encoded_password":	"$7$1000$1xDY7690zPvmETDZiIHmnQKjL1/sax3lAy9UoJDf0XaoaWkNqAYYoy+B0RAXxHVGyVErOb873esl9J+/bw7IDA==$nV1oxTWChqq+tXRbcJ/E0o89ON9l7BBCSIN4dtLkrfRS6U5qWsbpUyyfsTM1c+p9ZUAELKyc1eW8PIWYdw1Sfw=="
+		}, {
+			"username":	"scout-DEV-431-temperature",
+			"textname":	"Scout DEV-431-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-431-temperature"
+				}],
+			"encoded_password":	"$7$1000$mPwd5mac9GSyP1QZ0s2oI2s9eoSQKy1NI3Q8QAFSmBwOmHOrkZIrpR6cKswzeSlRpnogs6EpcTLRN+Ae0VyTew==$iB9zNj54+NQew3RBrBpkTaC8V5o+POk5xMq/cNK6X6ZnX5uccJLiU1L5Bt1byzDRYcOboXpr9e/ttwTtAF+Gww=="
+		}, {
+			"username":	"scout-DEV-432-door_open",
+			"textname":	"Scout DEV-432-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-432-door_open"
+				}],
+			"encoded_password":	"$7$1000$E1O8kAqmYdkkJc79wJvu28tUoHoP1+/zSYAj2O/UAuWwzvXpNFYEZH+L5qzawXxU6nseOjxJk6U3KiypZOVZZA==$iRvnCSK6ntxQRKQjunmmnlQlLLHe/qfaWGPE1IZxPsUSDdhM3fkzN2VYFOXRfZ5g0IVTmi8END8wQeK+PmfhWw=="
+		}, {
+			"username":	"scout-DEV-432-temperature",
+			"textname":	"Scout DEV-432-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-432-temperature"
+				}],
+			"encoded_password":	"$7$1000$nSh0tnP3+5zkJnUY9+IB4F+lq3FtK2yaW8RsOmjLJyZjVGfLHmMx8djt1ekUqNCJenC5L+R6SRoD/b7LVrTMjg==$9H2hqWqDjA8jtDRc+c8YAVWrpeAKEUh59Cjd6oCwl3mK18biQowrsIEhcZVgKAhWw2K7xV5OMPb4Q1XV0RA70A=="
+		}, {
+			"username":	"scout-DEV-433-door_open",
+			"textname":	"Scout DEV-433-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-433-door_open"
+				}],
+			"encoded_password":	"$7$1000$N3z3qxlkhXzkK6EdWXi6jZ0m5PJuwge2pJEkR9wEoR8w+AvXBKHG8AN9P2FaltVKH9KRPEujOVREcRbu7GfWTw==$HGqbEwGbxMRAUs8FhXEWBW/WlM/Td2UhTOaoO3nnqMe3tDAS692W79hviUCzsLL0LTsF1/4NNz5wafvySqOsGQ=="
+		}, {
+			"username":	"scout-DEV-433-temperature",
+			"textname":	"Scout DEV-433-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-433-temperature"
+				}],
+			"encoded_password":	"$7$1000$SBA2QEOjdvNMy6Fse03n0hNcH2lK1RpQkDcfy7U68x71DVky+sWvcGdVnKMiTa0RWY/EREE3dQT+rScEDBh7kg==$1leiJ3BGBouOO7zvpwW5Lv1gH4wtbjW/B/wBM42P8eLSfe9xQLob6ka72GrkRciPL3s48xKXRuxdBa5xV7aajA=="
+		}, {
+			"username":	"scout-DEV-434-door_open",
+			"textname":	"Scout DEV-434-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-434-door_open"
+				}],
+			"encoded_password":	"$7$1000$sQ7hfLY5xkFRai4KPw5dB/si4txt/qGe3FTa4O0bFSaFwvhHMBh2JnxPeGDglq8y8g9ut3Oz8KYqn0IOmp++Ig==$3dSY3ah7xYJ38eMY3WPjGAEhrXAv0VJ2qbi6sf2mqLag7uCWdD2Nme4P5I+aTBmqlRZmtCB2LDw/1WBsK2vKnw=="
+		}, {
+			"username":	"scout-DEV-434-temperature",
+			"textname":	"Scout DEV-434-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-434-temperature"
+				}],
+			"encoded_password":	"$7$1000$LL1Pc7UY+/tlscL3fXMqv5PFd10b3z2OSLq/8cY2e5MmjkmTpMp5+2EfekhlGHhmC7uUuV7yD+6eOv4N5teqKw==$bTO/7w7BHb+vJW3+z1Pp2HouIjpJ2MihbymsCaanCYbkDfk/fvgIbDSZYT61jl6vKoqPDtJJx+FF38LWn+WlPg=="
+		}, {
+			"username":	"scout-DEV-435-temperature",
+			"textname":	"Scout DEV-435-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-435-temperature"
+				}],
+			"encoded_password":	"$7$1000$EtT0KLcnQ8gjkl77nAmgHdJFDfK0wbgjsZmNJUT8qDu9iv3odb2O0A6kGOs3fdO6nkBcZ8L2Nwrl16e4ixaNWQ==$oxIpzWo4q3k+RX0b1IBUDebXHINMwMc/sLAY7zxWikuE0tqi7fTaFGCLbU4KT7WxzJCugaXrrkyOGi/q+jK2Rg=="
+		}, {
+			"username":	"scout-DEV-436-temperature",
+			"textname":	"Scout DEV-436-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-436-temperature"
+				}],
+			"encoded_password":	"$7$1000$c1yPP89Voiwwu4xP3jV/bIUE3jUUesx7pH04UJGHp0AvtX+3vjrYoI10tjZxdoHvWNFVBv+ezGB5be5yOJa2UA==$NtIOPq37egP2nKomOjbHY8LIOJLEkpLQHLGKD7XBU2qB0nM6ls4zyS/NQwnU9MDhe1wCPHS+X6k/niY7IXZjEA=="
+		}, {
+			"username":	"scout-DEV-437-temperature",
+			"textname":	"Scout DEV-437-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-437-temperature"
+				}],
+			"encoded_password":	"$7$1000$49z8PhDZOhxARDuEaz2Gbk+4DGKoNiZuOswa/oFKyLW1PIUMl1LPXmNzpp9ji2MkUi9qQtUL3kyxx4g7z0Dvgg==$MG1Ff0qr5++P3bgcI3JFUiHvn2o0VSlaCV5aEYMUyZ+sM2aO0FRRrENFrDRH2Ds0UK1XS5cAojeX7nZFv7vRXA=="
+		}, {
+			"username":	"scout-DEV-438-temperature",
+			"textname":	"Scout DEV-438-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-438-temperature"
+				}],
+			"encoded_password":	"$7$1000$rnEUwRXM2hXS4KZe7MDwF3HnGMC1/XT4PUSnnHegf+XwjnJCZckLm5I9iYPqvBoGNbC+9TzT0nN6Izv6JmjzGg==$Ypdm3UrhGMoC6c20Pv8wv3Gd3vB0Rs7Xp08c4QApo43sB7UhKMwv5/+mxJ6SbLaciXx6Dku8ywI6lcLujA/xsQ=="
+		}, {
+			"username":	"scout-DEV-439-door_open",
+			"textname":	"Scout DEV-439-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-439-door_open"
+				}],
+			"encoded_password":	"$7$1000$ZXDRHz8Ubb2XER/ZYbfyNCUydZlxywZkNKkjqIIyj/zJUgNgzS80BB5JaP4vPUav1VsTFLMyiA+j43JZ6Loaew==$QZGSCErla23VV7mcjtsXQFRZN75Xd9Xt6I4CaeXYmvP4VCJbPqW2k2I7Cb8ikxY4h1BI9mATSjccE6QIitiN6w=="
+		}, {
+			"username":	"scout-DEV-439-temperature",
+			"textname":	"Scout DEV-439-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-439-temperature"
+				}],
+			"encoded_password":	"$7$1000$TUx/JIueeeykFL+1Raewk/LGM02VAGiUujJmZDSc/FB8SyC/MzUhA08p7zvJVejzPjB/ewMVb8oYnE35bjegDw==$eKlOG4EzEKTNuizyg6BPImP/n4C6nQmbMIZxj2sZZgFy7kBgM3peWe1jGLXWjTI8PcWiBIUD/1yHl7WPHEU9bQ=="
+		}, {
+			"username":	"scout-DEV-440-door_open",
+			"textname":	"Scout DEV-440-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-440-door_open"
+				}],
+			"encoded_password":	"$7$1000$nMMhK8LfgXqZInyJVCBAT5unfJSZVoC1IC2bbHN5VxMsLPbHDlBogsTJflbxCWt2H7nNEdPscGCDXuf2xWM8zQ==$4KWWWOeDuDBQb8c1o1tKni0ppJAdFtWYF3FyxaJ/kqYK66UdsnMUM3oPzQZ8qFhaXNjap1kKAXqVLGn+XQlUwg=="
+		}, {
+			"username":	"scout-DEV-440-temperature",
+			"textname":	"Scout DEV-440-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-440-temperature"
+				}],
+			"encoded_password":	"$7$1000$G8J3RSiitdYTIRxhvy/mxa4Hx7HXD/VWHqN4zUX3H34IwfRyF0WBPtMlUDkuGRInsJ9mVBuIsS4NL2WVWrz6Mw==$Lf5ZRFdB/K+DDoJrbcICvOhtEJzm0JPk7oBx2oE9yn2ubjZAckrWeubTlSrukWqA7TIo78IvAxHk1myomVZxAg=="
+		}, {
+			"username":	"scout-DEV-441-door_open",
+			"textname":	"Scout DEV-441-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-441-door_open"
+				}],
+			"encoded_password":	"$7$1000$A8gXtVG3RE8JuKq/uR2P4iMDny670PKioJEN7/BZEANzl04rbJ0I0LIMtikmKoz3FQnC56NP3JrR6mjpKfWtaw==$AKqqifua+F0/yAz8Cl1CVIpF8EGPDqu+N9p1K7pBA3azYD6xTZAJ8VCE6mks5s0USQ5YSr3L05NW/1RHCmvyPg=="
+		}, {
+			"username":	"scout-DEV-441-temperature",
+			"textname":	"Scout DEV-441-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-441-temperature"
+				}],
+			"encoded_password":	"$7$1000$TH6EYqfauAsjO88u1HglfCTFSpHG1AW+zkBq+D5WDPAiF0g9zCE90SzHHUekm+jWMilJIbxUvo+AvLhHlibs2g==$ZbJ8NMnRLG1+GeVf5O3y1BJoGWIOU936O2ll6XKRHZJowk9/vW3gPNmVsjnlEOBmN0d4MOCXlyuV2D0NM6RbcA=="
+		}, {
+			"username":	"scout-DEV-442-door_open",
+			"textname":	"Scout DEV-442-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-442-door_open"
+				}],
+			"encoded_password":	"$7$1000$2O8wJ2Ou8ZIgmpdtExlEX7hTZQW16M74s2ZvKC5vOnB+uMsaN2Ys5wPRYMqZi11Xrf68Ff6+CpSYP/nB94ULcQ==$T9aenEaSxYZKzdmF/+Mzu5XfxhP5Wf8YwR0tVZdMVl+7StSZIQmsKNZSkpLhkIxq2wt/12o7uqraM0weXONlSg=="
+		}, {
+			"username":	"scout-DEV-442-temperature",
+			"textname":	"Scout DEV-442-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-442-temperature"
+				}],
+			"encoded_password":	"$7$1000$dg6dySYF7csZXh2P6TMtQhPwARr0SFsi2vH75jdcbk7GUCFAgPF0I2ndnHgmI13nFwF3hwt1TMwSCC14DJSu1Q==$QU3pqTXi3xEHcqlNNolpuk7HmVnWzlCX6nle6Np6TReV7rkPn0m0bahyCBY2scCowaE9iQjm1OKSATY86kA0rQ=="
+		}, {
+			"username":	"scout-DEV-443-door_open",
+			"textname":	"Scout DEV-443-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-443-door_open"
+				}],
+			"encoded_password":	"$7$1000$ErOUCsy1d/bFnBtNtQvEmN56imlsgeLd3eC8dilt+ITNhx0xTzuePmU3pd/APtU/hRZ6jeSg1X6+YAJe9wz7Bg==$2R2nUGK3t6N3ueHHm6iAyKgyoAmhRmuKhDEfdj6XVZcKRmZ43CCr+VqeSiSOSByZbIEDECH1YXpBQIj+m0dcaw=="
+		}, {
+			"username":	"scout-DEV-443-temperature",
+			"textname":	"Scout DEV-443-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-443-temperature"
+				}],
+			"encoded_password":	"$7$1000$apaBS8EOdwNceB4SzBiVQD1WlV+ZxyzI1r4boVk2eqD58N7V8uRNt1xr3Um0XFpoHqfTkHZ9TvMsZAXX6fvIpA==$BlhQdGtOpINlN+08Kxbjs+VYS22mRBJxoRLdv3p98Htj3otNJOVh0+GrKtFYE/XjeYUy1mOw03eG1QM2NKTuEQ=="
+		}, {
+			"username":	"scout-DEV-444-temperature",
+			"textname":	"Scout DEV-444-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-444-temperature"
+				}],
+			"encoded_password":	"$7$1000$tjfLIszPUi6tWWY9fMwpiTyUVHOlxurKZWVPcfP6Kb+2HqlcCCorGQeBmUiLep+0NNqYT8aTY7q18ARFpg2FLQ==$psFHIggZ7TgFa59cij/G+zOePIko8CqlFqVWuo1CvN1GCBQTea/DtTSJQ8rHi9p03n6Qt59AgoL7DzXm5Mf9bQ=="
+		}, {
+			"username":	"scout-DEV-445-door_open",
+			"textname":	"Scout DEV-445-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-445-door_open"
+				}],
+			"encoded_password":	"$7$1000$yqPpr+vvoK5YVjdVDiNqocWgg2Hqn0QVSIajdVOdhCNduJu0POeIybkHIwm5NGkPnpWuLCpfxTFIyI7kkHuaag==$2Z+DSiHFTYWkgUlAvEdqaQOk5Z2IKNTaLW8uL9838Cj1KUFEE2b6EvkP+aZFTZKybNxvPePR9pLW6toguEU8fQ=="
+		}, {
+			"username":	"scout-DEV-445-temperature",
+			"textname":	"Scout DEV-445-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-445-temperature"
+				}],
+			"encoded_password":	"$7$1000$AHkAQn983cCXjRfRqViG30pnGmbwX/Y74DB/ga7SvJ7qYdZzCdseRWldH6YhvqgFuI1Za/4YZ42LSN4zJqtsqg==$TDXU1SReRDAfFyd6Ne8EyU0wlpbXebUaBlCPaWNOgiprSbdwHxPu+8wdle1qB74X5zegzymbnxlEYgtRnz4bhg=="
+		}, {
+			"username":	"scout-DEV-446-door_open",
+			"textname":	"Scout DEV-446-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-446-door_open"
+				}],
+			"encoded_password":	"$7$1000$OUK8L5IDTKjFc5r9sBxfyS+uIC0mJhHqMDC6GPVeKN+yh6euzdKDZNMiMDojrv5W+FMciQsnNE3ohk+vXZD6xQ==$FCfZb8KX5afEJE0szsc+QCYf0ThUUQkw0mULkE58NvLSwyhOe0Fe9MXfpXnR3lgJeUvbnMeaHvJBnk17M1tUlw=="
+		}, {
+			"username":	"scout-DEV-446-temperature",
+			"textname":	"Scout DEV-446-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-446-temperature"
+				}],
+			"encoded_password":	"$7$1000$CgtYYO2sVyALT064FiQpR1I3fpKo85HyVAN8CLGfLluvggFQ2RVr3BvJj7Yurej1cCPuyBisWD4BFnnbcQb+dw==$TioTCn/zNI8K8PgMNQaGH4ediGNVJjD7twFuCn1gF2oTEldRA1ZmK/Ju8MoL7SS2pXl/sgzzsgLaFj2RJ3AWig=="
+		}, {
+			"username":	"scout-DEV-447-door_open",
+			"textname":	"Scout DEV-447-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-447-door_open"
+				}],
+			"encoded_password":	"$7$1000$lEBp3aFWPM2hAoNvv5PDNtuEA70nGqN0HuuUWwjDFtS2dg8lgI0H8/JQOohOWs6AoUVydySVv06BEuKnGZJq0A==$We0E7BWrrBbDcTXE2vYdaUmc4hhKbJd0nUwcH7kInzyTSm7wyH5YXi/JnTCt8nTmSQQBImJ5ChunLtg/lVuLOg=="
+		}, {
+			"username":	"scout-DEV-447-temperature",
+			"textname":	"Scout DEV-447-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-447-temperature"
+				}],
+			"encoded_password":	"$7$1000$2HbkhBZMITJPxd0JCaZfmHWTW6TxeeLTio9pi6qRtHCk6waxl0TZ4h1wG2y7/FsftCLvwaY6M5s+ya2Ibp5AOA==$d+stZnMStp//XDACJXPL50GsLY0jMLla4Ye7lb5nTuiHeY8ERgmymeGAOadSX45ptuuwHt2A6H63ZVv+9Fy3lw=="
+		}, {
+			"username":	"scout-DEV-448-door_open",
+			"textname":	"Scout DEV-448-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-448-door_open"
+				}],
+			"encoded_password":	"$7$1000$bhWAHYHQGTdI8KcQAf9w+13yn+7aOSyIEulVKR5PIry+7sTZPxH8p3CCho+p2Y1ewr9Kq3KndKP0MtW/C9YIQA==$wIyBG+VLmEdZmf69xVQprY6X7Jr3tr70o+eg7aI5Cif5CSef+cZFJeqtGe0Qsu6c0mCLGBbNcyWzJYuVMUULUA=="
+		}, {
+			"username":	"scout-DEV-448-temperature",
+			"textname":	"Scout DEV-448-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-448-temperature"
+				}],
+			"encoded_password":	"$7$1000$LBk5267lccrtsMqoPxk4ldD1SCmMcRWUZa/gXceCaTnVn8NP8SWJDR2e9R8twoB7V3CG5Br0j9IRKytXwfZMOw==$4nlU7TAP2Aj+UsvUbmKq/YJ/9DH7matbh9HgVKQkw0BJd95mVU0+MjA1GWDesWdVUSAWuaeXaa9fQHvDCcWM9w=="
+		}, {
+			"username":	"scout-DEV-449-door_open",
+			"textname":	"Scout DEV-449-door_open",
+			"roles":	[{
+					"rolename":	"scout-DEV-449-door_open"
+				}],
+			"encoded_password":	"$7$1000$P/P3iN9rOp4g7t/sgqJvBsRXmgi1gZ5uIFL6QKlpR2FLUdHvyYSDZ+mMy8q3E0qmpJM0vkPtmdjpcCvl6YPzog==$SuSX2E6ZdMvgCOhmau1r1EUmJdPBBmJr04U9EH3CSU4Af7mF2T0XIoqgDBBAW/gGnXoN+KnH9vxZcKG/hJW+8Q=="
+		}, {
+			"username":	"scout-DEV-449-temperature",
+			"textname":	"Scout DEV-449-temperature",
+			"roles":	[{
+					"rolename":	"scout-DEV-449-temperature"
+				}],
+			"encoded_password":	"$7$1000$TgqEh4Hg/24qEROpLaxkASP+Jb7eygj6zAdn4PyMyFg5gwhHIKxO2w3F5YTE+HHYGT30sj3/31AWavEhW4tT0A==$haGnBSDZIIzDNHJsp7XoIptxZ1VLO9Bf0qv1DQ/+LVULjxXYGPhgihGkZ5Un6zae8jPksTp3UxoJl2C0GaDdjQ=="
 		}, {
 			"username":	"scout-DEV-47-temperature",
 			"textname":	"Scout DEV-47-temperature",
@@ -2975,6 +3416,48 @@
 				}],
 			"encoded_password":	"$7$1000$I9p+A5DMCzx+peRLKsX9df3D6xBFyxg0BNOuevUNZc71d3drKlJZ/kOngeZSwXy23+FRoyxoPnNf12DUIa91ww==$hjyEHE4sGw8zPJ7cP8jrHp81d5YDbchooX/6fNjw94qWAcb/zvjUrhVwDWHq/xtDDwa4ELzlFYsvT0j8ewBMeg=="
 		}, {
+			"username":	"scout-SN-127",
+			"textname":	"Scout SN-127",
+			"roles":	[{
+					"rolename":	"scout-SN-127"
+				}],
+			"encoded_password":	"$7$1000$nBtsiDHs7RVrTdMcosMgJH+k/7AXr+L97sp8ZjKMjBirAHZ6YuQN1wm3f3ci4oPFrohPtzHVu+v62AMl0Xrt6g==$HV5fNCtyiNJnzCyb71TzEzFMwvH8MrbG5f+jVurVQZQUrVkghVI0DQmWrLJ/s4WAHwA6wtk/aKwZ8XzJC9jLnQ=="
+		}, {
+			"username":	"scout-SN-134",
+			"textname":	"Scout SN-134",
+			"roles":	[{
+					"rolename":	"scout-SN-134"
+				}],
+			"encoded_password":	"$7$1000$IIyPKfdDtfVtT3bACdW1QjXjIqBckNozZMTnm6atShw0LzZuCeE9vLcO2h3PGoSPM68hJwqThO4HwbfNnnF/6g==$4zg3lmND0O9d4BueHiK1102V7LhLGxINXA1f6n8Wyf/oc5M5rH9lPPXdbRC0jRwQEIhvo4qbpAguSyDo7KL4RQ=="
+		}, {
+			"username":	"scout-SN-135",
+			"textname":	"Scout SN-135",
+			"roles":	[{
+					"rolename":	"scout-SN-135"
+				}],
+			"encoded_password":	"$7$1000$+bbyuO53GlcnFIjG49xrVE8LIuNtTE2EE5TnL90QvTrhdW6urMTCV9vMFFmjHcHXS9n0dmoCwkDTjur34uLaRA==$JFaBvDFMBhTgJvDbdKECA68ri7oRUTkq3gcXN+/yDCu9lMFe83A4PRDM0x+9LrSl4VOUPwGvuxz48P48cvgPkw=="
+		}, {
+			"username":	"scout-SN-136",
+			"textname":	"Scout SN-136",
+			"roles":	[{
+					"rolename":	"scout-SN-136"
+				}],
+			"encoded_password":	"$7$1000$hHZVsUC9gU5lQLWdSGz2D9Bc9AEzwc48kV1/X8YHsdV2vRDQswaXYe9AqzwUL7LmPlskcy+y6sZgNtnMmYghhQ==$3+vx6dy7SFbXuMf/QAJyxG+VOp4BqMR9q07RNVYysZP6Z2OjzHUQbBXSyfm+J97BUWo07ULL2/gWLfDgL1gJig=="
+		}, {
+			"username":	"scout-SN-138",
+			"textname":	"Scout SN-138",
+			"roles":	[{
+					"rolename":	"scout-SN-138"
+				}],
+			"encoded_password":	"$7$1000$mEXk/c0IoG8sUv0OmUcd48RI9Qb9sdwUP0N8WxjoULNqYMiNWMVU07sZQ+G0A4nZt6K3l4VW40WKVWW9N5KECw==$pDcIFMBaD6uo7oprxd1bE/wsuVil6/9sU/BVFouZ5no6X6JPBA08Tnu1jfGY1UyCFWwQIOnnOC5fEg7Zq1E6YQ=="
+		}, {
+			"username":	"scout-SN-139",
+			"textname":	"Scout SN-139",
+			"roles":	[{
+					"rolename":	"scout-SN-139"
+				}],
+			"encoded_password":	"$7$1000$8ooXp1qM38l1pUpvDhaO3R9dPoWgiWpxpsWm/IJ7KcWRlc4HPQ6dgTOs7iFawChbKChxfPLiBDF/MFvAQ8QSLw==$LmcFXiwY3IkbZ/RnWsY//q2KCZirBLgebza+t1oh4UJ5njMoS/yiig4O6k//KWctDrBXUSu3/WOMopLdpSzFYA=="
+		}, {
 			"username":	"scout-SN-170",
 			"textname":	"Scout SN-170",
 			"roles":	[{
@@ -3380,6 +3863,20 @@
 					"rolename":	"scout-XTN001"
 				}],
 			"encoded_password":	"$7$1000$0s/VNuXH1e7gPTJwA0GQL64eZv3YgYB4OKBf6g3M9MRkeNckP6nNAD94TzIvexzDZBxWbDzhQpx2VIlRQ87JlQ==$g7CmJtBp1UA3aQuGx21ka8To/hlJiNFofG6O4+duBiTSUdxaBQbyUFuvcPIFM3zvAOWYqLRhk05epJZ7yWgYQA=="
+		}, {
+			"username":	"scout-outage-0",
+			"textname":	"Scout outage-0",
+			"roles":	[{
+					"rolename":	"scout-outage-0"
+				}],
+			"encoded_password":	"$7$1000$sfA+tj8dY8csLFiaxX1Xk+SnLEn4qbmMhHSZoBzFK4fxbU+joQ6gxi3Yu7xAaEpKe9dwq8+RwEqQTYpWpVahBw==$srs7QzhwO/EsHalG6Ec1txKYsRQaerrNTevED4e1Uf/xU5kmoeaN8h4wyGCShoGIj5mpPFTCUP4UhHhi4MvW9w=="
+		}, {
+			"username":	"scout-outage-1",
+			"textname":	"Scout outage-1",
+			"roles":	[{
+					"rolename":	"scout-outage-1"
+				}],
+			"encoded_password":	"$7$1000$Qq0ZqshPyI6idIN/TltbdJNeuBmvacNO/K6GZ2l55RutheakTT/ZDSRQoRmU0bv8k8ozrfF5UEFEHQz0VaSfBA==$I+H6UErAF/RdbX3YwfvhKkRvVa9ySIqn4+mILNQDZg0PSqL/jvVYRjvUgGdOST7vybeEPL4w+nf/OF8hrhqaww=="
 		}, {
 			"username":	"that-place-backend",
 			"textname":	"Dynsec admin user",
@@ -10946,6 +11443,54 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-402-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-402-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-402-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-402-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-402-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-403-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-403-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-403-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-403-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-403-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-403-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -10970,6 +11515,78 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-404-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-404-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-404-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-404-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-404-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-404-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-404-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-404-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-404-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-404-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-405-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-405-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-405-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-405-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-405-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-405-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -10990,6 +11607,54 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-405-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-406-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-406-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-406-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-406-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-406-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-406-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-406-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-406-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-406-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-406-temperature/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -11066,6 +11731,30 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-410-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-410-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-410-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-410-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-410-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-411-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11086,6 +11775,30 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-411-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-412-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-412-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-412-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-412-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-412-humidity/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -11114,6 +11827,30 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-413-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-413-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-413-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-413-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-413-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-413-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11138,6 +11875,30 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-414-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-414-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-414-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-414-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-414-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-414-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11158,6 +11919,30 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-414-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-415-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-415-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-415-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-415-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-415-humidity/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -11206,6 +11991,30 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-416-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-416-temp_b",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-416-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-416-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-416-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-416-temp_b/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -11306,6 +12115,30 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-418-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-418-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-418-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-418-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-418-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-418-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11350,6 +12183,30 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-419-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-419-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-419-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-419-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-419-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-419-humidity/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -11402,6 +12259,30 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-420-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-420-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-420-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-420-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-420-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-420-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11426,6 +12307,270 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-DEV-421-humidity",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-421-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-421-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-421-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-421-humidity/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-421-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-421-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-421-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-421-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-421-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-422-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-422-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-422-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-422-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-422-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-423-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-423-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-423-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-423-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-423-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-424-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-424-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-424-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-424-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-424-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-425-temp_b",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-425-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-425-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-425-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-425-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-425-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-425-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-425-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-425-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-425-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-426-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-426-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-426-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-426-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-426-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-427-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-427-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-427-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-427-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-427-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-428-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-428-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-428-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-428-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-428-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-429-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-429-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-429-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-429-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-429-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-DEV-43-temperature",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -11446,6 +12591,870 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/DEV-43-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-430-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-430-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-430-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-430-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-430-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-430-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-430-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-430-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-430-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-430-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-431-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-431-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-431-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-431-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-431-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-431-temp_b",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-431-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-431-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-431-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-431-temp_b/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-431-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-431-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-431-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-431-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-431-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-432-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-432-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-432-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-432-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-432-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-432-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-432-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-432-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-432-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-432-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-433-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-433-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-433-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-433-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-433-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-433-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-433-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-433-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-433-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-433-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-434-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-434-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-434-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-434-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-434-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-434-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-434-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-434-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-434-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-434-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-435-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-435-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-435-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-435-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-435-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-436-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-436-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-436-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-436-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-436-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-437-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-437-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-437-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-437-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-437-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-438-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-438-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-438-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-438-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-438-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-439-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-439-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-439-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-439-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-439-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-439-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-439-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-439-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-439-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-439-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-440-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-440-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-440-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-440-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-440-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-440-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-440-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-440-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-440-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-440-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-441-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-441-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-441-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-441-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-441-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-441-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-441-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-441-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-441-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-441-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-442-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-442-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-442-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-442-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-442-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-442-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-442-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-442-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-442-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-442-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-443-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-443-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-443-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-443-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-443-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-443-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-443-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-443-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-443-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-443-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-444-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-444-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-444-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-444-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-444-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-445-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-445-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-445-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-445-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-445-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-445-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-445-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-445-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-445-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-445-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-446-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-446-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-446-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-446-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-446-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-446-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-446-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-446-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-446-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-446-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-447-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-447-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-447-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-447-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-447-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-447-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-447-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-447-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-447-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-447-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-448-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-448-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-448-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-448-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-448-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-448-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-448-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-448-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-448-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-448-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-449-door_open",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-449-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-449-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-449-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-449-door_open/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-DEV-449-temperature",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/DEV-449-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/DEV-449-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/DEV-449-temperature/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/DEV-449-temperature/#",
 					"priority":	0,
 					"allow":	true
 				}]
@@ -13610,6 +15619,150 @@
 					"allow":	true
 				}]
 		}, {
+			"rolename":	"scout-SN-127",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-127/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-127/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-127/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-127/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-SN-134",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-134/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-134/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-134/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-134/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-SN-135",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-135/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-135/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-135/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-135/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-SN-136",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-136/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-136/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-136/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-136/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-SN-138",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-138/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-138/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-138/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-138/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-SN-139",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/SN-139/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/SN-139/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/SN-139/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/SN-139/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
 			"rolename":	"scout-SN-170",
 			"allowwildcardsubs":	true,
 			"acls":	[{
@@ -14998,6 +17151,54 @@
 				}, {
 					"acltype":	"subscribePattern",
 					"topic":	"fm/mm/XTN001/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-outage-0",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/outage-0/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/outage-0/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/outage-0/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/outage-0/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"scout-outage-1",
+			"allowwildcardsubs":	true,
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"that-place/scout/outage-1/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientSend",
+					"topic":	"fm/mm/outage-1/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"that-place/scout/outage-1/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"fm/mm/outage-1/#",
 					"priority":	0,
 					"allow":	true
 				}]

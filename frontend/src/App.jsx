@@ -17,6 +17,7 @@ import PendingDevices from './pages/admin/PendingDevices';
 import ProviderLibrary from './pages/admin/ProviderLibrary';
 import FeedProviders from './pages/admin/FeedProviders';
 import ReferenceDatasets from './pages/admin/ReferenceDatasets';
+import NotificationEventTypes from './pages/admin/NotificationEventTypes';
 import FeedSubscriptions from './pages/tenant/FeedSubscriptions';
 import DatasetAssignments from './pages/tenant/DatasetAssignments';
 import UserManagement from './pages/tenant/UserManagement';
@@ -62,6 +63,7 @@ function App() {
         <Route path="api-providers" element={<ProviderLibrary />} />
         <Route path="feed-providers" element={<FeedProviders />} />
         <Route path="reference-datasets" element={<ReferenceDatasets />} />
+        <Route path="notification-event-types" element={<NotificationEventTypes />} />
       </Route>
 
       {/* Tenant user routes */}

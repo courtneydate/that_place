@@ -4,7 +4,12 @@ Ref: SPEC.md § Feature: Notifications
 """
 from rest_framework import serializers
 
-from .models import Notification, NotificationSnooze, UserNotificationPreference
+from .models import (
+    Notification,
+    NotificationEventType,
+    NotificationSnooze,
+    UserNotificationPreference,
+)
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -31,6 +36,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'alert_rule_id',
             'event_type',
             'event_data',
+            'message',
             'channel',
             'sent_at',
             'read_at',
@@ -115,3 +121,49 @@ class SnoozeCreateSerializer(serializers.Serializer):
 
     rule_id = serializers.IntegerField()
     duration_minutes = serializers.ChoiceField(choices=ALLOWED_DURATIONS)
+
+
+class NotificationEventTypeSerializer(serializers.ModelSerializer):
+    """Read/write serializer for the notification event registry.
+
+    That Place Admins manage these records — typically editing severity,
+    channels, and the message template of a seeded event type.
+
+    Ref: SPEC.md § Data Model — NotificationEventType; ROADMAP Sprint 23
+    """
+
+    class Meta:
+        model = NotificationEventType
+        fields = [
+            'id',
+            'key',
+            'label',
+            'description',
+            'severity',
+            'audience',
+            'default_channels',
+            'metadata_schema',
+            'message_template',
+            'is_active',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def validate_default_channels(self, value):
+        """Ensure default_channels is a list of supported channel names."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError('default_channels must be a list.')
+        invalid = [c for c in value if c not in NotificationEventType.VALID_CHANNELS]
+        if invalid:
+            allowed = ', '.join(NotificationEventType.VALID_CHANNELS)
+            raise serializers.ValidationError(
+                f'Unsupported channel(s): {", ".join(map(str, invalid))}. '
+                f'Allowed: {allowed}.'
+            )
+        return value
+
+    def validate_metadata_schema(self, value):
+        """Ensure metadata_schema is a list of placeholder key names."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError('metadata_schema must be a list.')
+        return value

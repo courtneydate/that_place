@@ -230,6 +230,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'devices.check_command_timeouts',
         'schedule': 60.0,  # every 60 seconds — timeouts detected within one beat interval
     },
+    # Notifications — Sprint 23
+    'check-certificate-expiry': {
+        'task': 'ingestion.check_certificate_expiry',
+        'schedule': 86400.0,  # daily — certificate_expiry_warning at 30/14/7 days
+    },
 }
 
 # ---------------------------------------------------------------------------

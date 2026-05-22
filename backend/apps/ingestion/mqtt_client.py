@@ -173,8 +173,29 @@ class ThatPlaceMQTTClient:
         """Called on disconnect — paho will auto-reconnect if loop_forever is running."""
         if reason_code.value != 0:
             logger.warning('MQTT unexpectedly disconnected (reason=%s) — will reconnect', reason_code)
+            self._notify_broker_disconnect(reason_code)
         else:
             logger.info('MQTT disconnected cleanly')
+
+    @staticmethod
+    def _notify_broker_disconnect(reason_code) -> None:
+        """Emit the mqtt_broker_connectivity_failure platform event.
+
+        Re-emission is suppressed for a cooldown window (``cache.add`` returns
+        False while the key is live) so a flapping broker connection does not
+        flood That Place Admins. Ref: ROADMAP Sprint 23.
+        """
+        try:
+            from django.core.cache import cache
+            if not cache.add('mqtt_broker_disconnect_notified', True, timeout=900):
+                return
+            from apps.notifications.tasks import emit_event
+            emit_event.delay(
+                'mqtt_broker_connectivity_failure',
+                {'detail': f'broker connection lost (reason: {reason_code})'},
+            )
+        except Exception:
+            logger.exception('Failed to emit mqtt_broker_connectivity_failure')
 
     def _on_message(self, client, userdata, message):
         """Called for every inbound message — dispatches a Celery task."""

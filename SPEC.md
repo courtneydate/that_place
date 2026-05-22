@@ -853,24 +853,20 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] Snoozed rules are visually indicated in the notification panel (e.g. a clock icon with the expiry time)
 - [ ] Snooze is enforced at notification creation time — if the user has an active snooze for the rule, no notification row is written for that user
 
-**System event notifications:**
-- [ ] The following platform events trigger in-app (and optionally email) notifications to relevant tenant users:
-  - Device approved by That Place Admin
-  - Device went offline (per device's configured offline threshold)
-  - Device deleted
-  - DataSource poll failed (after retry exhausted)
-  - 3rd party API auth failure
-- [ ] ⚑ **This event list is dynamic** — new system event types will be added as features are built. Each event type should be registered in a central notification event registry rather than hardcoded. Flag for architectural review during implementation.
+**System & platform event notifications:**
+- [ ] System and platform events are dispatched through the `NotificationEventType` registry (§4 Data Model) — each event type is a DB record carrying severity, audience (`platform_admin` / `tenant`), default channels, an event-data schema, and an editable message template. Emitting an event requires only condition-detection code calling `emit_event(event_key, metadata, tenant_id)`; the registry resolves recipients, renders the message, and writes one `Notification` per recipient per channel
+- [ ] **Tenant-audience events** notify the emitting tenant's Admins (in-app): device approved, device offline, device deleted, datasource poll failure
+- [ ] **Platform-audience events** notify all That Place Admins (in-app + email). v1 platform events and their triggers:
+  - `device_pending_approval` — a device is registered and awaits That Place Admin approval
+  - `tenant_created` / `tenant_deactivated` — a tenant is created, or deactivated
+  - `feed_provider_poll_failure` — a system feed provider fails every endpoint on a poll cycle
+  - `mqtt_broker_connectivity_failure` — the backend MQTT client loses its broker connection unexpectedly (paho `on_disconnect`, non-zero reason); re-emission is cooldown-suppressed so broker flapping does not spam
+  - `third_party_api_provider_failure` — a 3rd-party API provider is down platform-wide (every active data source for that provider is in `error` / `auth_failure`) — distinct from the per-tenant `datasource_poll_failure`; cooldown-suppressed per provider
+  - `certificate_expiry_warning` — a daily Celery beat task checks the MQTT backend client certificate and every device mTLS certificate, warning at 30, 14, and 7 days before expiry
+  - `backend_pipeline_failure` — a Celery `task_failure` signal handler emits on any failed task, deduplicated per (task name, hour)
+- [ ] Delivery is in-app + email in v1; outbound webhook delivery (Slack / PagerDuty / ops tooling) is flagged for future development
 - [ ] Notification retention: kept forever (consistent with raw data retention policy)
 - [ ] ⚑ **Flag:** notification volume at scale could become a concern — revisit retention policy if needed
-
-**That Place Admin notification channel:**
-- [ ] That Place Admins have a separate system-level notification channel for platform-wide events:
-  - Platform/service degradation or downtime
-  - MQTT broker connectivity failures
-  - 3rd party API provider failures (affecting multiple tenants)
-  - Any tenant device pending approval
-- [ ] ⚑ **That Place Admin notification channel design** — delivery mechanism (in-app, email, PagerDuty-style alerting) and the full event list to be defined in a dedicated deep dive
 
 ---
 
@@ -1850,3 +1846,6 @@ A four-part arc (~11 sprints). Each part ships independent value. Promoted from 
 - [ ] ⚑ **Notification retention at scale** — currently retained forever consistent with raw data policy. Revisit if notification volume becomes a storage concern.
 - [ ] ⚑ **Redis atomic flag deep dive** — before implementing the rule evaluation engine, review how `SET NX` works in practice: key naming, TTL/expiry strategy to prevent stale locks if a worker crashes mid-evaluation, how the Redis flag stays in sync with `Rule.current_state` in the DB, and degraded behaviour if Redis is temporarily unavailable.
 - [ ] ⚑ **AER embedded-network report format (v1.1)** — Phase 4c B3 ships a compliance data export, not AER-format submission templates. Which AER report format v1.1 implements first is parked until a real embedded-network operator names a specific report / exemption class. (Promoted from `docs/billing-module.md` §18 Q21.)
+- [x] **Reference Dataset delete protection** — resolved (2026-05-22): `DELETE /api/v1/reference-datasets/:id/` is blocked with a **409** that lists the affected tenants/sites when active `TenantDatasetAssignment` records reference the dataset; the delete proceeds only when none exist. Scheduled — ROADMAP Sprint 23b.
+- [x] **That Place Admin — per-tenant user visibility** — resolved (2026-05-22): a read-only `GET /api/v1/tenants/:id/users/` (That Place Admin only) returns the tenant's members (email, role, joined date) plus outstanding unexpired invites, surfaced on the admin Tenant detail view. Scheduled — ROADMAP Sprint 23b.
+- [x] **Duplicate email invited across tenants** — resolved (2026-05-22), two-part: **(1) interim guard** — the invite endpoints reject an email that already belongs to a `TenantUser` in another tenant (or has an active invite elsewhere), and the accept-invite flow guards as a backstop (ROADMAP Sprint 23b). **(2) full fix** — **Multi-Tenant User Accounts**: allow one login to span multiple tenants, which removes the conflict entirely and reverses the §4 one-tenant-per-user rule. That is an auth-core change tracked as a dedicated sprint (ROADMAP Backlog) requiring its own design deep dive; it supersedes the interim guard once delivered.

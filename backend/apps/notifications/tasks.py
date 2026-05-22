@@ -6,8 +6,16 @@ create_alert_notifications(alert_id)
     creates one Notification row per user per enabled channel. Dispatches
     send_email_notification / send_sms_notification for non-in-app rows.
 
+emit_event(event_key, metadata, tenant_id=None)
+    Central event-registry dispatcher. Resolves a NotificationEventType,
+    renders its template, and creates Notification rows for the resolved
+    audience (That Place Admins or a tenant's Admins) on each enabled channel.
+
 create_system_notification(event_type, tenant_id, event_data)
-    Writes one in_app Notification per Tenant Admin in the given tenant.
+    Backwards-compatible shim around emit_event for tenant system events.
+
+send_event_email(notification_id)
+    Sends a single platform/system-event email Notification.
 
 send_email_notification(notification_id)
     Sends a single email Notification via the configured SMTP backend.
@@ -219,8 +227,101 @@ def create_alert_notifications(alert_id: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# System event notification creation
+# Event registry dispatch — emit_event
 # ---------------------------------------------------------------------------
+
+@shared_task(name='notifications.emit_event')
+def emit_event(
+    event_key: str,
+    metadata: dict | None = None,
+    tenant_id: int | None = None,
+) -> None:
+    """Turn a registered event into Notification rows — the central dispatcher.
+
+    Resolves the `NotificationEventType` by key, renders its message template
+    against ``metadata``, resolves recipients by audience, and creates one
+    Notification per recipient per enabled channel. Email rows dispatch
+    send_event_email.
+
+    Recipients:
+      audience=platform_admin → all That Place Admins (no tenant_id needed)
+      audience=tenant         → the Tenant Admins of ``tenant_id``
+
+    Unknown or inactive event keys are logged and skipped — a missing registry
+    entry never raises into the caller.
+
+    Ref: SPEC.md § Data Model — NotificationEventType; ROADMAP Sprint 23
+    """
+    from apps.accounts.models import TenantUser, User
+
+    from .models import Notification, NotificationEventType
+
+    metadata = metadata or {}
+
+    try:
+        event_type = NotificationEventType.objects.get(key=event_key, is_active=True)
+    except NotificationEventType.DoesNotExist:
+        logger.warning(
+            'emit_event: no active NotificationEventType "%s" — skipping', event_key,
+        )
+        return
+
+    if event_type.audience == NotificationEventType.Audience.PLATFORM_ADMIN:
+        recipient_pks = list(
+            User.objects
+            .filter(is_that_place_admin=True, is_active=True)
+            .values_list('pk', flat=True)
+        )
+    else:  # tenant audience
+        if tenant_id is None:
+            logger.warning(
+                'emit_event: event "%s" is tenant-audience but no tenant_id '
+                'was supplied — skipping', event_key,
+            )
+            return
+        recipient_pks = list(
+            TenantUser.objects
+            .filter(tenant_id=tenant_id, role=TenantUser.Role.ADMIN)
+            .values_list('user_id', flat=True)
+        )
+
+    if not recipient_pks:
+        logger.debug('emit_event: "%s" has no recipients — skipping', event_key)
+        return
+
+    message = event_type.render(metadata)
+    channels = event_type.default_channels or [Notification.Channel.IN_APP]
+
+    in_app_rows: list = []
+    email_rows: list = []
+    for user_pk in recipient_pks:
+        for channel in channels:
+            row = Notification(
+                user_id=user_pk,
+                notification_type=Notification.NotificationType.SYSTEM_EVENT,
+                event_type=event_key,
+                event_data=metadata,
+                message=message,
+                channel=channel,
+                delivery_status=Notification.DeliveryStatus.SENT,
+            )
+            if channel == Notification.Channel.EMAIL:
+                email_rows.append(row)
+            else:
+                in_app_rows.append(row)
+
+    if in_app_rows:
+        Notification.objects.bulk_create(in_app_rows)
+    if email_rows:
+        created = Notification.objects.bulk_create(email_rows)
+        for notif in created:
+            send_event_email.delay(notif.pk)
+
+    logger.info(
+        'emit_event: "%s" — in_app=%d email=%d (audience=%s)',
+        event_key, len(in_app_rows), len(email_rows), event_type.audience,
+    )
+
 
 @shared_task(name='notifications.create_system_notification')
 def create_system_notification(
@@ -228,41 +329,79 @@ def create_system_notification(
     tenant_id: int,
     event_data: dict | None = None,
 ) -> None:
-    """Create in_app Notification rows for all Tenant Admins in a tenant.
+    """Backwards-compatible shim — routes a tenant system event through the
+    `NotificationEventType` registry via emit_event.
 
-    Used for platform events: device_approved, device_offline, device_deleted,
-    datasource_poll_failure. Admins only; no email/SMS for system events in MVP.
+    Retained so existing call sites (device approved / offline / deleted,
+    datasource poll failure) need no change. New code should call emit_event
+    directly.
 
-    Ref: SPEC.md § Feature: Notifications — system event notifications
+    Ref: ROADMAP Sprint 23 — registry retrofit
     """
-    from apps.accounts.models import TenantUser
+    emit_event(event_type, metadata=event_data or {}, tenant_id=tenant_id)
+
+
+@shared_task(
+    name='notifications.send_event_email',
+    bind=True,
+    max_retries=1,
+    default_retry_delay=60,
+)
+def send_event_email(self, notification_id: int) -> None:
+    """Send a single platform/system-event Notification by email.
+
+    Subject is generic; the body is the rendered ``message`` stored on the
+    Notification by emit_event. Same single-retry behaviour as
+    send_email_notification.
+
+    Ref: ROADMAP Sprint 23 — platform notification email delivery
+    """
+    from django.core.mail import send_mail
 
     from .models import Notification
 
-    admin_user_pks = list(
-        TenantUser.objects
-        .filter(tenant_id=tenant_id, role=TenantUser.Role.ADMIN)
-        .values_list('user_id', flat=True)
-    )
-    if not admin_user_pks:
+    try:
+        notif = (
+            Notification.objects
+            .select_related('user')
+            .get(pk=notification_id, channel=Notification.Channel.EMAIL)
+        )
+    except Notification.DoesNotExist:
+        logger.warning('send_event_email: notification %d not found', notification_id)
         return
 
-    notifications = [
-        Notification(
-            user_id=pk,
-            notification_type=Notification.NotificationType.SYSTEM_EVENT,
-            event_type=event_type,
-            event_data=event_data or {},
-            channel=Notification.Channel.IN_APP,
-            delivery_status=Notification.DeliveryStatus.SENT,
+    recipient = notif.user.email
+    if not recipient:
+        logger.warning(
+            'send_event_email: user %d has no email — skipping', notif.user_id,
         )
-        for pk in admin_user_pks
-    ]
-    Notification.objects.bulk_create(notifications)
-    logger.info(
-        'create_system_notification: %s — created %d notification(s) for tenant %d',
-        event_type, len(notifications), tenant_id,
-    )
+        notif.delivery_status = Notification.DeliveryStatus.FAILED
+        notif.save(update_fields=['delivery_status'])
+        return
+
+    body = f'{notif.message}\n\nLog in to That Place to review this event.'
+    try:
+        send_mail(
+            subject='[That Place] Platform notification',
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+        notif.delivery_status = Notification.DeliveryStatus.DELIVERED
+        notif.save(update_fields=['delivery_status'])
+        logger.info(
+            'send_event_email: sent to %s (notification %d)', recipient, notification_id,
+        )
+    except Exception as exc:
+        logger.error(
+            'send_event_email: failed for notification %d (%s) — %s',
+            notification_id, recipient, exc,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+        notif.delivery_status = Notification.DeliveryStatus.FAILED
+        notif.save(update_fields=['delivery_status'])
 
 
 # ---------------------------------------------------------------------------

@@ -64,17 +64,25 @@ class Notification(models.Model):
         related_name='notifications',
     )
     event_type = models.CharField(
-        max_length=50,
+        max_length=64,
         blank=True,
         help_text=(
-            'For system_event notifications: device_approved, device_offline, '
-            'device_deleted, datasource_poll_failure.'
+            'For system_event notifications: the NotificationEventType.key '
+            'this notification was emitted from (e.g. device_offline).'
         ),
     )
     event_data = models.JSONField(
         null=True,
         blank=True,
         help_text='Context for the event — device name, serial, etc.',
+    )
+    message = models.TextField(
+        blank=True,
+        help_text=(
+            'Rendered notification text. Populated for system/platform events '
+            'from the NotificationEventType template; blank for alert '
+            'notifications (the frontend renders those from the alert).'
+        ),
     )
     channel = models.CharField(
         max_length=10,
@@ -179,3 +187,97 @@ class NotificationSnooze(models.Model):
             f'NotificationSnooze(user={self.user_id} '
             f'rule={self.rule_id} until={self.snoozed_until})'
         )
+
+
+class NotificationEventType(models.Model):
+    """DB-backed registry of system-event and platform-event types.
+
+    Each record defines how one kind of event becomes notifications: its
+    severity, who receives it (audience), which channels it uses, the
+    event_data keys it carries (metadata_schema), and the message template
+    rendered into the notification text. New event types are added as data —
+    only the code that detects a condition and calls emit_event() is
+    code-level.
+
+    Resolves SPEC.md §9 ⚑ "Notification event registry".
+
+    Ref: SPEC.md § Data Model — NotificationEventType; ROADMAP Sprint 23
+    """
+
+    class Severity(models.TextChoices):
+        INFO = 'info', 'Info'
+        WARNING = 'warning', 'Warning'
+        CRITICAL = 'critical', 'Critical'
+
+    class Audience(models.TextChoices):
+        PLATFORM_ADMIN = 'platform_admin', 'That Place Admins'
+        TENANT = 'tenant', 'Tenant Admins'
+
+    # The channels an event type may deliver on in v1 (in-app + email).
+    # Outbound webhook delivery is flagged for future development.
+    VALID_CHANNELS = ('in_app', 'email')
+
+    key = models.SlugField(
+        max_length=64,
+        unique=True,
+        help_text='Stable event identifier, e.g. "device_offline". Stored on Notification.event_type.',
+    )
+    label = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    severity = models.CharField(
+        max_length=10,
+        choices=Severity.choices,
+        default=Severity.INFO,
+    )
+    audience = models.CharField(
+        max_length=20,
+        choices=Audience.choices,
+        help_text=(
+            'platform_admin → delivered to all That Place Admins; '
+            'tenant → delivered to the Tenant Admins of the emitting tenant.'
+        ),
+    )
+    default_channels = models.JSONField(
+        default=list,
+        help_text='Channels this event delivers on, e.g. ["in_app", "email"].',
+    )
+    metadata_schema = models.JSONField(
+        default=list,
+        help_text=(
+            'The event_data keys this event carries — documents the template '
+            'placeholders available to message_template.'
+        ),
+    )
+    message_template = models.TextField(
+        help_text=(
+            'Notification text. Placeholders are filled from event_data, '
+            'e.g. "Device {device_name} went offline".'
+        ),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Inactive event types are skipped by emit_event().',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['key']
+
+    def __str__(self) -> str:
+        """Return a human-readable identifier for the event type."""
+        return f'NotificationEventType({self.key})'
+
+    def render(self, metadata: dict | None) -> str:
+        """Render message_template against event metadata.
+
+        Missing placeholders resolve to an empty string rather than raising,
+        so a template/metadata mismatch degrades gracefully instead of
+        dropping the notification.
+        """
+        from collections import defaultdict
+
+        safe = defaultdict(str, metadata or {})
+        try:
+            return self.message_template.format_map(safe)
+        except (ValueError, IndexError, KeyError):
+            return self.message_template

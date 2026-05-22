@@ -23,8 +23,16 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Notification, NotificationSnooze, UserNotificationPreference
+from apps.accounts.permissions import IsThatPlaceAdmin
+
+from .models import (
+    Notification,
+    NotificationEventType,
+    NotificationSnooze,
+    UserNotificationPreference,
+)
 from .serializers import (
+    NotificationEventTypeSerializer,
     NotificationSerializer,
     NotificationSnoozeSerializer,
     SnoozeCreateSerializer,
@@ -200,3 +208,22 @@ class NotificationViewSet(viewsets.GenericViewSet):
             rule_id=rule_id,
         ).delete()
         return Response(status=204)
+
+
+class NotificationEventTypeViewSet(viewsets.ModelViewSet):
+    """CRUD for the notification event registry — That Place Admin only.
+
+    GET    /api/v1/notification-event-types/
+    POST   /api/v1/notification-event-types/
+    GET    /api/v1/notification-event-types/:id/
+    PUT    /api/v1/notification-event-types/:id/
+    PATCH  /api/v1/notification-event-types/:id/
+    DELETE /api/v1/notification-event-types/:id/
+
+    Ref: SPEC.md § Data Model — NotificationEventType; ROADMAP Sprint 23
+    """
+
+    queryset = NotificationEventType.objects.all().order_by('key')
+    serializer_class = NotificationEventTypeSerializer
+    permission_classes = [IsAuthenticated, IsThatPlaceAdmin]
+    pagination_class = None

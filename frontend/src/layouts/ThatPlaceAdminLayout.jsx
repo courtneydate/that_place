@@ -7,6 +7,7 @@
  */
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AdminNotificationBell from '../components/AdminNotificationBell';
 import styles from './ThatPlaceAdminLayout.module.css';
 
 function ThatPlaceAdminLayout() {
@@ -59,10 +60,19 @@ function ThatPlaceAdminLayout() {
           >
             Reference Datasets
           </NavLink>
+          <NavLink
+            to="/admin/notification-event-types"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Event Types
+          </NavLink>
         </nav>
-        <button onClick={handleLogout} className={styles.logoutButton}>
-          Sign out
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <AdminNotificationBell />
+          <button onClick={handleLogout} className={styles.logoutButton}>
+            Sign out
+          </button>
+        </div>
       </header>
       <main className={styles.main}>
         <Outlet />

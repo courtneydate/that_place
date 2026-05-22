@@ -70,10 +70,64 @@ class TenantSerializer(serializers.ModelSerializer):
 
 
 class InviteSerializer(serializers.Serializer):
-    """Serializer for invite endpoint payloads (That Place Admin and Tenant Admin)."""
+    """Serializer for invite endpoint payloads (That Place Admin and Tenant Admin).
+
+    The view passes the target tenant via serializer context as ``tenant`` so
+    the duplicate-email guard can tell a same-tenant member apart from a
+    cross-tenant conflict.
+    """
 
     email = serializers.EmailField()
     role = serializers.ChoiceField(choices=TenantUser.Role.choices, default=TenantUser.Role.ADMIN)
+
+    def validate(self, attrs):
+        """Reject an email that already belongs to — or is invited to — a tenant.
+
+        A user belongs to at most one tenant, so an email already registered
+        as a TenantUser anywhere, or holding an unexpired invite to another
+        tenant, cannot be invited again. Ref: SPEC.md §9; ROADMAP Sprint 23b.
+        """
+        email = attrs['email']
+        tenant = self.context.get('tenant')
+
+        existing = (
+            TenantUser.objects
+            .filter(user__email__iexact=email)
+            .select_related('tenant')
+            .first()
+        )
+        if existing is not None:
+            if tenant is not None and existing.tenant_id == tenant.id:
+                raise serializers.ValidationError(
+                    'This email already belongs to a user in this organisation.'
+                )
+            raise serializers.ValidationError(
+                'This email already belongs to a user in another organisation '
+                'on That Place.'
+            )
+
+        pending = TenantInvite.objects.filter(
+            email__iexact=email,
+            used_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        if tenant is not None:
+            pending = pending.exclude(tenant_id=tenant.id)
+        if pending.exists():
+            raise serializers.ValidationError(
+                'This email already has a pending invite to another '
+                'organisation on That Place.'
+            )
+        return attrs
+
+
+class TenantInvitePendingSerializer(serializers.ModelSerializer):
+    """Read-only representation of an outstanding (unused, unexpired) tenant invite."""
+
+    class Meta:
+        model = TenantInvite
+        fields = ['id', 'email', 'role', 'created_at', 'expires_at']
+        read_only_fields = fields
 
 
 class AcceptInviteSerializer(serializers.Serializer):
@@ -110,11 +164,20 @@ class AcceptInviteSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        """Ensure the invite email has not already been registered as an active account."""
+        """Reject acceptance when the invite email already belongs to a tenant.
+
+        A user belongs to at most one tenant; if the email gained a tenant
+        membership after the invite was sent, acceptance is blocked. This is
+        the backstop for the duplicate-email invite guard.
+        Ref: SPEC.md §9; ROADMAP Sprint 23b.
+        """
         invite = getattr(self, '_invite', None)
-        if invite and User.objects.filter(email=invite.email, is_active=True).exists():
+        if invite and TenantUser.objects.filter(
+            user__email__iexact=invite.email,
+        ).exists():
             raise serializers.ValidationError(
-                {'token': 'This invite has already been accepted.'}
+                {'token': 'This email already belongs to an account on That '
+                          'Place. Each email can belong to only one organisation.'}
             )
         return attrs
 

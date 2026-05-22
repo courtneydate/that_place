@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination
@@ -28,6 +29,7 @@ from .serializers import (
     InviteSerializer,
     NotificationGroupMemberSerializer,
     NotificationGroupSerializer,
+    TenantInvitePendingSerializer,
     TenantSerializer,
     TenantSettingsSerializer,
     TenantUserSerializer,
@@ -126,6 +128,26 @@ class TenantViewSet(viewsets.ModelViewSet):
     pagination_class = TenantCursorPagination
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
+    def perform_create(self, serializer):
+        """Create the tenant and emit the tenant_created platform event."""
+        tenant = serializer.save()
+        from apps.notifications.tasks import emit_event
+        emit_event.delay(
+            'tenant_created',
+            {'tenant_name': tenant.name, 'tenant_slug': tenant.slug},
+        )
+
+    def perform_update(self, serializer):
+        """Update the tenant; emit tenant_deactivated on an active→inactive transition."""
+        was_active = serializer.instance.is_active
+        tenant = serializer.save()
+        if was_active and not tenant.is_active:
+            from apps.notifications.tasks import emit_event
+            emit_event.delay(
+                'tenant_deactivated',
+                {'tenant_name': tenant.name, 'tenant_slug': tenant.slug},
+            )
+
     @action(detail=True, methods=['post'], url_path='invite')
     def invite(self, request, pk=None):
         """POST /api/v1/tenants/{id}/invite/ — send an invite email to a new Tenant Admin.
@@ -135,7 +157,7 @@ class TenantViewSet(viewsets.ModelViewSet):
         after 72 hours and are single-use.
         """
         tenant = self.get_object()
-        serializer = InviteSerializer(data=request.data)
+        serializer = InviteSerializer(data=request.data, context={'tenant': tenant})
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data['email']
@@ -165,6 +187,36 @@ class TenantViewSet(viewsets.ModelViewSet):
 
         logger.info('Invite sent to %s for tenant %s (role: %s)', email, tenant.name, role)
         return Response({'detail': f'Invite sent to {email}.'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='users')
+    def users(self, request, pk=None):
+        """GET /api/v1/tenants/{id}/users/ — list a tenant's members and pending invites.
+
+        Read-only; That Place Admin only. Lets the platform admin see who
+        belongs to a tenant — and who has an outstanding invite — without
+        entering that tenant's own user-management screens.
+
+        Ref: ROADMAP Sprint 23b
+        """
+        tenant = self.get_object()
+        members = (
+            TenantUser.objects.filter(tenant=tenant)
+            .select_related('user')
+            .order_by('joined_at')
+        )
+        pending = (
+            TenantInvite.objects
+            .filter(
+                tenant=tenant,
+                used_at__isnull=True,
+                expires_at__gt=timezone.now(),
+            )
+            .order_by('-created_at')
+        )
+        return Response({
+            'members': TenantUserSerializer(members, many=True).data,
+            'pending_invites': TenantInvitePendingSerializer(pending, many=True).data,
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +313,7 @@ class UserViewSet(viewsets.GenericViewSet):
         after 72 hours and are single-use.
         """
         tenant = request.user.tenantuser.tenant
-        serializer = InviteSerializer(data=request.data)
+        serializer = InviteSerializer(data=request.data, context={'tenant': tenant})
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data['email']

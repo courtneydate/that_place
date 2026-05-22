@@ -5,12 +5,17 @@ Ref: SPEC.md § Feature: Notifications
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import NotificationViewSet
+from .views import NotificationEventTypeViewSet, NotificationViewSet
 
 app_name = 'notifications'
 
 router = DefaultRouter()
 router.register('notifications', NotificationViewSet, basename='notification')
+router.register(
+    'notification-event-types',
+    NotificationEventTypeViewSet,
+    basename='notification-event-type',
+)
 
 # The DRF router handles all actions except the DELETE snooze which requires
 # a rule_id path parameter on a non-detail action — registered manually.

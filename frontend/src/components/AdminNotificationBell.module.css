@@ -1,0 +1,148 @@
+.bellWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bellButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.375rem;
+  border-radius: 6px;
+}
+
+.bellButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bellBadge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 9999px;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-height: 440px;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  z-index: 50;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.markAllBtn {
+  background: none;
+  border: none;
+  color: #1A6B4A;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.markAllBtn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.markAllBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.list {
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 1.5rem 1rem;
+  margin: 0;
+  text-align: center;
+  color: #6B7280;
+  font-size: 0.875rem;
+}
+
+.item {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #F3F4F6;
+  padding: 0.75rem 1.5rem 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item:hover {
+  background: #F9FAFB;
+}
+
+.unread {
+  background: #F0FDF4;
+}
+
+.read {
+  background: #FFFFFF;
+}
+
+.itemMessage {
+  font-size: 0.875rem;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.itemTime {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #9CA3AF;
+}
+
+.dot {
+  position: absolute;
+  top: 0.875rem;
+  right: 0.75rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #1A6B4A;
+}

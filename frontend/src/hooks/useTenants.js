@@ -1,7 +1,8 @@
 /**
  * React Query hooks for Tenant management (That Place Admin).
  *
- * Provides: useTenants, useTenant, useCreateTenant, useUpdateTenant, useSendInvite
+ * Provides: useTenants, useTenant, useCreateTenant, useUpdateTenant,
+ * useSendInvite, useTenantUsers
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
@@ -46,5 +47,17 @@ export function useSendInvite(tenantId) {
   return useMutation({
     mutationFn: (data) =>
       api.post(`/api/v1/tenants/${tenantId}/invite/`, data).then((r) => r.data),
+  });
+}
+
+export function useTenantUsers(id) {
+  /**
+   * Returns a tenant's members and outstanding invites for the That Place
+   * Admin tenant-detail view: { members: [...], pending_invites: [...] }.
+   */
+  return useQuery({
+    queryKey: [...TENANTS_KEY, id, 'users'],
+    queryFn: () => api.get(`/api/v1/tenants/${id}/users/`).then((r) => r.data),
+    enabled: !!id,
   });
 }
