@@ -743,22 +743,25 @@ separate **Multi-Tenant User Accounts** sprint (see Backlog), which would supers
 **Deliverables:**
 
 _Backend:_
-- [ ] Reference Dataset delete guard — `DELETE /api/v1/reference-datasets/:id/` returns **409** listing the affected tenants/sites when active `TenantDatasetAssignment` records reference the dataset; the delete proceeds only when none exist
-- [ ] `GET /api/v1/tenants/:id/users/` — That Place Admin only; returns the tenant's `TenantUser`s (email, role, joined date) plus outstanding unexpired `TenantInvite`s (email, role, invited date, expiry); read-only
-- [ ] Duplicate-email invite guard — both invite endpoints (`POST /api/v1/tenants/:id/invite/`, `POST /api/v1/users/invite/`) reject with a clear error when the email already belongs to a `TenantUser` in another tenant, or has an active invite to another tenant
-- [ ] Accept-invite integrity guard — the accept-invite flow rejects with a clear error if the email gained a tenant membership after the invite was sent (backstop for the one-tenant-per-user rule)
-- [ ] Tests — delete blocked with 409 when in use and allowed when not; tenant-users endpoint scoping (That Place Admin only, cross-tenant denied); duplicate invite rejected at creation; acceptance guard rejects
+- [x] Reference Dataset delete guard — `DELETE /api/v1/reference-datasets/:id/` returns **409** listing the affected tenants/sites when any `TenantDatasetAssignment` references the dataset (the `dataset` FK is already `on_delete=PROTECT`; the guard surfaces it as a clean 409); the delete proceeds only when none exist
+- [x] `GET /api/v1/tenants/:id/users/` — That Place Admin only; returns the tenant's `TenantUser`s (email, role, joined date) plus outstanding unexpired `TenantInvite`s (email, role, invited date, expiry); read-only
+- [x] Duplicate-email invite guard — both invite endpoints (`POST /api/v1/tenants/:id/invite/`, `POST /api/v1/users/invite/`) reject with a clear error when the email already belongs to a `TenantUser` in another tenant, or has an active invite elsewhere
+- [x] Accept-invite integrity guard — the accept-invite flow rejects with a clear error if the email gained a tenant membership after the invite was sent (backstop for the one-tenant-per-user rule)
+- [x] Tests — delete blocked with 409 when in use and allowed when not; tenant-users endpoint scoping (That Place Admin only, cross-tenant denied); duplicate invite rejected at creation; acceptance guard rejects
 
 _Frontend:_
-- [ ] Reference Datasets page — surface the 409 on delete by naming the tenants/sites still using the dataset, instead of a generic error
-- [ ] That Place Admin Tenant detail — a read-only "Users" section listing members and pending invites
-- [ ] Invite forms (tenant-detail invite and tenant-user invite) — show the duplicate-email rejection message clearly
+- [x] Reference Datasets page — surface the 409 on delete by naming the tenants/sites still using the dataset, instead of a generic error
+- [x] That Place Admin Tenant detail — a read-only "Users" section listing members and pending invites
+- [x] Invite forms (tenant-detail invite and tenant-user invite) — show the duplicate-email rejection message clearly
 
 **Definition of Done:**
 - Deleting an in-use Reference Dataset is blocked with a 409 that names the dependent tenants/sites; deleting an unused one still works
 - A That Place Admin can open any tenant and see its members and pending invites
 - Inviting an email that already belongs to another tenant is rejected with a clear message at invite time; acceptance is guarded as a backstop
 - All new endpoints pass cross-tenant / permission tests; full backend + frontend suites green
+
+> **Status (2026-05-22):** ✅ Complete. 12 Sprint 23b tests; full backend suite (683)
+> and frontend suite (43) green; flake8 / isort / eslint clean.
 
 ---
 

@@ -250,6 +250,16 @@ def poll_single_device(datasource_device_id: int) -> None:
             health.last_seen_at = now
             health.save(update_fields=['is_online', 'last_seen_at', 'updated_at'])
 
+    # Dispatch rule evaluation for any stream that received a new reading.
+    # The 3rd-party API poll path must trigger the rules engine the same way
+    # the MQTT ingestion path does — otherwise a rule whose condition watches a
+    # polled stream is never evaluated and never fires.
+    # Ref: SPEC.md § Feature: Rule Evaluation Engine.
+    if readings_to_create:
+        from apps.ingestion.tasks import _dispatch_stream_rule_evaluation
+        for stream_id in frozenset(r.stream_id for r in readings_to_create):
+            _dispatch_stream_rule_evaluation.delay(stream_id)
+
     logger.debug(
         'Polled DataSourceDevice %d: %d reading(s) stored',
         dsd.pk, len(readings_to_create),

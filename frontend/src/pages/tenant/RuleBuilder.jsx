@@ -561,8 +561,15 @@ function ConditionEditor({ condition, devices, onChange, onRemove }) {
   const set = (patch) => onChange({ ...condition, ...patch });
 
   const handleStreamChange = ({ stream, _device_id, _data_type }) => {
-    // Reset operator / value when stream changes.
-    set({ stream, _device_id, operator: '', threshold_value: '', _data_type });
+    // Only reset operator / value when the stream genuinely changes. In edit
+    // mode the StreamPicker resolves the device for the already-selected
+    // stream lazily and calls this with the *same* stream — in that case the
+    // saved operator and threshold must be preserved, not wiped.
+    if (stream === condition.stream) {
+      set({ stream, _device_id, _data_type });
+    } else {
+      set({ stream, _device_id, operator: '', threshold_value: '', _data_type });
+    }
   };
 
   return (
