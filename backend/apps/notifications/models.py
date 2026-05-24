@@ -281,3 +281,43 @@ class NotificationEventType(models.Model):
             return self.message_template.format_map(safe)
         except (ValueError, IndexError, KeyError):
             return self.message_template
+
+
+class UserPushToken(models.Model):
+    """An Expo push token registered by a user's mobile device.
+
+    One user can register multiple devices (phone + tablet); each device's
+    Expo token is a separate row. The mobile app POSTs its token on launch
+    or after the OS-level permission grant; the backend upserts on the token
+    string so re-registration refreshes ``last_seen_at`` instead of creating
+    duplicates. There is no separate ``push_enabled`` toggle — the presence
+    of a registered token is the user's consent (the OS permission grant
+    gated registration in the first place).
+
+    Ref: SPEC.md § Feature: Notifications — mobile push; ROADMAP Sprint 24
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='push_tokens',
+    )
+    token = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text='Expo push token, e.g. "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]".',
+    )
+    label = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text='Optional device label, e.g. "iPhone 15".',
+    )
+    last_seen_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-last_seen_at']
+
+    def __str__(self) -> str:
+        """Return a human-readable identifier (last 8 chars of the token)."""
+        return f'UserPushToken(user={self.user_id} ...{self.token[-8:]})'

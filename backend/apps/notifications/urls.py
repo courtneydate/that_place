@@ -5,12 +5,21 @@ Ref: SPEC.md § Feature: Notifications
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import NotificationEventTypeViewSet, NotificationViewSet
+from .views import (
+    NotificationEventTypeViewSet,
+    NotificationViewSet,
+    UserPushTokenViewSet,
+)
 
 app_name = 'notifications'
 
 router = DefaultRouter()
 router.register('notifications', NotificationViewSet, basename='notification')
+router.register(
+    'notifications/push-tokens',
+    UserPushTokenViewSet,
+    basename='push-token',
+)
 router.register(
     'notification-event-types',
     NotificationEventTypeViewSet,

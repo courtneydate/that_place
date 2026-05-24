@@ -25,6 +25,11 @@ send_email_notification(notification_id)
 send_sms_notification(notification_id)
     Sends a single SMS Notification via Twilio. Same retry behaviour.
 
+send_push_notification(notification_id)
+    Sends an alert push Notification to all of the user's registered Expo
+    push tokens via the Expo Push Service. Send-and-forget — delivery_status
+    is set from the immediate ticket response; stale tokens are removed.
+
 Ref: SPEC.md § Feature: Notifications
 """
 import logging
@@ -174,6 +179,17 @@ def create_alert_notifications(alert_id: int) -> None:
     in_app_rows = []
     email_rows = []
     sms_rows = []
+    push_rows = []
+
+    # Push: token presence is consent (no opt-in toggle — per Sprint 24 design).
+    # Pre-compute the set of users with at least one registered Expo token.
+    from .models import UserPushToken
+    users_with_push = set(
+        UserPushToken.objects
+        .filter(user_id__in=active_pks)
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
 
     for user_pk in active_pks:
         pref = prefs[user_pk]
@@ -201,6 +217,14 @@ def create_alert_notifications(alert_id: int) -> None:
                 channel=Notification.Channel.SMS,
                 delivery_status=Notification.DeliveryStatus.SENT,
             ))
+        if user_pk in users_with_push:
+            push_rows.append(Notification(
+                user_id=user_pk,
+                notification_type=Notification.NotificationType.ALERT,
+                alert=alert,
+                channel=Notification.Channel.PUSH,
+                delivery_status=Notification.DeliveryStatus.SENT,
+            ))
 
     # Bulk create in-app (no follow-up task needed)
     if in_app_rows:
@@ -218,11 +242,17 @@ def create_alert_notifications(alert_id: int) -> None:
         for notif in created_sms:
             send_sms_notification.delay(notif.pk)
 
+    # Create push rows then dispatch delivery per notification
+    if push_rows:
+        created_push = Notification.objects.bulk_create(push_rows)
+        for notif in created_push:
+            send_push_notification.delay(notif.pk)
+
     logger.info(
         'create_alert_notifications: alert %d — in_app=%d email=%d sms=%d '
-        '(snoozed=%d)',
+        'push=%d (snoozed=%d)',
         alert_id, len(in_app_rows), len(email_rows), len(sms_rows),
-        len(snoozed_pks & target_user_pks),
+        len(push_rows), len(snoozed_pks & target_user_pks),
     )
 
 
@@ -552,3 +582,116 @@ def send_sms_notification(self, notification_id: int) -> None:
             raise self.retry(exc=exc)
         notif.delivery_status = Notification.DeliveryStatus.FAILED
         notif.save(update_fields=['delivery_status'])
+
+
+# ---------------------------------------------------------------------------
+# Push delivery — Expo Push Service (Sprint 24)
+# ---------------------------------------------------------------------------
+
+EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+
+
+@shared_task(
+    name='notifications.send_push_notification',
+    bind=True,
+    max_retries=1,
+    default_retry_delay=60,
+)
+def send_push_notification(self, notification_id: int) -> None:
+    """Send an alert push Notification to every Expo token the user has registered.
+
+    Posts a single batched call to the Expo Push Service. ``delivery_status``
+    is set from the per-message ticket returned in the immediate response —
+    send-and-forget, no receipt polling. Tokens reported as
+    ``DeviceNotRegistered`` are removed so the next dispatch does not retry
+    a known-dead device.
+
+    Ref: ROADMAP Sprint 24; SPEC.md § Feature: Notifications — mobile push
+    """
+    import requests
+
+    from .models import Notification, UserPushToken
+
+    try:
+        notif = (
+            Notification.objects
+            .select_related('alert__rule', 'user')
+            .get(pk=notification_id, channel=Notification.Channel.PUSH)
+        )
+    except Notification.DoesNotExist:
+        logger.warning('send_push_notification: notification %d not found', notification_id)
+        return
+
+    tokens = list(
+        UserPushToken.objects
+        .filter(user_id=notif.user_id)
+        .values_list('token', flat=True)
+    )
+    if not tokens:
+        logger.warning(
+            'send_push_notification: user %d has no push tokens — skipping',
+            notif.user_id,
+        )
+        notif.delivery_status = Notification.DeliveryStatus.FAILED
+        notif.save(update_fields=['delivery_status'])
+        return
+
+    if notif.alert:
+        title = f'Alert: {notif.alert.rule.name}'
+        triggered = notif.alert.triggered_at.strftime('%Y-%m-%d %H:%M UTC')
+        body = f'Triggered {triggered}'
+        data = {'alert_id': notif.alert_id}
+    else:
+        title = 'That Place notification'
+        body = notif.message or ''
+        data = {}
+
+    messages = [
+        {'to': token, 'sound': 'default', 'title': title, 'body': body, 'data': data}
+        for token in tokens
+    ]
+
+    try:
+        resp = requests.post(
+            EXPO_PUSH_URL,
+            json=messages,
+            headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        tickets = resp.json().get('data', [])
+    except Exception as exc:
+        logger.error(
+            'send_push_notification: HTTP error notification=%d — %s',
+            notification_id, exc,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+        notif.delivery_status = Notification.DeliveryStatus.FAILED
+        notif.save(update_fields=['delivery_status'])
+        return
+
+    # Process tickets: count successes; remove stale tokens.
+    delivered = 0
+    for token, ticket in zip(tokens, tickets):
+        if ticket.get('status') == 'ok':
+            delivered += 1
+            continue
+        # status == 'error'
+        details = ticket.get('details', {}) or {}
+        if details.get('error') == 'DeviceNotRegistered':
+            UserPushToken.objects.filter(token=token).delete()
+            logger.info(
+                'send_push_notification: removed stale token (...%s) for user %d',
+                token[-8:], notif.user_id,
+            )
+
+    notif.delivery_status = (
+        Notification.DeliveryStatus.DELIVERED if delivered > 0
+        else Notification.DeliveryStatus.FAILED
+    )
+    notif.save(update_fields=['delivery_status'])
+    logger.info(
+        'send_push_notification: notification=%d delivered=%d/%d',
+        notification_id, delivered, len(tokens),
+    )

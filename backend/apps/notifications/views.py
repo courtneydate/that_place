@@ -30,6 +30,7 @@ from .models import (
     NotificationEventType,
     NotificationSnooze,
     UserNotificationPreference,
+    UserPushToken,
 )
 from .serializers import (
     NotificationEventTypeSerializer,
@@ -37,6 +38,7 @@ from .serializers import (
     NotificationSnoozeSerializer,
     SnoozeCreateSerializer,
     UserNotificationPreferenceSerializer,
+    UserPushTokenSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -207,6 +209,57 @@ class NotificationViewSet(viewsets.GenericViewSet):
             user=request.user,
             rule_id=rule_id,
         ).delete()
+        return Response(status=204)
+
+
+class UserPushTokenViewSet(viewsets.GenericViewSet):
+    """Per-user push-token registration for the mobile app.
+
+    GET    /api/v1/notifications/push-tokens/         — list the user's tokens
+    POST   /api/v1/notifications/push-tokens/         — register / refresh a token
+    DELETE /api/v1/notifications/push-tokens/:id/     — unregister a token
+
+    Registration upserts on the token value: re-posting the same token from
+    the same device refreshes ``last_seen_at``; if the token was previously
+    registered to a different user (device handed over) ownership is reassigned
+    to the requesting user. Token presence is the user's consent — there is no
+    separate ``push_enabled`` toggle.
+
+    Ref: ROADMAP Sprint 24; SPEC.md § Feature: Notifications — mobile push
+    """
+
+    serializer_class = UserPushTokenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return push tokens belonging to the requesting user."""
+        return UserPushToken.objects.filter(user=self.request.user)
+
+    def list(self, request):
+        """List the requesting user's registered push tokens."""
+        return Response(
+            UserPushTokenSerializer(self.get_queryset(), many=True).data,
+        )
+
+    def create(self, request):
+        """Register (or refresh) a push token for the requesting user."""
+        serializer = UserPushTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token_value = serializer.validated_data['token']
+        label = serializer.validated_data.get('label', '')
+        push_token, created = UserPushToken.objects.update_or_create(
+            token=token_value,
+            defaults={'user': request.user, 'label': label},
+        )
+        return Response(
+            UserPushTokenSerializer(push_token).data,
+            status=201 if created else 200,
+        )
+
+    def destroy(self, request, pk=None):
+        """Unregister one of the requesting user's push tokens."""
+        token = get_object_or_404(self.get_queryset(), pk=pk)
+        token.delete()
         return Response(status=204)
 
 

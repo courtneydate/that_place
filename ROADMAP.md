@@ -769,14 +769,25 @@ _Frontend:_
 
 **Goal:** Mobile push notifications delivered via Expo Push Service (in preparation for Phase 6 mobile app, but infrastructure built now).
 
+**Pre-sprint deep dive — ✅ resolved 2026-05-24:**
+- **Token storage:** per-device `UserPushToken` model (one user → many tokens) — matches Expo's per-device token model and lets a user use the platform on more than one device.
+- **Opt-in:** no separate `push_enabled` toggle — token presence is the user's consent (the OS-level permission grant already gated registration). To stop push, the user unregisters in-app or revokes OS permission.
+- **Delivery tracking:** send-and-forget — `Notification.delivery_status` is set from the immediate per-message ticket returned by Expo (`ok` → delivered, `error` → failed). No receipt polling. Stale `DeviceNotRegistered` tokens are removed.
+
 **Deliverables:**
-- [ ] Backend: Expo push token storage on user profile
-- [ ] Backend: Push notification delivery on alert fire (alongside in-app/email/SMS)
-- [ ] Backend: Tests — push token stored, push dispatched on alert fire
+- [x] Backend: `UserPushToken` model + migration — per-device tokens, unique on token value
+- [x] Backend: `/api/v1/notifications/push-tokens/` CRUD — list / register (upsert) / delete; scoped to `request.user`; ownership reassigned on re-registration from a different user
+- [x] Backend: `create_alert_notifications` push fan-out — one push `Notification` per user with a registered token, dispatched via `send_push_notification`
+- [x] Backend: `send_push_notification` — batched POST to the Expo Push Service; sets `delivery_status` from the per-message ticket; removes `DeviceNotRegistered` tokens
+- [x] Backend: Tests — token CRUD + cross-user scoping; alert fire creates push only when tokens exist; Expo `ok` → delivered, `DeviceNotRegistered` → token removed
 
 **Definition of Done:**
 - Push notification infrastructure in place and tested
 - Ready to be consumed by Phase 6 React Native app with no backend changes
+
+> **Status (2026-05-24):** ✅ Complete. 11 Sprint 24 tests + full backend suite green;
+> flake8 / isort clean. Mobile app (Phase 6) consumes `/api/v1/notifications/push-tokens/`
+> for registration; push fires automatically on alert when a token exists.
 
 ---
 

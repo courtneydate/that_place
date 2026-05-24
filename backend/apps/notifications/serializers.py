@@ -9,6 +9,7 @@ from .models import (
     NotificationEventType,
     NotificationSnooze,
     UserNotificationPreference,
+    UserPushToken,
 )
 
 
@@ -167,3 +168,25 @@ class NotificationEventTypeSerializer(serializers.ModelSerializer):
         if not isinstance(value, list):
             raise serializers.ValidationError('metadata_schema must be a list.')
         return value
+
+
+class UserPushTokenSerializer(serializers.ModelSerializer):
+    """Read/write serializer for a user's registered Expo push tokens.
+
+    The mobile app POSTs ``token`` (and optionally ``label``). The view's
+    create handler upserts on ``token`` so re-registering the same device
+    just refreshes ``last_seen_at`` and reassigns ownership if needed.
+
+    Ref: ROADMAP Sprint 24
+    """
+
+    # Declare ``token`` explicitly to skip ModelSerializer's auto-added
+    # UniqueValidator — uniqueness is handled by the view's update_or_create,
+    # so re-posting an existing token is a legal idempotent refresh rather
+    # than a 400.
+    token = serializers.CharField(max_length=255)
+
+    class Meta:
+        model = UserPushToken
+        fields = ['id', 'token', 'label', 'last_seen_at', 'created_at']
+        read_only_fields = ['id', 'last_seen_at', 'created_at']
