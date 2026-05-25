@@ -76,7 +76,10 @@ function LineChartWidget({ config = {}, refetchInterval, canEdit, onRemove, onEd
         const readings = queryResults[i]?.data || [];
         return {
           name: sc.label || `Stream ${sc.stream_id}`,
-          data: readings.map((r) => [new Date(r.recorded_at).getTime(), Number(r.value)]),
+          // StreamReading uses `timestamp` (see StreamReadingSerializer).
+          // The old reference to `r.recorded_at` produced NaN x-coords for
+          // every point, which surfaced as "NaN NaN NaN" in the chart tooltip.
+          data: readings.map((r) => [new Date(r.timestamp).getTime(), Number(r.value)]),
         };
       }),
     [streamConfigs, queryResults],

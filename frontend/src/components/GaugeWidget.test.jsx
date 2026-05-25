@@ -46,7 +46,7 @@ describe('GaugeWidget', () => {
     useStreamReadings.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [{ value: '45', recorded_at: '2026-01-01T00:00:00Z' }],
+      data: [{ value: '45', timestamp: '2026-01-01T00:00:00Z' }],
     });
     renderWithQuery(<GaugeWidget {...defaultProps} />);
     const chart = screen.getByTestId('apex-chart');
@@ -58,7 +58,7 @@ describe('GaugeWidget', () => {
     useStreamReadings.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [{ value: '45', recorded_at: '2026-01-01T00:00:00Z' }],
+      data: [{ value: '45', timestamp: '2026-01-01T00:00:00Z' }],
     });
     renderWithQuery(<GaugeWidget {...defaultProps} />);
     expect(screen.getByText(/^0/)).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('GaugeWidget', () => {
     useStreamReadings.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [{ value: '45', recorded_at: '2026-01-01T00:00:00Z' }],
+      data: [{ value: '45', timestamp: '2026-01-01T00:00:00Z' }],
     });
     renderWithQuery(<GaugeWidget {...defaultProps} />);
     expect(screen.getByText(/Normal/)).toBeInTheDocument();

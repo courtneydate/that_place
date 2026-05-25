@@ -93,6 +93,15 @@ export function useCreateDataSource() {
   });
 }
 
+export function useUpdateDataSource(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) =>
+      api.put(`/api/v1/data-sources/${id}/`, data).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: DATA_SOURCES_KEY }),
+  });
+}
+
 export function useDeleteDataSource() {
   const queryClient = useQueryClient();
   return useMutation({

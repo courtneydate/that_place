@@ -141,8 +141,34 @@ class DataSourceSerializer(serializers.ModelSerializer):
 
     provider_name = serializers.CharField(source='provider.name', read_only=True)
     provider_slug = serializers.CharField(source='provider.slug', read_only=True)
-    credentials = serializers.JSONField(write_only=True, required=True)
+    credentials = serializers.JSONField(write_only=True, required=False)
     connected_device_count = serializers.SerializerMethodField()
+
+    def validate(self, attrs):
+        """Require credentials on create; allow them to be omitted on update.
+
+        On update, an absent or empty credentials dict means "keep the existing
+        encrypted credentials" — so tenants can rename a connection without
+        re-typing their API key.
+        """
+        if self.instance is None and not attrs.get('credentials'):
+            raise serializers.ValidationError(
+                {'credentials': 'This field is required.'},
+            )
+        return attrs
+
+    def update(self, instance, validated_data):
+        """Preserve existing credentials when none are provided in the payload.
+
+        Also blocks reassigning ``provider`` after creation — connected
+        DataSourceDevices reference provider-specific external IDs and streams,
+        so swapping the provider would break those records.
+        """
+        creds = validated_data.get('credentials')
+        if not creds:
+            validated_data.pop('credentials', None)
+        validated_data.pop('provider', None)
+        return super().update(instance, validated_data)
 
     def get_connected_device_count(self, obj) -> int:
         """Return the number of active connected devices."""

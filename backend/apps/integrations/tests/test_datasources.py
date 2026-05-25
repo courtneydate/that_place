@@ -161,6 +161,131 @@ class TestDataSourceCRUD:
         # 403 because IsViewOnly excludes FM Admins
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_create_without_credentials_is_rejected(self):
+        """Credentials are required on create."""
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider = make_provider()
+        resp = auth_client(user).post(
+            DATA_SOURCES_URL,
+            {'provider': provider.pk, 'name': 'No creds'},
+            format='json',
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ---------------------------------------------------------------------------
+# DataSource update (rename + rotate credentials)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestDataSourceUpdate:
+    """Tenant Admin can rename a DataSource and rotate credentials in place.
+
+    Allows users to update a stored API key when it changes upstream, without
+    rebuilding the DataSource and rewiring every rule that targeted its devices.
+    """
+
+    def _put(self, user, ds, payload):
+        return auth_client(user).put(
+            f'{DATA_SOURCES_URL}{ds.pk}/', payload, format='json',
+        )
+
+    def test_tenant_admin_can_rename_without_supplying_credentials(self):
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider = make_provider()
+        ds = make_data_source(tenant, provider, name='Old name')
+
+        resp = self._put(user, ds, {'provider': provider.pk, 'name': 'New name'})
+
+        assert resp.status_code == status.HTTP_200_OK
+        ds.refresh_from_db()
+        assert ds.name == 'New name'
+        # Credentials must be untouched
+        assert ds.credentials == {'X-API-Key': 'test-key'}
+
+    def test_tenant_admin_can_rotate_credentials(self):
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider = make_provider()
+        ds = make_data_source(tenant, provider)
+
+        resp = self._put(
+            user,
+            ds,
+            {
+                'provider': provider.pk,
+                'name': ds.name,
+                'credentials': {'X-API-Key': 'rotated-key'},
+            },
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        ds.refresh_from_db()
+        assert ds.credentials == {'X-API-Key': 'rotated-key'}
+
+    def test_empty_credentials_dict_preserves_existing(self):
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider = make_provider()
+        ds = make_data_source(tenant, provider)
+
+        resp = self._put(
+            user,
+            ds,
+            {'provider': provider.pk, 'name': 'Renamed', 'credentials': {}},
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        ds.refresh_from_db()
+        assert ds.name == 'Renamed'
+        assert ds.credentials == {'X-API-Key': 'test-key'}
+
+    def test_provider_cannot_be_changed_on_update(self):
+        """Changing provider would break connected devices' streams and external IDs."""
+        tenant = make_tenant()
+        user = make_tenant_user('ta@acme.com', tenant)
+        provider_a = make_provider(name='Provider A', slug='provider-a')
+        provider_b = make_provider(name='Provider B', slug='provider-b')
+        ds = make_data_source(tenant, provider_a)
+
+        resp = self._put(
+            user,
+            ds,
+            {'provider': provider_b.pk, 'name': ds.name},
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        ds.refresh_from_db()
+        assert ds.provider_id == provider_a.pk
+
+    def test_viewer_cannot_update(self):
+        tenant = make_tenant()
+        viewer = make_tenant_user(
+            'viewer@acme.com', tenant, role=TenantUser.Role.VIEWER,
+        )
+        provider = make_provider()
+        ds = make_data_source(tenant, provider)
+
+        resp = self._put(viewer, ds, {'provider': provider.pk, 'name': 'Nope'})
+
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_cross_tenant_update_returns_404(self):
+        tenant_a = make_tenant('Tenant A')
+        tenant_b = make_tenant('Tenant B')
+        user_b = make_tenant_user('b@b.com', tenant_b)
+        provider = make_provider()
+        ds_a = make_data_source(tenant_a, provider)
+
+        resp = self._put(user_b, ds_a, {'provider': provider.pk, 'name': 'hacked'})
+
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        ds_a.refresh_from_db()
+        assert ds_a.name == 'My DS'
+
 
 # ---------------------------------------------------------------------------
 # Device discovery

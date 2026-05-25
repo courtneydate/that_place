@@ -51,7 +51,7 @@ describe('LineChartWidget', () => {
       {
         isLoading: false,
         isError: false,
-        data: [{ recorded_at: '2026-01-01T00:00:00Z', value: '42.5' }],
+        data: [{ timestamp: '2026-01-01T00:00:00Z', value: '42.5' }],
       },
     ]);
     render(<LineChartWidget {...defaultProps} />);
@@ -92,8 +92,8 @@ describe('LineChartWidget', () => {
       time_range: '24h',
     };
     useMultipleStreamReadings.mockReturnValue([
-      { isLoading: false, isError: false, data: [{ recorded_at: '2026-01-01T00:00:00Z', value: '22' }] },
-      { isLoading: false, isError: false, data: [{ recorded_at: '2026-01-01T00:00:00Z', value: '65' }] },
+      { isLoading: false, isError: false, data: [{ timestamp: '2026-01-01T00:00:00Z', value: '22' }] },
+      { isLoading: false, isError: false, data: [{ timestamp: '2026-01-01T00:00:00Z', value: '65' }] },
     ]);
     render(<LineChartWidget {...defaultProps} config={twoStreamConfig} />);
     const chart = screen.getByTestId('apex-chart');

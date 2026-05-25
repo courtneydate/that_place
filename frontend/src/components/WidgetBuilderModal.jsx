@@ -104,6 +104,32 @@ function StreamRow({ row, index, allDevices, sites, onChange, onRemove }) {
     row.deviceId || null,
   );
 
+  // Edit-mode lazy resolution: the saved widget config only carries
+  // stream_id, so when the modal opens the row has a streamId but no
+  // deviceId/siteId. Fetch the stream once to recover its device and site,
+  // then patch the row so the selectors render the saved selection instead
+  // of looking "disappeared".
+  const needsResolve = !!row.streamId && !row.deviceId;
+  const { data: streamDetail } = useQuery({
+    queryKey: ['stream', Number(row.streamId)],
+    queryFn: () =>
+      api.get(`/api/v1/streams/${row.streamId}/`).then((r) => r.data),
+    enabled: needsResolve,
+  });
+
+  useEffect(() => {
+    if (!streamDetail || row.deviceId) return;
+    const device = allDevices.find((d) => d.id === streamDetail.device);
+    onChange({
+      ...row,
+      deviceId: String(streamDetail.device),
+      siteId: device ? String(device.site) : '',
+    });
+    // Intentionally narrow deps — we only want to act once when the
+    // resolution result arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamDetail]);
+
   const devicesForSite = row.siteId
     ? allDevices.filter((d) => String(d.site) === String(row.siteId) && d.status === 'active')
     : allDevices.filter((d) => d.status === 'active');
@@ -231,6 +257,10 @@ function WidgetBuilderModal({ nextOrder = 0, editingWidget = null, onSubmit, onC
   const [healthDeviceId, setHealthDeviceId] = useState('');
   const [healthChartType, setHealthChartType] = useState('online_offline');
   const [healthTimeRange, setHealthTimeRange] = useState('24h');
+  // One-shot flag: lets the dedicated effect resolve healthSiteId from
+  // allDevices once it loads (edit-mode race), but only the first time per
+  // edit session — so a user later choosing "All sites" isn't auto-reset.
+  const [healthSiteAutoResolved, setHealthSiteAutoResolved] = useState(false);
 
   // --- data ---
   const { data: sites = [], isLoading: sitesLoading } = useSiteList();
@@ -317,11 +347,26 @@ function WidgetBuilderModal({ nextOrder = 0, editingWidget = null, onSubmit, onC
       setHealthDeviceId(String(config.device_id || ''));
       setHealthChartType(config.chart_type || 'online_offline');
       setHealthTimeRange(config.time_range || '24h');
-      const device = allDevices.find((d) => d.id === config.device_id);
-      if (device) setHealthSiteId(String(device.site));
+      // Site is set by the dedicated resolve effect below, which waits for
+      // allDevices to load. Resetting the auto-resolve flag re-arms it for
+      // this edit session.
+      setHealthSiteAutoResolved(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingWidget?.id]);
+
+  // Edit-mode lazy resolve of healthSiteId — the edit-pre-populate effect
+  // runs synchronously when editingWidget arrives, but the site lookup needs
+  // allDevices loaded; this catches up once it is. Only fires once per edit
+  // session (gated by healthSiteAutoResolved) so a user-driven "All sites"
+  // choice later isn't auto-reset.
+  useEffect(() => {
+    if (!editingWidget || editingWidget.widget_type !== 'health_uptime_chart') return;
+    if (healthSiteAutoResolved || !healthDeviceId || allDevices.length === 0) return;
+    const device = allDevices.find((d) => String(d.id) === String(healthDeviceId));
+    if (device) setHealthSiteId(String(device.site));
+    setHealthSiteAutoResolved(true);
+  }, [editingWidget, healthDeviceId, allDevices, healthSiteAutoResolved]);
 
   // Reset single-stream fields when type changes (add mode only)
   const handleTypeChange = (t) => {

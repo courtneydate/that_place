@@ -19,7 +19,7 @@ import {
   useDiscoverDevices,
   useProviders,
 } from '../../hooks/useIntegrations';
-import { useCreateDataSource } from '../../hooks/useIntegrations';
+import { useCreateDataSource, useUpdateDataSource } from '../../hooks/useIntegrations';
 import styles from '../admin/AdminPage.module.css';
 
 const POLL_STATUS_LABELS = {
@@ -723,6 +723,122 @@ ConnectedDevicesPanel.propTypes = {
 };
 
 // ---------------------------------------------------------------------------
+// Edit data source — name + (optionally) new credentials
+// ---------------------------------------------------------------------------
+
+function EditDataSourceForm({ ds, provider, onDone, onCancel }) {
+  const [name, setName] = useState(ds.name);
+  const [creds, setCreds] = useState({});
+  const [error, setError] = useState('');
+  const updateDs = useUpdateDataSource(ds.id);
+
+  const authFields = provider?.auth_param_schema || [];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!name.trim()) { setError('Please enter a name for this connection.'); return; }
+
+    const trimmedCreds = Object.entries(creds).reduce((acc, [k, v]) => {
+      if (typeof v === 'string' && v.trim() !== '') acc[k] = v;
+      return acc;
+    }, {});
+    const isReplacingCreds = Object.keys(trimmedCreds).length > 0;
+
+    if (isReplacingCreds) {
+      const missing = authFields.filter((f) => f.required && !trimmedCreds[f.key]);
+      if (missing.length) {
+        setError(
+          `When updating credentials, all required fields must be filled: ${missing.map((f) => f.label).join(', ')}.`,
+        );
+        return;
+      }
+    }
+
+    const payload = { provider: ds.provider, name };
+    if (isReplacingCreds) payload.credentials = trimmedCreds;
+
+    try {
+      await updateDs.mutateAsync(payload);
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.error?.message || 'Failed to update data source.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className={styles.form} noValidate>
+      <h3 style={{ marginTop: 0 }}>Edit {provider?.name || ds.provider_name} connection</h3>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Connection name *</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={styles.input}
+          disabled={updateDs.isPending}
+        />
+      </div>
+
+      {authFields.length > 0 && (
+        <>
+          <p
+            className={styles.label}
+            style={{ marginBottom: '0.25rem', fontWeight: 600 }}
+          >
+            Update credentials
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '0.75rem' }}>
+            Leave blank to keep the existing values. Fill in new values only if the {provider?.name || 'provider'} credentials have changed.
+          </p>
+          {authFields.map((field) => (
+            <div key={field.key} className={styles.field}>
+              <label className={styles.label}>{field.label}</label>
+              <input
+                type={field.type === 'password' ? 'password' : 'text'}
+                value={creds[field.key] || ''}
+                onChange={(e) => setCreds((c) => ({ ...c, [field.key]: e.target.value }))}
+                className={styles.input}
+                placeholder="Leave blank to keep current value"
+                autoComplete="new-password"
+                disabled={updateDs.isPending}
+              />
+            </div>
+          ))}
+        </>
+      )}
+
+      <div className={styles.actions}>
+        <button
+          type="submit"
+          className={styles.primaryButton}
+          disabled={updateDs.isPending}
+        >
+          {updateDs.isPending ? 'Saving…' : 'Save changes'}
+        </button>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={onCancel}
+          disabled={updateDs.isPending}
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className={styles.error}>{error}</p>}
+    </form>
+  );
+}
+
+EditDataSourceForm.propTypes = {
+  ds: PropTypes.object.isRequired,
+  provider: PropTypes.object,
+  onDone: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -735,6 +851,7 @@ function DataSources() {
   const [showWizard, setShowWizard] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [addingDevicesForId, setAddingDevicesForId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async (ds) => {
@@ -820,12 +937,24 @@ function DataSources() {
                         className={styles.secondaryButton}
                         onClick={() => {
                           setAddingDevicesForId(ds.id);
+                          setEditingId(null);
                           setShowWizard(false);
                         }}
                         style={{ fontSize: '0.85rem' }}
                         disabled={addingDevicesForId === ds.id}
                       >
                         Add devices
+                      </button>
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => {
+                          setEditingId(editingId === ds.id ? null : ds.id);
+                          setAddingDevicesForId(null);
+                          setShowWizard(false);
+                        }}
+                        style={{ fontSize: '0.85rem' }}
+                      >
+                        {editingId === ds.id ? 'Cancel edit' : 'Edit'}
                       </button>
                       <button
                         className={styles.dangerButton}
@@ -837,6 +966,20 @@ function DataSources() {
                       </button>
                     </td>
                   </tr>
+                  {editingId === ds.id && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 0 }}>
+                        <div style={{ padding: '1rem', background: 'var(--surface-raised, #f9f9f9)', borderTop: '1px solid var(--border)' }}>
+                          <EditDataSourceForm
+                            ds={ds}
+                            provider={providers.find((p) => p.id === ds.provider)}
+                            onDone={() => setEditingId(null)}
+                            onCancel={() => setEditingId(null)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {addingDevicesForId === ds.id && (() => {
                     const dsProvider = providers.find((p) => p.id === ds.provider);
                     if (!dsProvider) return (
