@@ -177,6 +177,31 @@ class TestThatPlaceV1DeviceTelemetry:
 
 
 # ---------------------------------------------------------------------------
+# That Place v1 — cmd/ack (Sprint 21 + Sprint 25 follow-up)
+# ---------------------------------------------------------------------------
+
+
+class TestThatPlaceV1CmdAck:
+
+    def test_bridged_device_ack_matches(self):
+        result = router.route('that-place/scout/GW-100/DEV-200/cmd/ack')
+        assert result is not None
+        assert result.pattern_name == 'that_place_v1_cmd_ack'
+        assert result.message_type == 'cmd_ack'
+        assert result.scout_serial == 'GW-100'
+        assert result.device_serial == 'DEV-200'
+
+    def test_scout_direct_ack_matches(self):
+        """Sprint 21 regression — Scout-direct (non-bridged) cmd/ack pattern."""
+        result = router.route('that-place/scout/SCOUT-001/cmd/ack')
+        assert result is not None
+        assert result.pattern_name == 'that_place_v1_scout_cmd_ack'
+        assert result.message_type == 'cmd_ack'
+        assert result.scout_serial == 'SCOUT-001'
+        assert result.device_serial == 'SCOUT-001'
+
+
+# ---------------------------------------------------------------------------
 # Outbound / unknown topics — must return None
 # ---------------------------------------------------------------------------
 

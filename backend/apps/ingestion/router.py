@@ -188,7 +188,7 @@ router.register(TopicPattern(
     has_device=False,
 ))
 
-# --- That Place v1: command acknowledgement ---
+# --- That Place v1: bridged device command acknowledgement ---
 # Topic: that-place/scout/{scout_serial}/{device_serial}/cmd/ack
 # Registered after telemetry patterns; more specific than the wildcard subscription.
 router.register(TopicPattern(
@@ -197,4 +197,16 @@ router.register(TopicPattern(
     topic_format='that_place_v1',
     message_type='cmd_ack',
     has_device=True,
+))
+
+# --- That Place v1: Scout-direct command acknowledgement ---
+# Topic: that-place/scout/{scout_serial}/cmd/ack
+# The Scout's own acks when commands are sent to it directly (no bridged device).
+# Mirrors the send-side topic shape in apps/devices/tasks.py:send_device_command.
+router.register(TopicPattern(
+    name='that_place_v1_scout_cmd_ack',
+    regex=re.compile(r'^that-place/scout/(?P<scout>[^/]+)/cmd/ack$'),
+    topic_format='that_place_v1',
+    message_type='cmd_ack',
+    has_device=False,
 ))

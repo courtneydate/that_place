@@ -1,0 +1,19 @@
+{
+  "name": "that-place-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright end-to-end tests for the That Place platform (Sprint 25).",
+  "scripts": {
+    "e2e": "node scripts/run-e2e.js",
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium firefox"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

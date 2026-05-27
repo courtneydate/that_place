@@ -796,21 +796,27 @@ _Frontend:_
 **Goal:** All features work end-to-end; the platform is stable and ready for Phase 6.
 
 **Deliverables:**
-- [ ] End-to-end tests (Playwright) for key user journeys:
-  - Onboarding: create tenant → invite admin → set up site → register device → approve device
-  - Ingestion: send MQTT reading → verify StreamReading → verify health update
-  - Rules: build rule → trigger condition → alert fires → in-app notification received → acknowledge alert
-  - Commands: send command → ack received → history logged
-  - Export: configure export → download CSV → verify format
-- [ ] Performance audit: identify and fix any N+1 queries, slow endpoints (> 500ms on realistic data)
-- [ ] Security audit: cross-tenant isolation, auth bypass attempts, View-Only access checks
-- [ ] Bug fix sprint — address all issues found during E2E and audits
+- [x] End-to-end tests (Playwright, Chromium + Firefox) for key user journeys:
+  - [x] Onboarding: create tenant → invite admin → set up site → register device → approve device
+  - [x] Ingestion: send MQTT reading → verify StreamReading → verify health update
+  - [x] Rules: build rule → trigger condition → alert fires → in-app notification received → acknowledge alert
+  - [x] Commands: send command → ack received → history logged
+  - [x] Export: configure export → download CSV → verify format
+- [x] Performance audit: confirmed no N+1 queries (4–5 queries per endpoint) and all hot endpoints < 100ms on a 100k-reading dataset (target was 500ms)
+- [x] Security audit: cross-tenant probes (404), role matrix (Admin/Operator/Viewer/anon/forged JWT) all enforced
+- [x] Bug fix sprint:
+  - **Sprint 21 follow-up** — `that-place/scout/{serial}/cmd/ack` (Scout-direct) wasn't registered in `apps/ingestion/router.py`; only the bridged 2-segment form matched. Surfaced by the commands E2E spec; new pattern `that_place_v1_scout_cmd_ack` added with regression test in `apps/ingestion/tests/test_router.py`.
 
 **Definition of Done:**
-- All Playwright E2E tests pass
-- No endpoint returns data from another tenant under any circumstances
-- No endpoint exceeds 500ms on a dataset of 100k StreamReadings
-- All known bugs resolved or explicitly deferred with rationale
+- [x] All Playwright E2E tests pass (14 tests across Chromium + Firefox)
+- [x] No endpoint returns data from another tenant under any circumstances (404 across the probe matrix)
+- [x] No endpoint exceeds 500ms on a dataset of 100k StreamReadings — measured 16–64ms across the hot list
+- [x] All known bugs resolved or explicitly deferred with rationale
+
+> **Status (2026-05-27):** ✅ Complete. New `/e2e` Playwright suite (5 sign-off journeys + smoke,
+> Chromium + Firefox); two new management commands (`seed_e2e`, `seed_perf_data`); one
+> Sprint 21 router bug fixed with regression test. Full backend + frontend suites green;
+> flake8 / isort / eslint clean.
 
 ---
 
