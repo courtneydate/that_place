@@ -75,6 +75,25 @@ def _get_active_snooze_user_pks(rule_id: int) -> set[int]:
     )
 
 
+def _get_per_rule_opt_outs(rule_id: int, user_pks: set[int]) -> dict[int, set[str]]:
+    """Return a dict of user_pk → set of opted-out channel codes for this rule.
+
+    Missing users have an empty set (no opt-outs). Used by
+    create_alert_notifications to suppress per-(user, rule, channel) combinations
+    on top of the global preference checks.
+
+    Ref: SPEC.md §8 Phase 5b; ROADMAP Sprint 26
+    """
+    from .models import RuleNotificationOptOut
+    result: dict[int, set[str]] = {pk: set() for pk in user_pks}
+    rows = RuleNotificationOptOut.objects.filter(
+        rule_id=rule_id, user_id__in=user_pks,
+    ).values_list('user_id', 'channel')
+    for user_id, channel in rows:
+        result[user_id].add(channel)
+    return result
+
+
 def _get_preferences(user_pks: set[int]) -> dict:
     """Return a dict of user_pk → UserNotificationPreference for the given users.
 
@@ -175,6 +194,7 @@ def create_alert_notifications(alert_id: int) -> None:
         return
 
     prefs = _get_preferences(active_pks)
+    opt_outs = _get_per_rule_opt_outs(alert.rule_id, active_pks)
 
     in_app_rows = []
     email_rows = []
@@ -191,9 +211,12 @@ def create_alert_notifications(alert_id: int) -> None:
         .distinct()
     )
 
+    # Most-restrictive wins: global pref + per-rule opt-out + (for SMS) phone +
+    # (for push) token presence must all permit the channel.
     for user_pk in active_pks:
         pref = prefs[user_pk]
-        if pref.in_app_enabled:
+        user_opt_outs = opt_outs[user_pk]
+        if pref.in_app_enabled and 'in_app' not in user_opt_outs:
             in_app_rows.append(Notification(
                 user_id=user_pk,
                 notification_type=Notification.NotificationType.ALERT,
@@ -201,7 +224,7 @@ def create_alert_notifications(alert_id: int) -> None:
                 channel=Notification.Channel.IN_APP,
                 delivery_status=Notification.DeliveryStatus.SENT,
             ))
-        if pref.email_enabled:
+        if pref.email_enabled and 'email' not in user_opt_outs:
             email_rows.append(Notification(
                 user_id=user_pk,
                 notification_type=Notification.NotificationType.ALERT,
@@ -209,7 +232,7 @@ def create_alert_notifications(alert_id: int) -> None:
                 channel=Notification.Channel.EMAIL,
                 delivery_status=Notification.DeliveryStatus.SENT,
             ))
-        if pref.sms_enabled and pref.phone_number:
+        if pref.sms_enabled and pref.phone_number and 'sms' not in user_opt_outs:
             sms_rows.append(Notification(
                 user_id=user_pk,
                 notification_type=Notification.NotificationType.ALERT,
@@ -217,7 +240,7 @@ def create_alert_notifications(alert_id: int) -> None:
                 channel=Notification.Channel.SMS,
                 delivery_status=Notification.DeliveryStatus.SENT,
             ))
-        if user_pk in users_with_push:
+        if user_pk in users_with_push and 'push' not in user_opt_outs:
             push_rows.append(Notification(
                 user_id=user_pk,
                 notification_type=Notification.NotificationType.ALERT,

@@ -64,3 +64,31 @@ export function useDeleteRule() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: RULES_KEY }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Per-user, per-rule notification preferences (Sprint 26)
+// ---------------------------------------------------------------------------
+
+export function useMyRuleNotificationPrefs(ruleId) {
+  return useQuery({
+    queryKey: [...RULES_KEY, ruleId, 'my-notification-prefs'],
+    queryFn: () =>
+      api.get(`/api/v1/rules/${ruleId}/my-notification-prefs/`).then((r) => r.data),
+    enabled: !!ruleId,
+    retry: false,
+  });
+}
+
+export function useSaveMyRuleNotificationPrefs(ruleId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (prefs) =>
+      api.put(`/api/v1/rules/${ruleId}/my-notification-prefs/`, prefs).then((r) => r.data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        [...RULES_KEY, ruleId, 'my-notification-prefs'],
+        data,
+      );
+    },
+  });
+}

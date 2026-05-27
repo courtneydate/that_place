@@ -10,6 +10,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useRule } from '../../hooks/useRules';
 import { useState } from 'react';
+import MyNotificationsPanel from './MyNotificationsPanel';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
 
@@ -303,7 +304,12 @@ function RuleDetail() {
       <TabBar active={activeTab} onChange={setActiveTab} />
 
       <section>
-        {activeTab === 'Overview' && <OverviewTab rule={rule} />}
+        {activeTab === 'Overview' && (
+          <>
+            <OverviewTab rule={rule} />
+            <MyNotificationsPanel ruleId={id} />
+          </>
+        )}
         {activeTab === 'Audit Trail' && <AuditTrailTab auditLogs={rule.audit_logs} />}
       </section>
     </div>

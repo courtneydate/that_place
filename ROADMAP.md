@@ -835,15 +835,20 @@ _Frontend:_
 **Goal:** Users can opt out of specific channels for specific rules, on top of the global per-channel preferences from Sprint 20.
 
 **Deliverables:**
-- [ ] Backend: per-(user, rule, channel) opt-out model + endpoints
-- [ ] Backend: opt-out check in `create_alert_notifications` — a rule-level channel opt-out suppresses that channel even when the global preference and the rule action both enable it
-- [ ] Backend: Tests — per-rule opt-out suppresses the right channel, global preference still independently respected, opt-out scoped per user
-- [ ] Frontend: per-rule channel opt-out controls (on the rule detail or notification preferences screen)
+- [x] Backend: `RuleNotificationOptOut` model (user + rule + channel, unique together) + migration `0005_rulenotificationoptout`
+- [x] Backend: `GET / PUT /api/v1/rules/:id/my-notification-prefs/` — returns/accepts `{in_app, email, sms, push}` for the requesting user; 403 if user is not currently a target of any notify action on the rule
+- [x] Backend: opt-out check in `create_alert_notifications` — most-restrictive wins across global pref, SMS opt-in, push token presence, snooze, and per-rule opt-out
+- [x] Backend: 15 new tests in `apps/notifications/tests/test_sprint26.py` covering all four channels, precedence with snooze + global prefs + SMS opt-in, per-user scoping, group-targeted users, cross-tenant 404, operator + viewer access, anonymous block, GET defaults, PUT round-trip
+- [x] Frontend: `MyNotificationsPanel` on the rule detail page Overview tab; 4 channel toggles loaded from the new endpoint, save on toggle, hides itself when endpoint returns 403
+- [x] Frontend: 6 new tests in `MyNotificationsPanel.test.jsx`
 
 **Definition of Done:**
-- A user can disable email for one specific rule while keeping email for all others
-- Global per-channel preference and per-rule opt-out are both enforced (most-restrictive wins)
-- SPEC.md §8 Phase 5b satisfied
+- [x] A user can disable email for one specific rule while keeping email for all others
+- [x] Global per-channel preference and per-rule opt-out are both enforced (most-restrictive wins)
+- [x] SPEC.md §8 Phase 5b satisfied
+
+> **Status (2026-05-27):** ✅ Complete. 718 backend tests + 49 frontend tests green;
+> flake8 / isort / eslint clean.
 
 ---
 

@@ -189,6 +189,48 @@ class NotificationSnooze(models.Model):
         )
 
 
+class RuleNotificationOptOut(models.Model):
+    """A user's per-channel opt-out for a specific rule.
+
+    Presence of a row = opted OUT for that (user, rule, channel) combination.
+    Absence = opted in (the default — matches Sprint 20's opted-in-by-default
+    posture for in_app + email; SMS still requires the separate global opt-in
+    on UserNotificationPreference and push still requires a registered token).
+
+    The opt-out is enforced inside create_alert_notifications and stacks with
+    the existing global preference, SMS opt-in, and snooze checks
+    (most-restrictive-wins).
+
+    Ref: SPEC.md §8 Phase 5b — Per-channel opt-out per rule; ROADMAP Sprint 26
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='rule_notification_opt_outs',
+    )
+    rule = models.ForeignKey(
+        'rules.Rule',
+        on_delete=models.CASCADE,
+        related_name='notification_opt_outs',
+    )
+    channel = models.CharField(
+        max_length=10,
+        choices=Notification.Channel.choices,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'rule', 'channel')]
+
+    def __str__(self) -> str:
+        """Return a human-readable description of the opt-out."""
+        return (
+            f'RuleNotificationOptOut(user={self.user_id} '
+            f'rule={self.rule_id} channel={self.channel})'
+        )
+
+
 class NotificationEventType(models.Model):
     """DB-backed registry of system-event and platform-event types.
 
