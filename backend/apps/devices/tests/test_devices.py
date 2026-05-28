@@ -76,7 +76,10 @@ class TestDeviceTypeList:
         make_device_type('Station A')
         resp = auth_client(fm).get(DEVICE_TYPES_URL)
         assert resp.status_code == status.HTTP_200_OK
-        assert len(resp.data) == 1
+        # Site Composite is platform-seeded via post_migrate (Sprint 27); the
+        # test-created Station A must appear alongside it.
+        names = {dt['name'] for dt in resp.data}
+        assert 'Station A' in names
 
     def test_tenant_user_can_list(self):
         tenant = make_tenant()

@@ -77,6 +77,8 @@ const emptyCondition = (order = 0) => ({
   dataset: null,
   value_key: '',
   dimension_overrides: null,
+  aggregate_fn: '',
+  window_minutes: '',
   order,
 });
 
@@ -140,6 +142,16 @@ const buildPayload = (form) => ({
       if (c.condition_type === 'feed_channel') {
         return { ...base, channel: c.channel, operator: c.operator, threshold_value: c.threshold_value };
       }
+      if (c.condition_type === 'windowed_aggregate') {
+        return {
+          ...base,
+          stream: c.stream,
+          aggregate_fn: c.aggregate_fn,
+          window_minutes: parseInt(c.window_minutes, 10),
+          operator: c.operator,
+          threshold_value: c.threshold_value,
+        };
+      }
       // reference_value
       return {
         ...base,
@@ -195,6 +207,8 @@ const formFromRule = (rule) => ({
           dataset: c.dataset || null,
           value_key: c.value_key || '',
           dimension_overrides: c.dimension_overrides || null,
+          aggregate_fn: c.aggregate_fn || '',
+          window_minutes: c.window_minutes != null ? String(c.window_minutes) : '',
           order: c.order ?? ci,
         })),
       }))
@@ -245,6 +259,14 @@ const validateStep = (step, form) => {
           if (!c.value_key) return 'Select a value key for every reference_value condition.';
           if (!c.operator) return 'Select an operator for every reference_value condition.';
           if (c.threshold_value === '') return 'Enter a value for every reference_value condition.';
+        } else if (c.condition_type === 'windowed_aggregate') {
+          if (!c.stream) return 'Select a stream for every windowed_aggregate condition.';
+          if (!c.aggregate_fn) return 'Pick avg / min / max for every windowed_aggregate condition.';
+          if (!c.window_minutes || parseInt(c.window_minutes, 10) < 1) {
+            return 'Window minutes must be a positive integer.';
+          }
+          if (!c.operator) return 'Select an operator for every windowed_aggregate condition.';
+          if (c.threshold_value === '') return 'Enter a threshold for every windowed_aggregate condition.';
         }
       }
     }
@@ -585,16 +607,20 @@ function ConditionEditor({ condition, devices, onChange, onRemove }) {
             operator: '', threshold_value: '', staleness_minutes: '',
             channel: null, _provider_id: null,
             dataset: null, value_key: '', dimension_overrides: null,
+            aggregate_fn: '', window_minutes: '',
           })}
         >
           <option value="stream">Stream value</option>
           <option value="staleness">Not reported in…</option>
           <option value="feed_channel">Feed channel value</option>
           <option value="reference_value">Reference dataset value</option>
+          <option value="windowed_aggregate">Windowed aggregate</option>
         </select>
 
-        {/* Stream picker — for stream and staleness types */}
-        {(condition.condition_type === 'stream' || condition.condition_type === 'staleness') && (
+        {/* Stream picker — for stream, staleness, and windowed_aggregate types */}
+        {(condition.condition_type === 'stream'
+          || condition.condition_type === 'staleness'
+          || condition.condition_type === 'windowed_aggregate') && (
           <StreamPicker
             streamId={condition.stream}
             deviceId={condition._device_id}
@@ -688,6 +714,52 @@ function ConditionEditor({ condition, devices, onChange, onRemove }) {
               style={{ width: '90px' }}
             />
             <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>minutes</span>
+          </>
+        )}
+
+        {condition.condition_type === 'windowed_aggregate' && (
+          <>
+            <select
+              className={b.selectSmall}
+              value={condition.aggregate_fn}
+              onChange={(e) => set({ aggregate_fn: e.target.value })}
+            >
+              <option value="">Aggregate…</option>
+              <option value="avg">avg</option>
+              <option value="min">min</option>
+              <option value="max">max</option>
+            </select>
+            <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>over</span>
+            <input
+              type="number"
+              min="1"
+              className={b.inputSmall}
+              placeholder="Minutes"
+              value={condition.window_minutes}
+              onChange={(e) => set({ window_minutes: e.target.value })}
+              style={{ width: '90px' }}
+            />
+            <span style={{ fontSize: '0.8125rem', color: '#6B7280' }}>min</span>
+            <select
+              className={b.selectSmall}
+              value={condition.operator}
+              onChange={(e) => set({ operator: e.target.value })}
+              disabled={!condition.aggregate_fn || !condition.window_minutes}
+            >
+              <option value="">Operator…</option>
+              {OPERATORS_BY_TYPE.numeric.map((op) => (
+                <option key={op} value={op}>{OPERATOR_LABELS[op] || op}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              className={b.inputSmall}
+              placeholder="Threshold"
+              value={condition.threshold_value}
+              onChange={(e) => set({ threshold_value: e.target.value })}
+              disabled={!condition.operator}
+              style={{ width: '100px' }}
+            />
           </>
         )}
 

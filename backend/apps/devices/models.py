@@ -215,6 +215,14 @@ class Device(models.Model):
             'Clear this field once the operator confirms the key has been loaded.'
         ),
     )
+    is_virtual = models.BooleanField(
+        default=False,
+        help_text=(
+            'True for platform-created virtual devices (e.g. the per-site '
+            '`site_composite` host of cross-device derived streams). '
+            'Virtual devices have no MQTT credentials and do not ingest telemetry.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -8,3 +8,7 @@ class ReadingsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.readings'
     label = 'readings'
+
+    def ready(self) -> None:
+        """Register derived-stream signal handlers (Sprint 27)."""
+        from . import derived_dispatch  # noqa: F401

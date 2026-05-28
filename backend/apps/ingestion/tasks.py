@@ -300,8 +300,12 @@ def _store_stream_readings(
     stream_ids = frozenset(r.stream_id for r in readings_to_create)
 
     def _dispatch():
+        from apps.readings.derived_dispatch import dispatch_stream_derived_evaluation
         for stream_id in stream_ids:
             _dispatch_stream_rule_evaluation.delay(stream_id)
+            # Sprint 27: derived streams sourced from this stream are
+            # re-evaluated alongside rule dispatch.
+            dispatch_stream_derived_evaluation.delay(stream_id)
 
     transaction.on_commit(_dispatch)
 

@@ -10,15 +10,22 @@ from django.db.models import OuterRef, Subquery
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsTenantAdmin
 
-from .models import DataExport, Stream, StreamReading
-from .serializers import DataExportSerializer, ExportRequestSerializer, StreamReadingSerializer, StreamSerializer
+from .models import DataExport, DerivedStream, Stream, StreamReading
+from .serializers import (
+    DataExportSerializer,
+    DerivedStreamBackfillSerializer,
+    DerivedStreamSerializer,
+    ExportRequestSerializer,
+    StreamReadingSerializer,
+    StreamSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -273,3 +280,93 @@ class ExportHistoryView(APIView):
             tenant=tenant_user.tenant,
         ).select_related('exported_by')
         return Response(DataExportSerializer(exports, many=True).data)
+
+
+# ---------------------------------------------------------------------------
+# Derived streams (Sprint 27)
+# ---------------------------------------------------------------------------
+
+
+class DerivedStreamViewSet(viewsets.GenericViewSet):
+    """CRUD + backfill for tenant-scoped derived streams.
+
+    Reads are open to all authenticated tenant users; writes (create / update /
+    delete / backfill) require Tenant Admin.
+
+    Ref: SPEC.md § Feature: Derived / Computed Streams; ROADMAP Sprint 27
+    """
+
+    serializer_class = DerivedStreamSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsTenantAdmin()]
+
+    def get_queryset(self):
+        tenant_user = getattr(self.request.user, 'tenantuser', None)
+        if tenant_user is None:
+            return DerivedStream.objects.none()
+        return (
+            DerivedStream.objects
+            .filter(stream__device__tenant=tenant_user.tenant)
+            .select_related('stream', 'stream__device')
+            .prefetch_related('source_streams')
+        )
+
+    def list(self, request):
+        return Response(DerivedStreamSerializer(self.get_queryset(), many=True).data)
+
+    def retrieve(self, request, pk=None):
+        derived = get_object_or_404(self.get_queryset(), pk=pk)
+        return Response(DerivedStreamSerializer(derived).data)
+
+    def create(self, request):
+        serializer = DerivedStreamSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        logger.info(
+            'Derived stream created by %s: formula=%s key=%s',
+            request.user.email, serializer.data['formula'], serializer.data['stream_key'],
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None):
+        derived = get_object_or_404(self.get_queryset(), pk=pk)
+        serializer = DerivedStreamSerializer(
+            derived, data=request.data, partial=False, context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        derived = get_object_or_404(self.get_queryset(), pk=pk)
+        serializer = DerivedStreamSerializer(
+            derived, data=request.data, partial=True, context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def destroy(self, request, pk=None):
+        derived = get_object_or_404(self.get_queryset(), pk=pk)
+        # Deleting the output Stream cascades to the DerivedStream (one-to-one).
+        derived.stream.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def backfill(self, request, pk=None):
+        """POST /api/v1/derived-streams/:id/backfill/ — recompute a date range."""
+        derived = get_object_or_404(self.get_queryset(), pk=pk)
+        serializer = DerivedStreamBackfillSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from .derived_dispatch import backfill_derived_stream
+        backfill_derived_stream.delay(
+            derived.pk,
+            serializer.validated_data['date_from'].isoformat(),
+            serializer.validated_data['date_to'].isoformat(),
+        )
+        return Response(
+            {'detail': 'Backfill dispatched.'},
+            status=status.HTTP_202_ACCEPTED,
+        )

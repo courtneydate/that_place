@@ -20,13 +20,19 @@ class Stream(models.Model):
     fields are editable by Tenant Admins.
 
     data_type is inferred from the DeviceType stream definitions when
-    available, otherwise defaults to numeric.
+    available, otherwise defaults to numeric. stream_type marks streams
+    produced by the platform itself (derived/computed) vs. ingested raw
+    from a device — derived streams have a backing `DerivedStream` config.
     """
 
     class DataType(models.TextChoices):
         NUMERIC = 'numeric', 'Numeric'
         BOOLEAN = 'boolean', 'Boolean'
         STRING = 'string', 'String'
+
+    class StreamType(models.TextChoices):
+        RAW = 'raw', 'Raw (ingested)'
+        DERIVED = 'derived', 'Derived (computed)'
 
     device = models.ForeignKey(
         'devices.Device',
@@ -37,6 +43,12 @@ class Stream(models.Model):
     label = models.CharField(max_length=255, blank=True, help_text='Human-readable label — editable by Tenant Admin.')
     unit = models.CharField(max_length=50, blank=True, help_text='Unit of measurement, e.g. "°C", "%", "L/min".')
     data_type = models.CharField(max_length=20, choices=DataType.choices, default=DataType.NUMERIC)
+    stream_type = models.CharField(
+        max_length=20,
+        choices=StreamType.choices,
+        default=StreamType.RAW,
+        help_text='Raw = ingested from a device. Derived = computed from other streams.',
+    )
     display_enabled = models.BooleanField(
         default=True,
         help_text='Controls dashboard visibility. Data is always stored regardless of this flag.',
@@ -135,3 +147,89 @@ class RuleStreamIndex(models.Model):
 
     def __str__(self) -> str:
         return f'Stream {self.stream_id} → Rule {self.rule_id}'
+
+
+class DerivedStream(models.Model):
+    """Config for a Stream whose values are computed from other Streams.
+
+    The output `Stream` (one-to-one) has `stream_type=derived` so consumers
+    see it as a regular stream. The DerivedStream record holds the formula,
+    source stream(s), and params used to evaluate.
+
+    Single-source formulas live on the source Device. Cross-device formulas
+    (e.g. `consumption_from_solar`) live on a per-site virtual Device with
+    role `site_composite`, auto-created on first use.
+
+    Ref: SPEC.md § Feature: Derived / Computed Streams; ROADMAP Sprint 27
+    """
+
+    class Formula(models.TextChoices):
+        DELTA = 'delta', 'Δ (current − previous)'
+        SUM = 'sum', 'Σ sources at same minute'
+        DIFFERENCE = 'difference', 'A − B at same minute'
+        SCALE = 'scale', 'source × factor'
+        WINDOW_MIN = 'window_min', 'rolling min over N minutes'
+        WINDOW_MAX = 'window_max', 'rolling max over N minutes'
+
+    stream = models.OneToOneField(
+        Stream,
+        on_delete=models.CASCADE,
+        related_name='derived_config',
+        help_text='The virtual output Stream this config writes into. Must have stream_type=derived.',
+    )
+    formula = models.CharField(max_length=20, choices=Formula.choices)
+    source_streams = models.ManyToManyField(
+        Stream,
+        related_name='consumer_derived_streams',
+        help_text=(
+            'One or more source streams. delta/scale/window_min/window_max take 1; '
+            'sum takes 1+ (cross-device allowed); difference takes exactly 2 (A, B).'
+        ),
+    )
+    params = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Formula-specific params. '
+            'delta: max_gap_minutes (optional int). '
+            'scale: factor (float). '
+            'window_min/window_max: window_minutes (int). '
+            'difference: source_a_id / source_b_id (override ordering).'
+        ),
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f'DerivedStream({self.pk}) {self.formula} → Stream {self.stream_id}'
+
+
+class DerivedStreamSourceIndex(models.Model):
+    """Reverse index: source Stream → DerivedStream that consumes it.
+
+    Maintained automatically on DerivedStream create/edit/delete. The dispatch
+    task looks up this index when a source StreamReading is saved to find the
+    derived streams that need re-evaluation.
+
+    Analogous to RuleStreamIndex.
+
+    Ref: SPEC.md § Feature: Derived / Computed Streams; ROADMAP Sprint 27
+    """
+
+    source_stream = models.ForeignKey(
+        Stream,
+        on_delete=models.CASCADE,
+        related_name='derived_index_entries',
+    )
+    derived_stream = models.ForeignKey(
+        DerivedStream,
+        on_delete=models.CASCADE,
+        related_name='source_index_entries',
+    )
+
+    class Meta:
+        unique_together = [('source_stream', 'derived_stream')]
+
+    def __str__(self) -> str:
+        return f'Stream {self.source_stream_id} → DerivedStream {self.derived_stream_id}'

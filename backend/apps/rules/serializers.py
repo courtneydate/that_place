@@ -58,6 +58,7 @@ class RuleConditionSerializer(serializers.ModelSerializer):
             'stream', 'operator', 'threshold_value', 'staleness_minutes',
             'channel',
             'dataset', 'value_key', 'dimension_overrides',
+            'aggregate_fn', 'window_minutes',
             'order',
         ]
 
@@ -158,6 +159,39 @@ class RuleConditionSerializer(serializers.ModelSerializer):
             if threshold_value is None:
                 raise serializers.ValidationError(
                     {'threshold_value': 'A reference_value condition requires a threshold_value.'}
+                )
+
+        elif condition_type == RuleCondition.ConditionType.WINDOWED_AGGREGATE:
+            aggregate_fn = attrs.get('aggregate_fn', '')
+            window_minutes = attrs.get('window_minutes')
+            if not stream:
+                raise serializers.ValidationError(
+                    {'stream': 'A windowed_aggregate condition requires a stream.'}
+                )
+            if aggregate_fn not in {c[0] for c in RuleCondition.AggregateFn.choices}:
+                raise serializers.ValidationError(
+                    {'aggregate_fn': "Choose one of: 'avg', 'min', 'max'."}
+                )
+            if not window_minutes or window_minutes < 1:
+                raise serializers.ValidationError(
+                    {'window_minutes': 'window_minutes must be a positive integer.'}
+                )
+            if not operator:
+                raise serializers.ValidationError(
+                    {'operator': 'A windowed_aggregate condition requires an operator.'}
+                )
+            if operator not in NUMERIC_OPERATORS:
+                raise serializers.ValidationError(
+                    {
+                        'operator': (
+                            f"Operator '{operator}' is not valid for windowed_aggregate conditions. "
+                            f"Allowed: {sorted(NUMERIC_OPERATORS)}."
+                        )
+                    }
+                )
+            if threshold_value is None:
+                raise serializers.ValidationError(
+                    {'threshold_value': 'A windowed_aggregate condition requires a threshold_value.'}
                 )
 
         return attrs

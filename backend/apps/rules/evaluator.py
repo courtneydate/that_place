@@ -195,9 +195,63 @@ def _evaluate_condition(condition, rule) -> bool:
         return _eval_feed_channel_condition(condition)
     if ct == RuleCondition.ConditionType.REFERENCE_VALUE:
         return _eval_reference_value_condition(condition, rule)
+    if ct == RuleCondition.ConditionType.WINDOWED_AGGREGATE:
+        return _eval_windowed_aggregate_condition(condition)
 
     logger.warning('Unknown condition type "%s" on condition %d', ct, condition.pk)
     return False
+
+
+def _eval_windowed_aggregate_condition(condition) -> bool:
+    """Evaluate a rolling-aggregate condition (avg / min / max over N minutes).
+
+    Reuses the windowed primitive from ``apps.readings.derived``. Returns False
+    when the stream has no readings in the window. Numeric-only comparison.
+
+    Ref: SPEC.md § Feature: Rules Engine — Windowed aggregate conditions
+         (Sprint 27 — folded in from Backlog).
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.readings.derived import SourceReading, evaluate_window
+    from apps.readings.models import StreamReading
+
+    if (
+        condition.stream_id is None
+        or not condition.aggregate_fn
+        or not condition.window_minutes
+    ):
+        return False
+
+    window_end = timezone.now()
+    window_start = window_end - timedelta(minutes=condition.window_minutes)
+    readings = list(
+        StreamReading.objects
+        .filter(stream_id=condition.stream_id, timestamp__gt=window_start, timestamp__lte=window_end)
+        .values('value', 'timestamp')
+    )
+    if not readings:
+        return False
+
+    source_readings = []
+    for r in readings:
+        try:
+            source_readings.append(SourceReading(
+                stream_id=condition.stream_id,
+                timestamp=r['timestamp'],
+                value=float(r['value']),
+            ))
+        except (TypeError, ValueError):
+            continue
+    if not source_readings:
+        return False
+
+    out = evaluate_window(source_readings, aggregate=condition.aggregate_fn, window_end=window_end)
+    if out is None:
+        return False
+    return _compare(out.value, condition.operator, condition.threshold_value, data_type='numeric')
 
 
 def _eval_stream_condition(condition) -> bool:

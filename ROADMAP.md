@@ -852,63 +852,501 @@ _Frontend:_
 
 ---
 
-## Backlog — Deferred SPEC Items (unscheduled)
+## Phase B — Metering & Billing
 
-> SPEC.md deliverables that are committed but not yet assigned to a sprint. Each is scheduled into a phase when prioritised.
+> Detailed per-sprint plan locked in on 2026-05-28 at Phase B kickoff. Source of
+> truth is SPEC.md v5.3 — §3 (feature sections), §4 (data model), §5 (API),
+> §6 (UI/UX), §8 Phase 4c. The arc is 11 sprints across four sub-phases plus one
+> mini-sprint (3rd-party API backfill) and one auth-core sprint (Multi-Tenant
+> User Accounts). Each sub-phase ships independent value and has its own
+> sign-off checklist.
+>
+> Backlog folding (decided 2026-05-28):
+> - Windowed-aggregate rule conditions → folded into Sprint 27 (shares
+>   `window_min` / `window_max` implementation).
+> - 3rd-party API history / backfill → mini-sprint 29a between B1 and B2.
+> - Outbound webhook delivery for platform notifications → folded into
+>   Sprint 37 (shares HMAC + retry infra with the consumer webhook system).
+> - Multi-Tenant User Accounts → Sprint 38, after Phase B sign-off.
+> - Legacy weatherstation / tbox / abb payload parsers → remain parked
+>   (hardware-team payload formats still required — see Backlog below).
 
-- **Outbound webhook delivery for platform notifications** — Slack / PagerDuty / ops-tooling delivery of That Place Admin notifications. Flagged during the Sprint 23 deep dive; v1 ships in-app + email only.
-- **Windowed aggregate rule conditions** (avg / max / min over a rolling window) — SPEC §3 Rules Engine, deferred from Phase 4 to Phase 5 in SPEC §8. Shares the `window_min` / `window_max` implementation with Phase B1 derived streams — best scheduled alongside or just after B1.
-- **3rd-party API history / backfill endpoint** — SPEC §8 Phase 2 (deferred to Phase 3) and SPEC §9 ⚑. A date-range backfill polling pattern that does not collide with regular detail-endpoint polling.
-- **Legacy weatherstation / tbox / abb payload parsers** — SPEC §2 & §9 ⚑. Blocked on hardware-team payload-format input. Topic patterns are registered (Sprint 6); the parsers cannot be built until the formats are confirmed.
-- **Multi-Tenant User Accounts** (dedicated sprint — needs a pre-sprint design deep dive). Allow one email / login to belong to multiple tenants and switch between them via a personal settings page. Requires: `TenantUser.user` `OneToOneField` → `ForeignKey`; an "active tenant" concept (a JWT claim re-issued on switch); reworking the tenant-context middleware and every permission class to resolve the *active* `TenantUser`; a tenant switcher in the UI; and full re-verification of cross-tenant isolation. Reverses the SPEC §4 "a user belongs to at most one tenant" rule — an auth-core change, so it warrants its own deep dive before being slotted. Resolving it fully supersedes the Sprint 23b interim duplicate-email guard. (SPEC §9 ⚑.)
+### Phase B1 — Foundations (Sprints 27–29)
+
+> SPEC.md §3 (Derived / Computed Streams, Interval Aggregation Engine, Data
+> Quality Flags, Metering Model — Meter Profiles), §8 Phase 4c · B1.
 
 ---
 
-## Phase B — Metering & Billing
+### Sprint 27 — Derived / Computed Streams + Windowed Aggregate Rule Conditions
 
-> Promoted into SPEC.md v5.3 — see §3 (feature sections), §4 (data model), §5 (API),
-> §6 (UI/UX), and §8 Phase 4c. All 19 §18 open questions in `docs/billing-module.md`
-> are resolved; that doc is now a historical design artifact and SPEC.md is the source
-> of truth. The arc is ~11 sprints across four sub-phases, each shipping independent
-> value. Detailed per-sprint Deliverables and Definition of Done are authored at Phase B
-> kickoff (after the Phase 1–5 sign-off at Sprint 25).
+**Goal:** Tenant Admins can configure derived streams whose values are computed from other streams (`delta`, `sum`, `difference`, `scale`, `window_min` / `window_max`) and write regular `StreamReading` records on a virtual stream. The windowed-aggregate rule condition type (avg / max / min over a rolling window) lands at the same time because it shares the windowed-evaluation implementation.
 
-### Phase B1 — Foundations (~3 sprints)
+**Context:** A derived stream is configured once and writes regular `StreamReading` records on a virtual stream. From that point on every consumer treats it as just another stream — same pattern as the `_battery` / `_signal` virtual streams. Adding a derived stream requires no code. The windowed-aggregate rule condition is folded in because the `window_min` / `window_max` formulas already implement the rolling-window evaluation primitive — adding `window_avg` and exposing it as a rule condition is a thin extension.
 
-> SPEC.md §3 (Derived / Computed Streams, Interval Aggregation Engine, Data Quality Flags,
-> Metering Model — Meter Profiles), §8 Phase 4c · B1.
-- Derived / Computed Streams (`delta`, `sum`, `difference`, `scale`, `window_min` / `window_max`) + `DerivedStreamSourceIndex`
-- Interval Aggregation Engine (`IntervalAggregate`, Celery beat maintenance, on-demand backfill)
-- Data Quality Flags (`StreamReading.quality`, roll-up to aggregate `quality_breakdown` and line-item `quality_summary`)
-- `MeterProfile` (NMI, meter role, phases, parent meter) + `Stream.billing_role`
+**Deliverables:**
 
-### Phase B2 — PPA Billing (~3 sprints)
+_Derived streams (SPEC §3 Derived / Computed Streams):_
+- [x] Backend: `DerivedStream` model (key, label, unit, formula type, source stream(s), params JSONB, is_active) one-to-one with a virtual `Stream` where `stream_type = derived`
+- [x] Backend: `DerivedStreamSourceIndex` (source → derived) maintained on create / edit / delete via Django signals (m2m_changed + post_delete)
+- [x] Backend: v1 formula evaluators — `delta` (current − previous, drop negative, honour `max_gap_minutes`), `sum`, `difference`, `scale`, `window_min`, `window_max` — pure functions in `apps/readings/derived.py`
+- [x] Backend: Celery task dispatched on source `StreamReading` save — looks up derived streams via `DerivedStreamSourceIndex`, evaluates each; hooked into `_store_stream_readings` alongside rule dispatch
+- [x] Backend: Output `StreamReading` worst-quality propagation built into the evaluators (Sprint 28 will wire it through to the storage layer)
+- [x] Backend: Idempotency via `update_or_create` on `(stream, timestamp)` — re-running produces identical end state
+- [x] Backend: On-demand backfill endpoint (Tenant Admin, date range) — Celery task that upserts without touching out-of-range derived readings
+- [x] Backend: Cross-device derived streams live on a per-site virtual `Device` with `is_virtual=True` and the platform-seeded `Site Composite` DeviceType, auto-created on first cross-device use
+- [x] Backend: CRUD + backfill endpoints `/api/v1/derived-streams/` (tenant-scoped; Tenant Admin for writes)
+- [x] Backend: 20 integration tests in `apps/readings/tests/test_derived_dispatch.py` + 22 evaluator unit tests in `test_derived_evaluators.py` covering formula correctness, index maintenance, dispatch, idempotency, backfill, site composite auto-creation, cross-tenant isolation, role permissions
+- [x] Frontend: `DerivedStreamBuilder` component on the device Streams tab — formula picker, source picker (device → stream, multi-select for sum/difference), per-formula params form
+- [x] Frontend: "Provenance" column on the Streams table — Raw / Derived badge
+
+_Windowed aggregate rule conditions (SPEC §3 Rules Engine):_
+- [x] Backend: `RuleCondition.condition_type = 'windowed_aggregate'` with `aggregate_fn` (`avg` / `min` / `max`), `window_minutes`, `stream`, `operator`, `threshold_value`
+- [x] Backend: `_eval_windowed_aggregate_condition` evaluator reusing the `evaluate_window` primitive from `apps/readings/derived.py`
+- [x] Backend: 12 tests in `apps/rules/tests/test_sprint27_windowed.py` — avg/min/max correctness over windows, empty window returns False, readings outside the window excluded, serializer validation across the matrix, `RuleStreamIndex` picks up the source stream
+- [x] Frontend: Rule builder adds a "Windowed aggregate" condition type with `aggregate_fn` + `window_minutes` + numeric operator + threshold controls; payload + edit-mode round-trip + step-3 validation included
+
+**Definition of Done:**
+- [x] Configuring `consumption_from_solar = generation − grid_export` (cross-device `difference`) produces a stream readable like any other; host Device is the auto-created Site Composite
+- [x] Configuring `interval_kwh = delta(cumulative_kwh)` produces correct interval values; counter resets drop cleanly; gaps over `max_gap_minutes` produce no reading
+- [x] Backfill over a date range recomputes derived history idempotently and does not touch readings outside the window (test_backfill_does_not_touch_readings_outside_range)
+- [x] A rule with condition "avg temperature over the last 15 minutes > 25" fires when the rolling average crosses the threshold
+- [x] All cross-tenant isolation tests continue to pass
+
+> **Status (2026-05-28):** ✅ Complete. 773 backend tests + 55 frontend tests green
+> (up from 718 / 49 at the start of the sprint); flake8 / isort / eslint clean.
+> One pre-existing test (`test_fm_admin_can_list`) updated to account for the new
+> platform-seeded `Site Composite` DeviceType.
+
+---
+
+### Sprint 28 — Interval Aggregation Engine + Data Quality Flags
+
+**Goal:** Maintain rolling aggregates of stream readings at fixed periods (5 min / 30 min / 1 h / 1 d / 1 month) and tag every reading with a data-quality flag, so billing runs and dashboards can read aggregates instead of recomputing over raw, and invoices can identify intervals that weren't directly measured.
+
+**Deliverables:**
+
+_Interval aggregation (SPEC §3 Interval Aggregation Engine):_
+- [ ] Backend: `IntervalAggregate` model (stream, period, period_start, value, count, aggregation_kind, quality_breakdown JSONB) with `unique_together (stream, period, period_start, aggregation_kind)` and `(stream, -period_start)` index
+- [ ] Backend: Aggregation kinds — `sum`, `mean`, `min`, `max`, `last`; multiple per stream allowed
+- [ ] Backend: `Stream.aggregation_kind_default` field — `sum` for energy, `mean` for power/voltage/current, `last` for cumulative
+- [ ] Backend: Celery beat task — maintains the next-due aggregate period for every active stream; idempotent on (stream, period, period_start, aggregation_kind)
+- [ ] Backend: On-demand backfill endpoint over a date range (Tenant Admin)
+- [ ] Backend: Read endpoint `/api/v1/streams/:id/aggregates/?period=&from=&to=` (with cursor pagination)
+- [ ] Backend: Tests — per-kind correctness, multiple kinds per stream, beat-task maintenance, backfill, quality_breakdown roll-up, cross-tenant isolation
+
+_Data quality flags (SPEC §3 Data Quality Flags):_
+- [ ] Backend: `StreamReading.quality` enum (`measured` / `estimated` / `substituted` / `gap`), default `measured`
+- [ ] Backend: Derived streams (Sprint 27) inherit worst-input quality at evaluation time
+- [ ] Backend: Interval-fill Celery beat task — for each active stream, marks periods with no readings as a `gap` aggregate (no estimation in v1)
+- [ ] Backend: `IntervalAggregate.quality_breakdown` JSONB — counts of source readings by quality, plus a single derived aggregate quality (worst-input rule)
+- [ ] Backend: Reading endpoints include `quality` on every row; aggregate endpoints include `quality_breakdown` + the derived quality
+- [ ] Backend: Tests — quality propagation through derived streams, gap detection, worst-input roll-up, LGC-claim filter on `quality=measured`
+- [ ] Frontend: Stream detail / chart shows quality badges per reading where relevant
+
+**Definition of Done:**
+- [ ] A stream with one reading per minute has 5-minute, 30-minute, hourly, daily, and monthly aggregates maintained automatically
+- [ ] Backfilling a 30-day window over a 100k-reading stream completes within a single Celery task with no duplicates
+- [ ] A measured stream with one missing day produces a `gap`-quality daily aggregate for that day
+- [ ] A derived stream computed from one `measured` and one `gap` input inherits `gap` quality
+- [ ] Filtering generation by `quality=measured` returns only directly-measured intervals with a full audit trail back to raw readings
+
+---
+
+### Sprint 29 — Meter Profiles & Billing Roles
+
+**Goal:** Tag a Device as a billing meter with its metering attributes (NMI, role, phases, parent), tag Streams with their billing role, and prove the hierarchical-site write-time invariants — so Phase B2's billing engine knows which devices and streams carry billable energy.
+
+**Deliverables:**
+- [ ] Backend: `MeterProfile` one-to-one optional with `Device` — `nmi`, `meter_role`, `parent_meter_id`, `pattern_approval`, `phases`, `install_date`, `serial_number_secondary`
+- [ ] Backend: `meter_role` enum — `gate`, `child`, `generation`, `storage`, `consumption`, `common_area`, `sub_check`
+- [ ] Backend: `Stream.billing_role` (nullable enum) — `grid_import`, `grid_export`, `generation`, `bess_charge`, `bess_discharge`, `consumption`, `consumption_from_solar`, `net`
+- [ ] Backend: `Site.is_hierarchical`, `Site.reconciliation_tolerance_percent`, `Site.common_area_apportionment_method`, `Site.embedded_network_exemption_id`
+- [ ] Backend: Write-time enforcement — `gate` has no parent; `child` / `common_area` on a hierarchical site must point to a `gate` on the same site; at most one `gate` per site in v1; deactivating an active `gate` while children are active is blocked
+- [ ] Backend: CRUD endpoints `/api/v1/devices/:id/meter-profile/` (Tenant Admin) and stream billing-role PATCH
+- [ ] Backend: Bulk MeterProfile CSV import endpoint (Tenant Admin) — same pattern as reference-dataset CSV import; per-row errors returned
+- [ ] Backend: Tests — invariant enforcement (every case), bulk import upsert + per-row errors, cross-tenant isolation, role permissions, deactivation guard
+- [ ] Frontend: Meter Profile panel on device detail (Tenant Admin) — NMI, role, parent picker (scoped to gate meters on the same site), phases, install date
+- [ ] Frontend: Stream billing-role inline editor on the device Streams tab
+- [ ] Frontend: Bulk MeterProfile CSV upload UI (drag-and-drop, per-row error display)
+
+**Definition of Done:**
+- [ ] A device can be marked a meter with NMI + role; the meter shows on the device detail
+- [ ] Marking a site as hierarchical and adding a `gate` meter unlocks the `child` / `common_area` workflow
+- [ ] Adding a `child` meter without a parent on a hierarchical site is rejected with a clear error
+- [ ] Bulk uploading 400 meter profiles via CSV completes in under 30 seconds with per-row validation errors
+- [ ] Streams correctly carry their billing role and appear filtered in the billing-relevant stream picker
+
+---
+
+### Phase B1 Sign-Off Checklist
+- [ ] All Sprint 0–29 tests passing (full cumulative suite — no failures, no skips)
+- [ ] Manual smoke test: configure a `delta` derived stream → publish raw readings → verify interval kWh stream values
+- [ ] Manual smoke test: configure a cross-device `consumption_from_solar` → verify auto-created site composite Device
+- [ ] Manual smoke test: 5-min / 30-min / 1-h / 1-d aggregates maintained automatically over a 24h window
+- [ ] Manual smoke test: build a windowed-aggregate rule (avg > 30 over 15 min) and verify firing
+- [ ] Hierarchical-site invariants verified manually (gate + 3 children + common area + reconciliation tolerance set)
+
+---
+
+### Sprint 29a — 3rd-Party API History / Backfill _(mini-sprint)_
+
+**Goal:** Allow tenants to backfill historical interval data from a 3rd-party provider over a date range, on top of the existing live-poll path, without colliding with regular detail-endpoint polling.
+
+**Context:** Some providers offer a date-range endpoint for historical data (e.g. `/history/?from=&to=`). Live polling (Sprint 10) handles the ongoing live feed but cannot cover the period before a tenant connects a data source. Slotted between B1 and B2 because the billing engine in B2 needs the option of operating against backfilled history. Folded in from SPEC §9 ⚑.
+
+**Deliverables:**
+- [ ] Backend: `ThirdPartyAPIProvider.history_endpoint` config + `supports_history` flag set on providers offering the capability
+- [ ] Backend: `DataSourceBackfillJob` model — data_source, date_from, date_to, status (`queued` / `running` / `completed` / `failed`), progress (rows fetched / rows stored), error_detail, started_at, finished_at
+- [ ] Backend: Celery task — fetches in pages from the provider history endpoint, stores `StreamReading` records with the provider-supplied timestamp, deduplicates against existing readings on `(stream, timestamp)`
+- [ ] Backend: Dispatch + status endpoints `POST/GET /api/v1/data-sources/:id/backfill/`; backoff coordinated with the live-poll lock so the two never run concurrently for the same `DataSourceDevice`
+- [ ] Backend: Tests — backfill stores readings idempotently, live poll skipped while backfill running, page-cursor handled correctly, cross-tenant isolation, role permissions
+- [ ] Frontend: Backfill button on the DataSource detail page (Tenant Admin) — date range picker, in-progress status, completion / error message
+
+**Definition of Done:**
+- [ ] Tenant Admin can request a backfill over a 90-day range for a connected data source that supports history
+- [ ] Backfill runs without duplicating readings already collected by live polling
+- [ ] Backfill and live poll cannot run concurrently on the same `DataSourceDevice` (verified via integration test)
+- [ ] The Reporting CSV export for a backfilled stream over the historical window returns the backfilled rows
+
+---
+
+### Phase B2 — Single-tier PPA Billing (Sprints 30–32)
 
 > SPEC.md §3 (Billing Accounts & Tariffs, Billing Runs & Invoicing), §8 Phase 4c · B2.
 > Builds on the `network-tariffs` dataset seeded in Sprint 15a; PPA retail-rate datasets to add.
-- `BillingAccount`, `BillingAccountMeter`, `BillingAccountTariffAssignment`
-- PPA tariff datasets (generation, consumption-from-solar, feed-in) as `scope=tenant` Reference Datasets
-- `BillingRun` + billing-run algorithm for non-hierarchical sites; `BillingRunSnapshot`, `BillingLineItem`
-- `BillingInvoice` + WeasyPrint PDF rendering + invoice email delivery; `BillingSchedule`; void / recompute
-- `BillingAccountAuditLog` access logging
 
-### Phase B3 — Embedded-Network Billing (~3 sprints)
+---
+
+### Sprint 30 — Billing Accounts, Tariffs & Bulk Import
+
+**Goal:** Model the end customer (a `BillingAccount`) that the operator bills, link it to specific billed streams, and assign PPA tariff datasets — so Sprint 31's billing run has accounts, meters, and rates to compute against.
+
+**Deliverables:**
+- [ ] Backend: `BillingAccount` model — tenant FK, name, customer_reference, contact details, billing_address, abn, account_type (`ppa_host` / `en_tenant` / `internal`), optional parent_account_id, invoice_email_recipients, floor_area_sqm, activated_at, deactivated_at
+- [ ] Backend: `BillingAccountMeter` model — billing_account FK, stream FK, effective_from, effective_to; stream-level linkage (one meter can carry several billing-role streams that bill to different accounts)
+- [ ] Backend: `BillingAccountTariffAssignment` model — bridges a billing account to a `ReferenceDataset` (PPA tariff), optional stream scope, dimension_filter, version pin, effective_from / effective_to; reuses `TenantDatasetAssignment` row-resolution logic
+- [ ] Backend: PPA tariff dataset schemas — generation, consumption-from-solar, feed-in — seeded via fixture (`backend/apps/feeds/fixtures/ppa_tariffs_template.json`); operators duplicate and customise
+- [ ] Backend: CRUD endpoints — `/api/v1/billing-accounts/`, nested meter and tariff endpoints
+- [ ] Backend: Bulk `BillingAccount` CSV import endpoint — column schema matches model fields; per-row errors returned
+- [ ] Backend: `BillingAccountAuditLog` model + automatic write on every billing-account CRUD operation (who, when, before/after)
+- [ ] Backend: `Tenant.gst_rate` (default 0.10), `Tenant.invoice_number_format`, `Tenant.invoice_pdf_template_id`, `Tenant.invoice_settlement_disclaimer` fields
+- [ ] Backend: Tests — model invariants, CRUD permissions (Tenant Admin only), cross-tenant isolation, bulk import upsert + per-row errors, audit log immutability + automatic write
+- [ ] Frontend: Billing Accounts nav item under a new "Billing" section
+- [ ] Frontend: Billing Account list + create + detail page (lifecycle dates, meter assignments, tariff assignments, audit log tab)
+- [ ] Frontend: Bulk CSV upload UI for billing accounts
+- [ ] Frontend: "Tariffs" nav item — filtered view of `scope=tenant` Reference Datasets that are PPA tariffs
+
+**Definition of Done:**
+- [ ] A Tenant Admin can create a `ppa_host` billing account, link a `generation` stream to it, and assign a PPA generation tariff
+- [ ] Bulk uploading 200 billing accounts via CSV completes with per-row validation errors
+- [ ] Every billing-account CRUD operation writes an audit log entry with before/after diff
+- [ ] `BillingAccountAuditLog` rows are immutable (no UPDATE / DELETE endpoints)
+- [ ] Cross-tenant: Tenant B cannot read Tenant A's billing accounts on any endpoint
+
+---
+
+### Sprint 31 — Billing Run Engine
+
+**Goal:** Run a billing period over an account set and produce reconciled, auditable per-customer line items. Snapshots the readings used so the run is reproducible. Non-hierarchical (PPA / single-tier) only — embedded-network logic lands in B3.
+
+**Deliverables:**
+- [ ] Backend: `BillingRun` model — period_start, period_end, timezone_snapshot, scope (site or account set), status (`draft` / `computing` / `review` / `finalized` / `voided` / `failed`), failed_step (nullable), created_by, created_at
+- [ ] Backend: `BillingRunSnapshot` model — exact `StreamReading` / `IntervalAggregate` IDs and computed kWh per stream
+- [ ] Backend: `BillingLineItem` model — billing_run, billing_account, line_kind (`energy` / `supply` / `discount` / `adjustment` / `credit` / `common_area_share`), tou_period_name, kwh, rate, amount, gst_amount, quality_summary JSONB
+- [ ] Backend: Idempotent Celery task chain dispatched on `BillingRun.objects.create` — resolves accounts in scope, walks each account's billed streams, fetches `IntervalAggregate`s for the period, applies the assigned tariff row (with TOU period resolution in tenant timezone), produces `BillingLineItem` rows
+- [ ] Backend: Redis `SET NX` lock — only one in-flight run per `(site, period_start, period_end)`
+- [ ] Backend: GST line — subtotal × `Tenant.gst_rate`
+- [ ] Backend: Solar feed-in / buyback emits a `credit` line item against a `grid_export` stream
+- [ ] Backend: Failure handling — `failed_step` recorded; manual `retry_run` endpoint restarts from the last successful step (idempotent)
+- [ ] Backend: `BillingSchedule` model + Celery beat task — cadence (`monthly_calendar` / `monthly_anchor` / `quarterly` / `custom_cron`), period_offset_days, auto_finalize
+- [ ] Backend: Endpoints — `POST /api/v1/billing-runs/` (create + dispatch), `GET /api/v1/billing-runs/:id/`, `GET /api/v1/billing-runs/:id/line-items/`, `POST /api/v1/billing-runs/:id/retry/`, `POST /api/v1/billing-runs/:id/recompute/` (draft only), `POST /api/v1/billing-runs/:id/void/` (finalized, Tenant Admin only)
+- [ ] Backend: Tests — happy-path single-account run, multi-account run, TOU resolution in tenant timezone, idempotency on rerun, Redis lock prevents concurrent runs on same (site, period), failure mid-step + retry, void of finalized run, cross-tenant isolation
+
+**Definition of Done:**
+- [ ] A PPA billing run over a 1-month period for one `ppa_host` account produces correct line items at the assigned generation tariff rate
+- [ ] A draft run can be recomputed; a finalized run can only be voided
+- [ ] Two concurrent run attempts on the same (site, period) — exactly one succeeds, the other returns 409
+- [ ] A failed Celery step records the failing step; `retry` resumes from there without recomputing prior steps
+- [ ] `BillingSchedule` cron triggers an auto-finalize run on the cadence
+- [ ] Line items carry `quality_summary` rolled up from the source aggregates
+
+---
+
+### Sprint 32 — Invoice Rendering, Delivery & Audit
+
+**Goal:** Render finalized billing runs as PDF invoices stored in object storage, deliver them by email, and lock everything immutable post-finalize. Closes Phase B2.
+
+**Deliverables:**
+- [ ] Backend: `BillingInvoice` model — billing_run FK, billing_account FK, invoice_number, subtotal, gst_amount, total_amount, pdf_storage_key, status (`draft` / `delivered` / `void`), created_at, delivered_at, voided_at
+- [ ] Backend: Atomic per-tenant invoice-number sequence via `SELECT FOR UPDATE` on `Tenant.invoice_number_sequence`; format from `Tenant.invoice_number_format`
+- [ ] Backend: WeasyPrint PDF rendering pipeline — per-tenant HTML/CSS template (FK on `Tenant.invoice_pdf_template_id`); stored in object storage at `invoices/{tenant_slug}/{YYYY}/{invoice_number}.pdf`
+- [ ] Backend: Configurable settlement-grade disclaimer footer (`Tenant.invoice_settlement_disclaimer`) — rendered by default on `en_tenant` invoices, off for `ppa_host`
+- [ ] Backend: In-app preview — signed short-lived URLs (15 min) via object storage; no public URLs
+- [ ] Backend: Email delivery — one Celery task per invoice (so one bad address does not fail the run), 14-day signed URL in email, PDF attached
+- [ ] Backend: Finalize endpoint `POST /api/v1/billing-runs/:id/finalize/` — locks the run, line items, invoices, and snapshot immutable; dispatches per-invoice email tasks
+- [ ] Backend: Manual resend per invoice — `POST /api/v1/billing-invoices/:id/resend/`
+- [ ] Backend: Void workflow — on `BillingRun.objects.void`, all invoices `delivered` get an auto void-notification email unless `silent_void=true`
+- [ ] Backend: Line-item CSV export — `GET /api/v1/billing-runs/:id/line-items.csv` (streaming response, Admin only)
+- [ ] Backend: Tests — per-tenant invoice-number atomicity, PDF generation, object-storage upload + signed URL, email delivery success + retry, finalize locks the run, void notification logic, immutability of finalized invoices, role permissions, cross-tenant isolation
+- [ ] Frontend: Billing Run list + detail page (line items, invoices grid, status, retry / recompute / finalize / void controls per role)
+- [ ] Frontend: Invoice detail with PDF preview iframe (signed URL); resend button; void status indicator
+- [ ] Frontend: BillingSchedule management page (Tenant Admin) — cadence picker, period_offset, auto_finalize toggle
+
+**Definition of Done:**
+- [ ] A finalized PPA run delivers one PDF invoice per account to the recipient addresses with a 14-day signed download link
+- [ ] Invoice numbers are sequential per tenant with no gaps and no duplicates under concurrent finalize
+- [ ] Voiding a delivered finalized run sends one void-notification email per invoice unless `silent_void` is set
+- [ ] Line items CSV export streams without timeouts on a 1000-row run
+- [ ] PDF templates can be replaced per tenant without code changes
+
+---
+
+### Phase B2 Sign-Off Checklist
+- [ ] All Sprint 0–32 tests passing (full cumulative suite — no failures, no skips)
+- [ ] Manual smoke test: end-to-end PPA — create billing account → assign generation tariff → run billing → finalize → confirm invoice delivered + accessible via signed URL
+- [ ] Manual smoke test: void a finalized run and confirm void-notification emails sent
+- [ ] BillingSchedule cron confirmed firing on the configured cadence
+- [ ] Cross-tenant isolation confirmed across all billing endpoints
+
+---
+
+### Phase B3 — Embedded-Network Billing (Sprints 33–35)
 
 > SPEC.md §3 (Embedded-Network Billing), §8 Phase 4c · B3.
-- Hierarchical metering (`gate` / `child` / `common_area` roles, `parent_meter_id`)
-- Per-interval solar allocation (`SolarAllocationRecord`) + split-rate tenant invoices
-- Parent-meter reconciliation (`ReconciliationReport`, variance tolerance)
-- Common-area apportionment (`pro_rata_consumption` / `equal_share` / `by_floor_area`)
-- EN retail tariffs, EN-specific invoice template, compliance data export, bulk billing-account CSV import
-- B3-readiness security review (NDB runbook, APP 12/13 tooling scope, Privacy Impact Assessment) — gate before the first embedded network goes live
+> Hierarchical sites are gated by Sprint 29's `MeterProfile` invariants.
 
-### Phase B4 — Outbound Metering API (~2 sprints)
+---
+
+### Sprint 33 — Hierarchical Metering & Solar Allocation
+
+**Goal:** Extend the billing run to hierarchical sites (gate + children + common area), computing per-interval solar allocation across child accounts pro-rata by `grid_import`. Produces split-rate tenant invoices (solar-allocated kWh + remaining-consumption kWh as two `energy` line items).
+
+**Deliverables:**
+- [ ] Backend: `BillingRun` algorithm extended to detect `Site.is_hierarchical` and switch to the hierarchical code path
+- [ ] Backend: Per-interval solar pool computation — `pool = Σ generation − gate_export` (kWh that stayed inside the network), excluding `bess_discharge`
+- [ ] Backend: Pro-rata allocation across active child accounts by `grid_import` interval value
+- [ ] Backend: `SolarAllocationRecord` model — billing_run FK, interval timestamp, child_account FK, allocated_kwh, pool_kwh, child_grid_import_kwh; `unique_together (billing_run, interval, child_account)`
+- [ ] Backend: Tenant invoice line items split into two `energy` lines per period — solar-allocated kWh at the solar (PPA) rate, remaining-consumption kWh at the grid (EN retail) rate
+- [ ] Backend: BESS handling — `bess_discharge` does not count toward the solar pool; `bess_charge` reduces grid_import (per SPEC)
+- [ ] Backend: Tests — single-gate single-child happy path, multi-child pro-rata correctness, BESS exclusion, an interval where solar = 0 produces no allocations, an interval where gate_export > generation (battery discharging out) caps the pool at 0, mid-cycle account onboarding pro-rates allocations correctly, idempotent on rerun, cross-tenant isolation
+
+**Definition of Done:**
+- [ ] A hierarchical site with 1 gate + 5 children + on-site solar produces 5 split-rate invoices with correct per-child solar shares
+- [ ] Allocation totals across all children equal the solar pool exactly (no rounding leakage)
+- [ ] Reproducible — re-running on the same period produces identical `SolarAllocationRecord`s
+- [ ] PPA (non-hierarchical) runs are unaffected — Sprint 31 tests still pass
+
+---
+
+### Sprint 34 — Common-Area Apportionment & Reconciliation
+
+**Goal:** Apportion common-area energy across tenant accounts using the per-site method, and reconcile the whole hierarchical run back to the gate meter — flagging variance beyond tolerance for operator review.
+
+**Deliverables:**
+- [ ] Backend: Common-area meter energy accumulates on an `internal` billing account (auto-created per common-area meter on first run); costed at the EN tariff
+- [ ] Backend: Apportionment method per `Site.common_area_apportionment_method`:
+  - [ ] `pro_rata_consumption` (default) — share by child grid_import for the period
+  - [ ] `equal_share` — equal split across active child accounts
+  - [ ] `by_floor_area` — share by `BillingAccount.floor_area_sqm`
+- [ ] Backend: `common_area_share` line item on each child invoice — `source_account_id` links back to the internal account for audit
+- [ ] Backend: `ReconciliationReport` model — billing_run FK, gate_import_kwh, generation_kwh, gate_export_kwh, child_grid_import_total_kwh, common_area_total_kwh, computed_losses_kwh, variance_percent, within_tolerance bool, created_at
+- [ ] Backend: At run finalize, per period: `gate_import + Σ generation − gate_export` vs `Σ child_grid_import + common_area + losses`; variance beyond `Site.reconciliation_tolerance_percent` (default 1.5%) sets the run to `review` status — finalize blocked until operator confirms or recomputes
+- [ ] Backend: Tests — apportionment correctness for each method, common-area auto-account creation, reconciliation within tolerance passes, variance over tolerance blocks finalize, idempotent on rerun, cross-tenant isolation
+- [ ] Frontend: ReconciliationReport panel on the BillingRun detail (variance, within-tolerance badge, period-by-period breakdown)
+- [ ] Frontend: Apportionment method picker on Site settings (Tenant Admin)
+
+**Definition of Done:**
+- [ ] A hierarchical site with a common-area meter produces a `common_area_share` line item on each child invoice using the configured method
+- [ ] `by_floor_area` apportionment with one missing `floor_area_sqm` returns a clear validation error before the run starts
+- [ ] A run with 5% variance is moved to `review`; the operator can investigate, recompute, or force-finalize with a note
+- [ ] Reconciliation report shows the full math for every period — audit-quality
+
+---
+
+### Sprint 35 — EN Tariffs, Invoice Template, Compliance Export, Security Review
+
+**Goal:** Ship the EN retail tariff dataset shape, the EN-specific invoice template, the per-site compliance data export operators need for AER reporting, and the B3-readiness security review — the gate before the first embedded network goes live. Closes Phase B3.
+
+**Deliverables:**
+
+_EN tariffs & invoice template:_
+- [ ] Backend: EN retail tariff dataset schemas seeded via fixture — typical NMI-pattern × TOU shape, daily fixed supply charge, GST handling
+- [ ] Backend: Invoice template registry — multiple `InvoicePDFTemplate` records per tenant; assignable on a per-account basis; EN-specific template included by default
+- [ ] Backend: EN-specific template renders solar-allocation breakdown, common-area share, and the configurable settlement-grade disclaimer footer (`Tenant.invoice_settlement_disclaimer`)
+- [ ] Backend: Tests — template selection per account type, EN solar / common-area breakdown rendering, disclaimer footer on/off, role permissions
+
+_Compliance data export (SPEC §3 — not AER format templates):_
+- [ ] Backend: `GET /api/v1/billing-runs/:id/compliance-export/` — per-period, per-site CSV / JSON covering per-account energy, solar-allocation totals, reconciliation status, comms-loss stats (gap/estimated counts), disconnections (deactivated accounts in period), billing disputes (operator-flagged)
+- [ ] Backend: `BillingDispute` model — billing_invoice FK, raised_by, raised_at, status (`open` / `resolved`), notes; surfaced in compliance export
+- [ ] Backend: Bulk billing-account CSV import already shipped in Sprint 30 — this sprint adds dispute import + tariff-assignment bulk operations
+- [ ] Backend: Tests — compliance export shape, dispute lifecycle, cross-tenant isolation
+
+_B3-readiness security review (gate):_
+- [ ] At-rest encryption verification — Postgres + object storage (S3 / MinIO) encryption confirmed enabled in deployment guide
+- [ ] NDB runbook drafted (Notifiable Data Breach response steps) — committed to `docs/security/ndb-runbook.md`
+- [ ] APP 12 / APP 13 tooling scope — what export / correction tooling do we need before live operators ingest end-customer PII? Stub endpoints if required
+- [ ] Privacy Impact Assessment — documented and signed off in `docs/security/pia-en-billing.md`
+- [ ] Penetration test scope and timing decided (external test commissioned vs in-house)
+
+**Definition of Done:**
+- [ ] An embedded-network billing run produces invoices using the EN template with correct solar / common-area / disclaimer rendering
+- [ ] Compliance export for a finalized run can be downloaded as CSV with all required columns
+- [ ] NDB runbook, PIA, and APP 12/13 scope documents committed to the repo
+- [ ] Security review formally signed off before any live tenant onboarding to an embedded network
+
+---
+
+### Phase B3 Sign-Off Checklist
+- [ ] All Sprint 0–35 tests passing (full cumulative suite — no failures, no skips)
+- [ ] Manual smoke test: hierarchical site with 10+ children → run billing → invoices with solar + common-area split → reconciliation within tolerance
+- [ ] Manual smoke test: force a reconciliation variance, confirm run blocked at `review` status
+- [ ] Compliance export confirmed against a finalized run
+- [ ] Security review documents committed and reviewed
+
+---
+
+### Phase B4 — Outbound Metering API (Sprints 36–37)
 
 > SPEC.md §3 (Outbound Metering API), §8 Phase 4c · B4.
-- `DataConsumer` + `/api/v1/external/` namespace (`X-Consumer-Key` auth, per-consumer rate limiting)
-- Normalised interval / daily / billing-run endpoints with opaque cursor pagination
-- `DataConsumerWebhook` + HMAC-signed payloads + at-least-once delivery with retry; `WebhookDelivery` log
-- Channel-partner onboarding documentation
+
+---
+
+### Sprint 36 — Data Consumers & External API
+
+**Goal:** Channel partners can call a normalised, scoped, read-only API for interval / daily / billing-run data. Authentication is separate from the tenant JWT so partner credentials cannot be confused with tenant logins.
+
+**Deliverables:**
+- [ ] Backend: `DataConsumer` model — tenant FK, name, api_key_hash (SHA-256), allowed_meter_ids JSONB, allowed_billing_account_ids JSONB, allowed_scopes JSONB (`intervals` / `daily` / `billing_runs` / `webhooks`), rate_limit_per_minute (default 60), created_at, last_used_at
+- [ ] Backend: API key creation endpoint returns the raw key once on creation (one-time disclosure); subsequent reads expose only the hash + last_4
+- [ ] Backend: API key rotation endpoint — issues new key, invalidates old
+- [ ] Backend: `X-Consumer-Key` header auth middleware — distinct from `Authorization` JWT; explicit 401 if both headers are present (no confusion)
+- [ ] Backend: `/api/v1/external/` URL namespace under its own router with its own permission classes
+- [ ] Backend: Read-only endpoints (all scoped by consumer ACL):
+  - [ ] `GET /api/v1/external/meters/` — meter list with NMI
+  - [ ] `GET /api/v1/external/meters/:nmi/intervals/?from=&to=&period=` — interval kWh with `quality`
+  - [ ] `GET /api/v1/external/meters/:nmi/daily/?from=&to=` — daily-close kWh with `quality`
+  - [ ] `GET /api/v1/external/billing-runs/` — finalized billing runs list
+  - [ ] `GET /api/v1/external/billing-runs/:id/` — run detail + snapshot
+- [ ] Backend: Response normalisation — kWh units, UTC ISO 8601 timestamps, NMI on every row, `quality` on every interval; opaque base64 cursor pagination, max 1,000 rows per page
+- [ ] Backend: Rate limiting per-consumer via Redis token bucket; 429 on overflow; per-consumer Prometheus metrics (`thatplace_external_request_count`, `thatplace_external_request_duration_seconds`, labels: consumer_id, endpoint, status)
+- [ ] Backend: Tests — auth header confusion rejected, ACL enforcement (consumer cannot read meters/accounts not in allow-list), pagination cursor stability, rate limit enforcement, key rotation invalidates old key, cross-tenant isolation
+- [ ] Frontend: Data Consumers management page (Tenant Admin) — create, view, rotate, revoke; one-time key display on creation; ACL editor
+
+**Definition of Done:**
+- [ ] A Tenant Admin can create a `DataConsumer`, see the raw API key exactly once, then never again
+- [ ] A consumer with `allowed_meter_ids=[5]` cannot read meter 6 — 403 or filtered list (consistent across endpoints)
+- [ ] Cursor pagination is stable across page boundaries even when rows are inserted concurrently
+- [ ] A consumer exceeding `rate_limit_per_minute` gets 429 within one tick; Prometheus metric increments
+- [ ] Tenant JWT cannot authenticate against `/api/v1/external/`; consumer key cannot authenticate against `/api/v1/`
+
+---
+
+### Sprint 37 — Webhooks (Consumer + Platform Notification) & Channel-Partner Docs
+
+**Goal:** Channel partners receive HMAC-signed webhook events on key billing milestones, and the existing platform notification infrastructure gains outbound webhook delivery (Slack / PagerDuty / ops tooling) on top of in-app + email. Closes Phase B4 — and Phase B overall.
+
+**Deliverables:**
+
+_Consumer webhooks (SPEC §3 Outbound Metering API):_
+- [ ] Backend: `DataConsumerWebhook` model — data_consumer FK, target_url, secret (32-byte random, shown once), event_types JSONB (`daily_close` / `billing_run_finalized` / `billing_run_voided` / `billing_account_lifecycle`), is_active, created_at
+- [ ] Backend: Webhook dispatch — Celery task on the relevant event; POSTs to `target_url` with `X-That-Place-Signature: sha256=<hex>` header; payload signed with HMAC-SHA256 of the request body using the webhook secret
+- [ ] Backend: At-least-once delivery — exponential-backoff retries at 1m, 5m, 30m, 4h, 24h; 2xx response = delivered, non-2xx = retry
+- [ ] Backend: `WebhookDelivery` model — webhook FK, event_type, payload (JSONB), http_status, response_body_excerpt (first 500 chars), attempts, delivered_at (nullable), failed_permanently_at (nullable), last_attempt_at
+- [ ] Backend: CRUD endpoints + delivery log endpoint `/api/v1/external-webhooks/:id/deliveries/`
+- [ ] Backend: Manual retry endpoint for a specific delivery
+- [ ] Backend: Tests — HMAC signature correctness, retry schedule (mocked clock), permanent failure after final retry, delivery log shape, signature secret rotation
+
+_Platform notification webhook delivery (folded in from Backlog):_
+- [ ] Backend: New `Notification.Channel.WEBHOOK` choice; reuses the consumer webhook delivery primitive (same HMAC + retry + log infrastructure)
+- [ ] Backend: `NotificationEventType.default_channels` now accepts `webhook` alongside `in_app` / `email`
+- [ ] Backend: `PlatformNotificationWebhook` model — global (not consumer-scoped), label (e.g. "Ops Slack"), target_url, secret, event_type_keys JSONB filter, is_active; That Place Admin only
+- [ ] Backend: `emit_event` dispatch fan-out extended to write a webhook `Notification` row and queue dispatch when the target event type has webhook in its default_channels and at least one PlatformNotificationWebhook matches
+- [ ] Backend: Tests — platform-notification webhook fires on `pending_device_approval`, `mqtt_broker_connectivity_failure`, signature correctness, retry path
+- [ ] Frontend: That Place Admin — Platform Webhooks management page (list, create, edit, rotate secret, test-fire)
+
+_Channel-partner documentation:_
+- [ ] `docs/channel-partner-onboarding.md` — how to obtain a consumer key, ACL semantics, endpoint reference with examples, webhook signature verification code samples (Python, Node), retry semantics, rate limit policy
+- [ ] OpenAPI / Swagger schema generated for the `/api/v1/external/` namespace
+
+**Definition of Done:**
+- [ ] A consumer webhook fires on `billing_run_finalized` with a valid HMAC signature within 30 seconds of finalize
+- [ ] A webhook that returns 500 retries five times on the configured schedule then marks permanently failed
+- [ ] A platform notification with the webhook channel delivers to a configured Slack ops endpoint
+- [ ] Channel-partner docs are sufficient for a partner to integrate without internal handholding (verified by a dry-run integration)
+- [ ] OpenAPI schema accurately describes every external endpoint
+
+---
+
+### Phase B4 Sign-Off Checklist
+- [ ] All Sprint 0–37 tests passing (full cumulative suite — no failures, no skips)
+- [ ] Manual smoke test: create DataConsumer → fetch intervals via API → finalize a billing run → confirm webhook delivered with valid signature
+- [ ] Manual smoke test: a non-2xx webhook target retries and eventually permanently-fails
+- [ ] Platform notification webhook confirmed delivering to an ops Slack endpoint
+- [ ] OpenAPI schema published and channel-partner docs reviewed
+
+---
+
+**Phase B Final Sign-Off:**
+- [ ] All Sprint 0–37 complete with passing tests (full cumulative suite)
+- [ ] E2E sign-off journeys extended to cover at least one billing-run round trip
+- [ ] No open P1 or P2 bugs across the billing engine
+- [ ] SPEC.md, ERD.md, and `docs/channel-partner-onboarding.md` up to date
+- [ ] Security review documents (NDB runbook, PIA, APP 12/13 scope) committed and reviewed
+- [ ] Performance audit on a 1-tenant 100-account 1-month run completes inside the operator-acceptable cycle close window
+
+---
+
+## Phase 5c — Auth Core
+
+### Sprint 38 — Multi-Tenant User Accounts
+
+> **Pre-sprint design deep dive required before kickoff.** This sprint reverses
+> the SPEC §4 "a user belongs to at most one tenant" rule — an auth-core change
+> that touches the JWT, every permission class, the tenant-context middleware,
+> and full cross-tenant isolation re-verification. Slotted after Phase B
+> sign-off so the billing surface is stable before auth core changes.
+
+**Goal:** Allow one email / login to belong to multiple tenants and switch between them via a personal settings page. Fully supersedes the Sprint 23b interim duplicate-email guard.
+
+**Pre-sprint deep dive (must complete before deliverables start):**
+- JWT shape — `active_tenant_id` claim, re-issuance flow on switch, refresh-token behaviour across switches
+- Tenant context middleware — resolves *active* `TenantUser` from JWT claim instead of `User.tenantuser` OneToOne
+- Permission class rework — every `IsTenantAdmin` / `IsOperator` / `IsViewOnly` resolves the active TenantUser
+- UI surface — tenant switcher, "you are managing N tenants" UX, account-level vs tenant-scoped settings boundary
+- Migration plan — how do existing single-tenant users move to the new shape without downtime? `TenantUser.user` `OneToOneField` → `ForeignKey` is straightforward; the JWT format change is the risk
+- Cross-tenant isolation re-verification scope — every read endpoint must be exercised under "user is in tenants A and B; JWT says active=A; cannot see B data"
+
+**Deliverables:**
+- [ ] Backend: `TenantUser.user` `OneToOneField` → `ForeignKey`; migration preserves existing rows
+- [ ] Backend: JWT customisation — `active_tenant_id` claim; tokens reissued on `POST /api/v1/auth/switch-tenant/`
+- [ ] Backend: Tenant context middleware reworked to use the JWT claim; falls back to user's single TenantUser if exactly one
+- [ ] Backend: Every permission class resolves the *active* TenantUser
+- [ ] Backend: `GET /api/v1/auth/me/` returns `tenant_memberships` list + `active_tenant`
+- [ ] Backend: Invite flow updated — inviting an email that already belongs to another tenant creates a second TenantUser (no error); duplicate-email guard from Sprint 23b removed
+- [ ] Backend: Tests — full cross-tenant isolation re-verified (every read endpoint), tenant switch reissues JWT correctly, JWT with stale `active_tenant_id` (user removed from tenant) rejected, single-tenant users unaffected
+- [ ] Frontend: Tenant switcher in the top nav when user has ≥ 2 tenants; switching calls `/auth/switch-tenant/` and replaces tokens
+- [ ] Frontend: User profile page surfaces tenant memberships
+- [ ] Frontend: Accept-invite flow updated to handle "already have an account" path — log in then accept (or merge if already logged in)
+- [ ] Frontend: All tenant-scoped queries get a `queryClient.clear()` on tenant switch to prevent stale cache
+
+**Definition of Done:**
+- [ ] An email can hold an active TenantUser in two tenants simultaneously; the user can switch between them via the UI
+- [ ] Cross-tenant isolation re-verified: with `active=A`, no API call returns Tenant B data
+- [ ] A user with one tenant sees no UI change; the switcher is hidden
+- [ ] Sprint 23b duplicate-email guard removed; the new path is what backstops the constraint
+- [ ] SPEC.md §4 updated: a user can belong to multiple tenants (one active at a time per session)
+- [ ] All existing cumulative tests still pass on the new auth core
+
+---
+
+## Backlog — Parked (hardware / external blockers)
+
+> Remaining unscheduled items. The previous Backlog has been folded into Phase B
+> and Sprint 38 per the 2026-05-28 planning round.
+
+- **Legacy weatherstation / tbox / abb payload parsers** — SPEC §2 & §9 ⚑. Blocked on hardware-team payload-format input. Topic patterns are registered (Sprint 6); the parsers cannot be built until the formats are confirmed.
+- **Legacy command format clarification** — SPEC §9 ⚑. Current command format sent to Scouts is inconsistent (strings, JSON, raw characters). Clarify with hardware team and define migration path before legacy command handling can be specced.
 
 ---
 

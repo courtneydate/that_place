@@ -152,6 +152,12 @@ class RuleCondition(models.Model):
         STALENESS = 'staleness', 'Stream staleness'
         FEED_CHANNEL = 'feed_channel', 'Feed channel value comparison'
         REFERENCE_VALUE = 'reference_value', 'Reference dataset value comparison'
+        WINDOWED_AGGREGATE = 'windowed_aggregate', 'Windowed aggregate (avg/min/max over N minutes)'
+
+    class AggregateFn(models.TextChoices):
+        AVG = 'avg', 'Average'
+        MIN = 'min', 'Minimum'
+        MAX = 'max', 'Maximum'
 
     group = models.ForeignKey(
         RuleConditionGroup,
@@ -206,6 +212,18 @@ class RuleCondition(models.Model):
             'Optional JSONB overrides merged over the site\'s TenantDatasetAssignment '
             'dimension_filter for this condition (reference_value type only).'
         ),
+    )
+    # --- windowed_aggregate fields ---
+    aggregate_fn = models.CharField(
+        max_length=10,
+        choices=AggregateFn.choices,
+        blank=True,
+        help_text='Rolling aggregate function (windowed_aggregate type only).',
+    )
+    window_minutes = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Window length in minutes (windowed_aggregate type only).',
     )
     order = models.PositiveIntegerField(default=0)
 

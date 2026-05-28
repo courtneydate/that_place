@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDeviceHealth, useDevices, useUpdateDevice } from '../../hooks/useDevices';
 import { useCommandHistory, useSendCommand } from '../../hooks/useDeviceCommands';
 import { useDeviceStreams, useUpdateStream } from '../../hooks/useStreams';
+import DerivedStreamBuilder from '../../components/DerivedStreamBuilder';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
 
@@ -286,7 +287,9 @@ function StreamRow({ stream, canEdit, deviceId }) {
 
   return (
     <tr className={!stream.display_enabled ? detailStyles.rowDisabled : ''}>
-      <td className={styles.mono}>{stream.key}</td>
+      <td className={styles.mono}>
+        {stream.key}
+      </td>
       <td>
         {canEdit ? (
           <input
@@ -315,6 +318,11 @@ function StreamRow({ stream, canEdit, deviceId }) {
         )}
       </td>
       <td>{stream.data_type}</td>
+      <td>
+        {stream.stream_type === 'derived'
+          ? <span style={{ color: '#6366F1', fontWeight: 600, fontSize: '0.8125rem' }}>Derived</span>
+          : <span style={{ color: '#9CA3AF', fontSize: '0.8125rem' }}>Raw</span>}
+      </td>
       <td className={styles.mono}>
         {formatValue(stream.latest_value, stream.data_type)}
         {stream.latest_timestamp && (
@@ -370,14 +378,31 @@ StreamRow.propTypes = {
 
 function StreamsTab({ deviceId, canEdit }) {
   const { data: streams = [], isLoading, isError } = useDeviceStreams(deviceId);
+  const [showDerivedForm, setShowDerivedForm] = useState(false);
 
   if (isLoading) return <p className={styles.loading}>Loading streams…</p>;
   if (isError) return <p className={styles.error}>Failed to load streams.</p>;
-  if (streams.length === 0) return (
-    <p className={styles.empty}>No streams discovered yet — send telemetry to auto-discover streams.</p>
-  );
 
   return (
+    <div>
+      {canEdit && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+          <button
+            className={styles.primaryButton}
+            onClick={() => setShowDerivedForm((v) => !v)}
+          >
+            {showDerivedForm ? 'Cancel' : '+ Add derived stream'}
+          </button>
+        </div>
+      )}
+      {canEdit && showDerivedForm && (
+        <DerivedStreamBuilder onDone={() => setShowDerivedForm(false)} />
+      )}
+      {streams.length === 0 ? (
+        <p className={styles.empty}>
+          No streams discovered yet — send telemetry to auto-discover streams.
+        </p>
+      ) : (
     <table className={styles.table}>
       <thead>
         <tr>
@@ -385,6 +410,7 @@ function StreamsTab({ deviceId, canEdit }) {
           <th>Label</th>
           <th>Unit</th>
           <th>Type</th>
+          <th>Provenance</th>
           <th>Latest value</th>
           <th>Dashboard</th>
           {canEdit && <th></th>}
@@ -401,6 +427,8 @@ function StreamsTab({ deviceId, canEdit }) {
         ))}
       </tbody>
     </table>
+      )}
+    </div>
   );
 }
 
