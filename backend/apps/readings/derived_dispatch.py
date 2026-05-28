@@ -114,15 +114,14 @@ def _upsert_output(stream: Stream, timestamp, value, quality: str = 'measured') 
     """Idempotent write of a derived StreamReading on (stream, timestamp).
 
     Uses update_or_create so re-running on the same inputs produces identical
-    end state — required by the acceptance criterion.
+    end state — required by the acceptance criterion. Inherits worst-input
+    quality from the evaluator (Sprint 28).
     """
     StreamReading.objects.update_or_create(
         stream=stream,
         timestamp=timestamp,
-        defaults={'value': value},
+        defaults={'value': value, 'quality': quality},
     )
-    # NOTE: quality is wired through StreamReading.quality once Sprint 28 lands.
-    _ = quality
 
 
 def _evaluate_for_trigger(derived: DerivedStream, trigger_stream_id: int) -> int:

@@ -17,12 +17,14 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsTenantAdmin
 
-from .models import DataExport, DerivedStream, Stream, StreamReading
+from .models import DataExport, DerivedStream, IntervalAggregate, Stream, StreamReading
 from .serializers import (
     DataExportSerializer,
     DerivedStreamBackfillSerializer,
     DerivedStreamSerializer,
     ExportRequestSerializer,
+    IntervalAggregateBackfillSerializer,
+    IntervalAggregateSerializer,
     StreamReadingSerializer,
     StreamSerializer,
 )
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def _annotate_latest(qs):
-    """Annotate a Stream queryset with the latest reading value and timestamp.
+    """Annotate a Stream queryset with the latest reading value, timestamp, and quality.
 
     Uses subqueries so the entire list is fetched in a fixed number of DB queries
     rather than one per stream (N+1).
@@ -46,9 +48,15 @@ def _annotate_latest(qs):
             stream=OuterRef('pk'),
         ).order_by('-timestamp').values('timestamp')[:1]
     )
+    latest_quality = Subquery(
+        StreamReading.objects.filter(
+            stream=OuterRef('pk'),
+        ).order_by('-timestamp').values('quality')[:1]
+    )
     return qs.annotate(
         annotated_latest_value=latest_value,
         annotated_latest_ts=latest_ts,
+        annotated_latest_quality=latest_quality,
     )
 
 
@@ -130,6 +138,101 @@ class StreamViewSet(viewsets.GenericViewSet):
 
         qs = qs[:limit]
         return Response(StreamReadingSerializer(qs, many=True).data)
+
+    def aggregates(self, request, pk=None):
+        """GET /api/v1/streams/:id/aggregates/ — paginated rolled-up aggregates.
+
+        Query params:
+            period — '5min' / '30min' / '1h' / '1d' / '1mo' (required)
+            kind   — sum / mean / min / max / last (default: stream default)
+            from   — ISO 8601 datetime, inclusive
+            to     — ISO 8601 datetime, exclusive
+            cursor — opaque base64 timestamp cursor (newest first; pass the
+                     next_cursor from a prior response to page back further)
+            limit  — page size (default 100, max 1000)
+        """
+        import base64
+        import binascii
+        from .models import IntervalAggregate
+
+        stream = get_object_or_404(self.get_queryset(), pk=pk)
+        period = request.query_params.get('period')
+        if period not in dict(IntervalAggregate.Period.choices):
+            return Response(
+                {'error': {'code': 'period_required',
+                           'message': "period must be one of '5min', '30min', '1h', '1d', '1mo'."}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        kind = request.query_params.get('kind', stream.aggregation_kind_default)
+
+        qs = IntervalAggregate.objects.filter(
+            stream=stream, period=period, aggregation_kind=kind,
+        ).order_by('-period_start')
+
+        from_param = request.query_params.get('from')
+        to_param = request.query_params.get('to')
+        if from_param:
+            dt = parse_datetime(from_param)
+            if dt:
+                qs = qs.filter(period_start__gte=dt)
+        if to_param:
+            dt = parse_datetime(to_param)
+            if dt:
+                qs = qs.filter(period_start__lt=dt)
+
+        cursor = request.query_params.get('cursor')
+        if cursor:
+            try:
+                cursor_ts = parse_datetime(base64.urlsafe_b64decode(cursor).decode())
+                if cursor_ts is not None:
+                    qs = qs.filter(period_start__lt=cursor_ts)
+            except (binascii.Error, UnicodeDecodeError, ValueError):
+                return Response(
+                    {'error': {'code': 'invalid_cursor', 'message': 'Cursor is malformed.'}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        try:
+            limit = min(int(request.query_params.get('limit', '100')), 1000)
+        except (ValueError, TypeError):
+            limit = 100
+
+        rows = list(qs[:limit + 1])
+        next_cursor = None
+        if len(rows) > limit:
+            last_in_page = rows[limit - 1]
+            next_cursor = base64.urlsafe_b64encode(
+                last_in_page.period_start.isoformat().encode(),
+            ).decode()
+            rows = rows[:limit]
+
+        return Response({
+            'results': IntervalAggregateSerializer(rows, many=True).data,
+            'next_cursor': next_cursor,
+        })
+
+    def aggregates_backfill(self, request, pk=None):
+        """POST /api/v1/streams/:id/aggregates/backfill/ — recompute a date range."""
+        stream = get_object_or_404(self.get_queryset(), pk=pk)
+        # Tenant Admin only.
+        tenant_user = getattr(request.user, 'tenantuser', None)
+        if tenant_user is None or tenant_user.role != 'admin':
+            return Response(
+                {'error': {'code': 'forbidden', 'message': 'Tenant Admin only.'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = IntervalAggregateBackfillSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from .aggregate_tasks import backfill_aggregates
+        kinds = serializer.validated_data.get('kinds') or None
+        backfill_aggregates.delay(
+            stream.pk,
+            serializer.validated_data['period'],
+            serializer.validated_data['date_from'].isoformat(),
+            serializer.validated_data['date_to'].isoformat(),
+            kinds,
+        )
+        return Response({'detail': 'Backfill dispatched.'}, status=status.HTTP_202_ACCEPTED)
 
 
 # ---------------------------------------------------------------------------

@@ -235,6 +235,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'ingestion.check_certificate_expiry',
         'schedule': 86400.0,  # daily — certificate_expiry_warning at 30/14/7 days
     },
+    # Readings — Sprint 28: interval aggregation engine
+    'maintain-interval-aggregates': {
+        'task': 'readings.maintain_interval_aggregates',
+        'schedule': 60.0,  # every 60 seconds — task only writes completed buckets
+    },
 }
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ Ref: SPEC.md § Feature: Stream Discovery & Configuration, § Feature: Data Expo
 """
 from rest_framework import serializers
 
-from .models import DataExport, DerivedStream, Stream, StreamReading
+from .models import DataExport, DerivedStream, IntervalAggregate, Stream, StreamReading
 
 
 class StreamReadingSerializer(serializers.ModelSerializer):
@@ -12,8 +12,40 @@ class StreamReadingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StreamReading
-        fields = ('id', 'value', 'timestamp', 'ingested_at')
-        read_only_fields = ('id', 'value', 'timestamp', 'ingested_at')
+        fields = ('id', 'value', 'timestamp', 'quality', 'ingested_at')
+        read_only_fields = ('id', 'value', 'timestamp', 'quality', 'ingested_at')
+
+
+class IntervalAggregateSerializer(serializers.ModelSerializer):
+    """Read-only serializer for IntervalAggregate (Sprint 28)."""
+
+    class Meta:
+        model = IntervalAggregate
+        fields = (
+            'id', 'stream', 'period', 'period_start',
+            'aggregation_kind', 'value', 'count',
+            'quality', 'quality_breakdown', 'computed_at',
+        )
+        read_only_fields = fields
+
+
+class IntervalAggregateBackfillSerializer(serializers.Serializer):
+    """Validates the POST body for an on-demand aggregate backfill."""
+
+    period = serializers.ChoiceField(choices=IntervalAggregate.Period.choices)
+    date_from = serializers.DateTimeField()
+    date_to = serializers.DateTimeField()
+    kinds = serializers.ListField(
+        child=serializers.ChoiceField(choices=Stream.AggregationKind.choices),
+        required=False,
+        allow_empty=False,
+        help_text='Optional list of aggregation kinds; defaults to the stream default.',
+    )
+
+    def validate(self, data):
+        if data['date_from'] >= data['date_to']:
+            raise serializers.ValidationError('date_from must be earlier than date_to.')
+        return data
 
 
 class StreamSerializer(serializers.ModelSerializer):
@@ -31,6 +63,8 @@ class StreamSerializer(serializers.ModelSerializer):
     latest_timestamp = serializers.SerializerMethodField()
     device = serializers.IntegerField(source='device_id', read_only=True)
 
+    latest_quality = serializers.SerializerMethodField()
+
     class Meta:
         model = Stream
         fields = (
@@ -41,15 +75,24 @@ class StreamSerializer(serializers.ModelSerializer):
             'unit',
             'data_type',
             'stream_type',
+            'aggregation_kind_default',
             'display_enabled',
             'latest_value',
             'latest_timestamp',
+            'latest_quality',
             'created_at',
         )
         read_only_fields = (
             'id', 'device', 'key', 'data_type', 'stream_type',
-            'latest_value', 'latest_timestamp', 'created_at',
+            'latest_value', 'latest_timestamp', 'latest_quality', 'created_at',
         )
+
+    def get_latest_quality(self, obj):
+        """Return the most recent reading's quality, or None."""
+        if hasattr(obj, 'annotated_latest_quality'):
+            return obj.annotated_latest_quality
+        reading = obj.readings.first()
+        return reading.quality if reading else None
 
     def get_latest_value(self, obj):
         """Return the most recent reading value, or None if no readings exist."""

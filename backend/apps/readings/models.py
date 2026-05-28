@@ -23,6 +23,9 @@ class Stream(models.Model):
     available, otherwise defaults to numeric. stream_type marks streams
     produced by the platform itself (derived/computed) vs. ingested raw
     from a device — derived streams have a backing `DerivedStream` config.
+    aggregation_kind_default is the kind the IntervalAggregation beat task
+    maintains for this stream — extra kinds can be added on demand via the
+    backfill endpoint.
     """
 
     class DataType(models.TextChoices):
@@ -33,6 +36,13 @@ class Stream(models.Model):
     class StreamType(models.TextChoices):
         RAW = 'raw', 'Raw (ingested)'
         DERIVED = 'derived', 'Derived (computed)'
+
+    class AggregationKind(models.TextChoices):
+        SUM = 'sum', 'Sum (energy)'
+        MEAN = 'mean', 'Mean (instantaneous)'
+        MIN = 'min', 'Minimum'
+        MAX = 'max', 'Maximum'
+        LAST = 'last', 'Last (cumulative)'
 
     device = models.ForeignKey(
         'devices.Device',
@@ -48,6 +58,17 @@ class Stream(models.Model):
         choices=StreamType.choices,
         default=StreamType.RAW,
         help_text='Raw = ingested from a device. Derived = computed from other streams.',
+    )
+    aggregation_kind_default = models.CharField(
+        max_length=10,
+        choices=AggregationKind.choices,
+        default=AggregationKind.MEAN,
+        help_text=(
+            'The aggregation kind maintained by the IntervalAggregate beat task. '
+            'Use sum for energy streams, mean for instantaneous (power/voltage/'
+            'current), last for cumulative counters. Extra kinds can be computed '
+            'on demand via the backfill endpoint.'
+        ),
     )
     display_enabled = models.BooleanField(
         default=True,
@@ -68,7 +89,16 @@ class StreamReading(models.Model):
 
     All readings are retained forever. timestamp is the ingestion time
     (server-side); future firmware versions may supply a device-side timestamp.
+    quality (Sprint 28) marks how the value was produced — raw readings from
+    the ingestion path are `measured`; derived streams inherit worst-input
+    quality from their source readings.
     """
+
+    class Quality(models.TextChoices):
+        MEASURED = 'measured', 'Measured (raw)'
+        ESTIMATED = 'estimated', 'Estimated'
+        SUBSTITUTED = 'substituted', 'Substituted'
+        GAP = 'gap', 'Gap (no data)'
 
     stream = models.ForeignKey(
         Stream,
@@ -77,6 +107,15 @@ class StreamReading(models.Model):
     )
     value = models.JSONField(help_text='Stored as JSON to support numeric, boolean, and string values.')
     timestamp = models.DateTimeField(help_text='Time the reading was ingested by the server.')
+    quality = models.CharField(
+        max_length=20,
+        choices=Quality.choices,
+        default=Quality.MEASURED,
+        help_text=(
+            'Data quality flag (Sprint 28). Raw readings = measured. Derived '
+            'streams inherit the worst-quality input. v1 does not estimate gaps.'
+        ),
+    )
     ingested_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -233,3 +272,80 @@ class DerivedStreamSourceIndex(models.Model):
 
     def __str__(self) -> str:
         return f'Stream {self.source_stream_id} → DerivedStream {self.derived_stream_id}'
+
+
+class IntervalAggregate(models.Model):
+    """A rolled-up aggregate of StreamReadings over a fixed period (Sprint 28).
+
+    Periods are clock-aligned in UTC: 5-minute buckets at 00:00/00:05/…,
+    30-minute at 00:00/00:30/…, hourly at the top of the hour, daily at
+    00:00 UTC, monthly at the first of the month. Multiple aggregation kinds
+    per stream are allowed but the beat task only maintains
+    `Stream.aggregation_kind_default` by default; other kinds can be filled
+    via the on-demand backfill endpoint.
+
+    Quality breakdown carries the count of source readings by quality plus a
+    single derived aggregate quality (worst-input rule). A period with zero
+    raw readings is created with `count=0` and `quality=gap`.
+
+    Ref: SPEC.md § Feature: Interval Aggregation Engine; § Feature: Data
+    Quality Flags; ROADMAP Sprint 28
+    """
+
+    class Period(models.TextChoices):
+        MIN_5 = '5min', '5 minutes'
+        MIN_30 = '30min', '30 minutes'
+        HOUR = '1h', '1 hour'
+        DAY = '1d', '1 day'
+        MONTH = '1mo', '1 month'
+
+    stream = models.ForeignKey(
+        Stream,
+        on_delete=models.CASCADE,
+        related_name='aggregates',
+    )
+    period = models.CharField(max_length=10, choices=Period.choices)
+    period_start = models.DateTimeField(
+        help_text='UTC-aligned bucket boundary (e.g. 2026-05-28T00:05:00Z for a 5-min bucket).',
+    )
+    aggregation_kind = models.CharField(
+        max_length=10,
+        choices=Stream.AggregationKind.choices,
+    )
+    value = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Aggregated value. Null for gap periods (count=0).',
+    )
+    count = models.PositiveIntegerField(
+        default=0,
+        help_text='Number of source readings included in this aggregate.',
+    )
+    quality = models.CharField(
+        max_length=20,
+        choices=StreamReading.Quality.choices,
+        default=StreamReading.Quality.MEASURED,
+        help_text='Derived aggregate quality via worst-input rule.',
+    )
+    quality_breakdown = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Map of quality → count for the source readings, e.g. '
+            '{"measured": 4, "estimated": 1}. Empty {} for gap periods.'
+        ),
+    )
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('stream', 'period', 'period_start', 'aggregation_kind')]
+        ordering = ['-period_start']
+        indexes = [
+            models.Index(fields=['stream', '-period_start']),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f'IntervalAggregate(stream={self.stream_id} {self.period}@{self.period_start} '
+            f'{self.aggregation_kind}={self.value}, q={self.quality})'
+        )

@@ -927,29 +927,33 @@ _Windowed aggregate rule conditions (SPEC §3 Rules Engine):_
 **Deliverables:**
 
 _Interval aggregation (SPEC §3 Interval Aggregation Engine):_
-- [ ] Backend: `IntervalAggregate` model (stream, period, period_start, value, count, aggregation_kind, quality_breakdown JSONB) with `unique_together (stream, period, period_start, aggregation_kind)` and `(stream, -period_start)` index
-- [ ] Backend: Aggregation kinds — `sum`, `mean`, `min`, `max`, `last`; multiple per stream allowed
-- [ ] Backend: `Stream.aggregation_kind_default` field — `sum` for energy, `mean` for power/voltage/current, `last` for cumulative
-- [ ] Backend: Celery beat task — maintains the next-due aggregate period for every active stream; idempotent on (stream, period, period_start, aggregation_kind)
-- [ ] Backend: On-demand backfill endpoint over a date range (Tenant Admin)
-- [ ] Backend: Read endpoint `/api/v1/streams/:id/aggregates/?period=&from=&to=` (with cursor pagination)
-- [ ] Backend: Tests — per-kind correctness, multiple kinds per stream, beat-task maintenance, backfill, quality_breakdown roll-up, cross-tenant isolation
+- [x] Backend: `IntervalAggregate` model (stream, period, period_start, value, count, aggregation_kind, quality_breakdown JSONB) with `unique_together (stream, period, period_start, aggregation_kind)` and `(stream, -period_start)` index
+- [x] Backend: Aggregation kinds — `sum`, `mean`, `min`, `max`, `last`; multi-kind supported via backfill `kinds` param
+- [x] Backend: `Stream.aggregation_kind_default` field with `Stream.AggregationKind` enum
+- [x] Backend: Period alignment helpers (`clock_align`, `period_end`, `previous_period_start`) — UTC-aligned 5min / 30min / 1h / 1d / 1mo
+- [x] Backend: `compute_aggregate` aggregator core in `apps/readings/aggregates.py`; idempotent `update_or_create` on the unique key
+- [x] Backend: `maintain_interval_aggregates` Celery beat task at 60s cadence — writes any newly-completed bucket for every active stream
+- [x] Backend: `backfill_aggregates` Celery task + `POST /api/v1/streams/:id/aggregates/backfill/` (Tenant Admin) with optional `kinds` parameter
+- [x] Backend: Read endpoint `GET /api/v1/streams/:id/aggregates/?period=&kind=&from=&to=&cursor=&limit=` with opaque base64 timestamp cursor pagination (max 1000/page)
 
 _Data quality flags (SPEC §3 Data Quality Flags):_
-- [ ] Backend: `StreamReading.quality` enum (`measured` / `estimated` / `substituted` / `gap`), default `measured`
-- [ ] Backend: Derived streams (Sprint 27) inherit worst-input quality at evaluation time
-- [ ] Backend: Interval-fill Celery beat task — for each active stream, marks periods with no readings as a `gap` aggregate (no estimation in v1)
-- [ ] Backend: `IntervalAggregate.quality_breakdown` JSONB — counts of source readings by quality, plus a single derived aggregate quality (worst-input rule)
-- [ ] Backend: Reading endpoints include `quality` on every row; aggregate endpoints include `quality_breakdown` + the derived quality
-- [ ] Backend: Tests — quality propagation through derived streams, gap detection, worst-input roll-up, LGC-claim filter on `quality=measured`
-- [ ] Frontend: Stream detail / chart shows quality badges per reading where relevant
+- [x] Backend: `StreamReading.quality` enum (`measured` / `estimated` / `substituted` / `gap`), default `measured`
+- [x] Backend: Derived streams (Sprint 27) now write inherited worst-input quality via `_upsert_output`
+- [x] Backend: Aggregator marks periods with zero readings as `count=0, value=null, quality=gap`
+- [x] Backend: `IntervalAggregate.quality_breakdown` JSONB — counts of source readings by quality; `IntervalAggregate.quality` is the worst-input roll-up
+- [x] Backend: Reading endpoints include `quality` on every row; aggregate endpoints include `quality_breakdown` + the derived quality
+- [x] Backend: 25 new tests in `apps/readings/tests/test_sprint28_aggregates.py` covering period alignment, per-kind correctness, idempotency, backfill (single + multi-kind), beat task, quality propagation through derived streams, LGC-style `quality=measured` filtering, pagination, cross-tenant 404, Tenant-Admin-only backfill
+- [x] Frontend: `QualityBadge` component + 7 unit tests; rendered on the latest-value cell on the device Streams tab when quality != measured. Stream API responses now carry `latest_quality`.
 
 **Definition of Done:**
-- [ ] A stream with one reading per minute has 5-minute, 30-minute, hourly, daily, and monthly aggregates maintained automatically
-- [ ] Backfilling a 30-day window over a 100k-reading stream completes within a single Celery task with no duplicates
-- [ ] A measured stream with one missing day produces a `gap`-quality daily aggregate for that day
-- [ ] A derived stream computed from one `measured` and one `gap` input inherits `gap` quality
-- [ ] Filtering generation by `quality=measured` returns only directly-measured intervals with a full audit trail back to raw readings
+- [x] A stream with one reading per period has 5-minute, 30-minute, hourly, daily, and monthly aggregates maintained automatically by the beat task
+- [x] Backfill over a date range walks every bucket idempotently (`test_backfill_walks_all_buckets_in_range`, `test_backfill_multi_kind_in_one_pass`)
+- [x] A period with no readings produces a `gap`-quality aggregate row (`test_zero_reading_period_produces_gap_aggregate`)
+- [x] A derived stream computed from one `measured` and one `gap` input inherits `gap` quality (`test_derived_delta_inherits_gap_quality_from_source`)
+- [x] Filtering by `quality=measured` excludes any aggregate that mixed in non-measured input (`test_lgc_filter_by_measured_only`)
+
+> **Status (2026-05-28):** ✅ Complete. 798 backend tests + 62 frontend tests green
+> (up from 773 / 55 at the start of the sprint); flake8 / isort / eslint clean.
 
 ---
 

@@ -15,6 +15,7 @@ import { useDeviceHealth, useDevices, useUpdateDevice } from '../../hooks/useDev
 import { useCommandHistory, useSendCommand } from '../../hooks/useDeviceCommands';
 import { useDeviceStreams, useUpdateStream } from '../../hooks/useStreams';
 import DerivedStreamBuilder from '../../components/DerivedStreamBuilder';
+import QualityBadge from '../../components/QualityBadge';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
 
@@ -325,6 +326,7 @@ function StreamRow({ stream, canEdit, deviceId }) {
       </td>
       <td className={styles.mono}>
         {formatValue(stream.latest_value, stream.data_type)}
+        <QualityBadge quality={stream.latest_quality} />
         {stream.latest_timestamp && (
           <span className={detailStyles.latestTs}>
             {' '}@ {formatDateTime(stream.latest_timestamp)}
