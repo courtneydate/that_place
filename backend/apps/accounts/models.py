@@ -106,6 +106,48 @@ class Tenant(models.Model):
         ),
     )
 
+    # ---------------------------------------------------------------------
+    # Invoicing (Sprint 30)
+    # ---------------------------------------------------------------------
+    # Sprint 30 stores the per-tenant invoicing settings the billing engine
+    # (S31) and PDF renderer (S32) will read at billing-run time.
+    gst_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        default='0.1000',
+        help_text='GST rate applied at invoice total (default 0.10 = 10%).',
+    )
+    invoice_number_format = models.CharField(
+        max_length=120,
+        default='INV-{YYYY}-{seq:06d}',
+        help_text=(
+            'Format string for invoice numbers. Supported tokens: {YYYY} '
+            '(year), {seq:06d} (zero-padded sequence). Sequence increments '
+            'atomically per tenant.'
+        ),
+    )
+    invoice_number_sequence = models.PositiveIntegerField(
+        default=0,
+        help_text='Atomic per-tenant counter — incremented under SELECT FOR UPDATE.',
+    )
+    invoice_pdf_template_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Reserved for a stored HTML/CSS invoice template (Sprint 32 will '
+            'wire the FK target). Nullable means the platform default applies.'
+        ),
+    )
+    invoice_settlement_disclaimer = models.TextField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Editable boilerplate rendered on en_tenant invoices to keep the '
+            'invoice-grade-not-settlement-grade boundary visible to end '
+            'customers. Null falls back to the platform default.'
+        ),
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

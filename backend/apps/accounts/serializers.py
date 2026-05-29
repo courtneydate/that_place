@@ -237,13 +237,45 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
 class TenantSettingsSerializer(serializers.ModelSerializer):
     """Serializer for the tenant settings endpoint.
 
-    Exposes tenant metadata as read-only and allows Tenant Admin to update timezone.
+    Exposes tenant metadata as read-only and allows Tenant Admin to update
+    timezone and the Sprint 30 invoicing fields. `invoice_number_sequence`
+    is read-only — it can only be incremented atomically by the billing
+    engine.
     """
 
     class Meta:
         model = Tenant
-        fields = ('id', 'name', 'slug', 'timezone', 'is_active', 'created_at')
-        read_only_fields = ('id', 'name', 'slug', 'is_active', 'created_at')
+        fields = (
+            'id', 'name', 'slug', 'timezone', 'is_active', 'created_at',
+            'gst_rate',
+            'invoice_number_format',
+            'invoice_number_sequence',
+            'invoice_pdf_template_id',
+            'invoice_settlement_disclaimer',
+        )
+        read_only_fields = (
+            'id', 'name', 'slug', 'is_active', 'created_at',
+            'invoice_number_sequence',
+        )
+
+    def validate_gst_rate(self, value):
+        """Keep GST rate in a defensible range — anything outside 0–1 is a typo."""
+        if value is None:
+            return value
+        if value < 0 or value > 1:
+            raise serializers.ValidationError(
+                'gst_rate must be between 0 and 1 (e.g. 0.10 for 10%).'
+            )
+        return value
+
+    def validate_invoice_number_format(self, value):
+        """Reject formats that don't contain {seq...} — invoice numbers must increment."""
+        if value and '{seq' not in value:
+            raise serializers.ValidationError(
+                'invoice_number_format must include the {seq} token so '
+                'invoice numbers are unique per tenant.'
+            )
+        return value
 
 
 class NotificationGroupMemberSerializer(serializers.ModelSerializer):

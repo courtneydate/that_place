@@ -138,6 +138,88 @@ NETWORK_TARIFFS_DATASET = {
     'has_version': True,
 }
 
+# ---------------------------------------------------------------------------
+# PPA tariff templates (Sprint 30) — scope=tenant
+# ---------------------------------------------------------------------------
+# Three template ReferenceDatasets that operators populate with their own
+# PPA plans. All three share the same dimension/value shape so the billing
+# engine (Sprint 31) can resolve them uniformly. `plan_code` is the
+# operator-defined identifier (e.g. "stage1-2026"); TOU support and version
+# pinning are both on so peak/off-peak and annual rate updates fit cleanly.
+
+_PPA_TARIFF_DIMENSION_SCHEMA = {
+    'plan_code': {
+        'type': 'string',
+        'label': 'Plan code',
+        'example': 'stage1-2026',
+    },
+    'period_name': {
+        'type': 'string',
+        'label': 'TOU period',
+        'example': 'peak',
+        'options': ['flat', 'peak', 'shoulder', 'off_peak'],
+    },
+}
+
+_PPA_TARIFF_VALUE_SCHEMA = {
+    'rate_cents_per_kwh': {
+        'type': 'numeric',
+        'label': 'Energy rate',
+        'unit': 'c/kWh',
+    },
+    'supply_charge_cents_per_day': {
+        'type': 'numeric',
+        'label': 'Daily supply charge',
+        'unit': 'c/day',
+    },
+}
+
+PPA_GENERATION_DATASET = {
+    'slug': 'ppa-generation-tariff',
+    'name': 'PPA Generation Tariff (template)',
+    'description': (
+        'Template for PPA generation tariffs — what the host pays for solar '
+        'generation that goes into the embedded network. Duplicate or add '
+        'rows for each PPA plan; tag rows with a plan_code and TOU period.'
+    ),
+    'scope': 'tenant',
+    'dimension_schema': _PPA_TARIFF_DIMENSION_SCHEMA,
+    'value_schema': _PPA_TARIFF_VALUE_SCHEMA,
+    'has_time_of_use': True,
+    'has_version': True,
+}
+
+PPA_CONSUMPTION_FROM_SOLAR_DATASET = {
+    'slug': 'ppa-consumption-from-solar-tariff',
+    'name': 'PPA Consumption-from-Solar Tariff (template)',
+    'description': (
+        'Template for the discounted rate end customers pay for solar-allocated '
+        'consumption inside an embedded network. Operators duplicate per PPA '
+        'contract and fill in plan-specific rates.'
+    ),
+    'scope': 'tenant',
+    'dimension_schema': _PPA_TARIFF_DIMENSION_SCHEMA,
+    'value_schema': _PPA_TARIFF_VALUE_SCHEMA,
+    'has_time_of_use': True,
+    'has_version': True,
+}
+
+PPA_FEED_IN_DATASET = {
+    'slug': 'ppa-feed-in-tariff',
+    'name': 'PPA Feed-in Tariff (template)',
+    'description': (
+        'Template for solar feed-in / buyback tariffs — the credit paid for '
+        'gate-exported kWh. Operators add rows per plan; the billing engine '
+        'emits credit line items.'
+    ),
+    'scope': 'tenant',
+    'dimension_schema': _PPA_TARIFF_DIMENSION_SCHEMA,
+    'value_schema': _PPA_TARIFF_VALUE_SCHEMA,
+    'has_time_of_use': True,
+    'has_version': True,
+}
+
+
 CO2_FACTORS_DATASET = {
     'slug': 'co2-factors',
     'name': 'CO2 Emission Factors',
@@ -202,6 +284,10 @@ class Command(BaseCommand):
         self._seed_dataset(NETWORK_TARIFFS_DATASET)
         dataset = self._seed_dataset(CO2_FACTORS_DATASET)
         self._seed_co2_rows(dataset)
+        # Sprint 30 — PPA tariff templates (scope=tenant, no seeded rows).
+        self._seed_dataset(PPA_GENERATION_DATASET)
+        self._seed_dataset(PPA_CONSUMPTION_FROM_SOLAR_DATASET)
+        self._seed_dataset(PPA_FEED_IN_DATASET)
 
         if options['csv']:
             dataset_slug, csv_path = options['csv']

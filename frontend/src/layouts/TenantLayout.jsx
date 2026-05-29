@@ -354,6 +354,18 @@ function TenantLayout() {
             </NavLink>
           )}
           <NavLink
+            to="/app/billing-accounts"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Billing
+          </NavLink>
+          <NavLink
+            to="/app/tariffs"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Tariffs
+          </NavLink>
+          <NavLink
             to="/app/settings"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
           >

@@ -35,6 +35,9 @@ import RuleDetail from './pages/tenant/RuleDetail';
 import Alerts from './pages/tenant/Alerts';
 import AlertDetail from './pages/tenant/AlertDetail';
 import Reporting from './pages/tenant/Reporting';
+import BillingAccounts from './pages/tenant/BillingAccounts';
+import BillingAccountDetail from './pages/tenant/BillingAccountDetail';
+import Tariffs from './pages/tenant/Tariffs';
 
 function App() {
   const { user } = useAuth();
@@ -93,6 +96,9 @@ function App() {
         <Route path="feed-subscriptions" element={<FeedSubscriptions />} />
         <Route path="dataset-assignments" element={<DatasetAssignments />} />
         <Route path="reporting" element={<Reporting />} />
+        <Route path="billing-accounts" element={<BillingAccounts />} />
+        <Route path="billing-accounts/:id" element={<BillingAccountDetail />} />
+        <Route path="tariffs" element={<Tariffs />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 
