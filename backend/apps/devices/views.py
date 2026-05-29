@@ -34,7 +34,7 @@ class SiteViewSet(viewsets.GenericViewSet):
 
     def get_permissions(self):
         """Restrict write actions to Tenant Admins."""
-        if self.action in ('create', 'update', 'destroy'):
+        if self.action in ('create', 'update', 'partial_update', 'destroy'):
             return [IsAuthenticated(), IsTenantAdmin()]
         return [IsAuthenticated(), IsViewOnly()]
 
@@ -64,6 +64,18 @@ class SiteViewSet(viewsets.GenericViewSet):
         """PUT /api/v1/sites/:id/ — update a site. Tenant Admin only."""
         site = get_object_or_404(self.get_queryset(), pk=pk)
         serializer = SiteSerializer(site, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        """PATCH /api/v1/sites/:id/ — partial update. Tenant Admin only.
+
+        Useful for toggling `is_hierarchical` or adjusting
+        `reconciliation_tolerance_percent` without re-sending the whole record.
+        """
+        site = get_object_or_404(self.get_queryset(), pk=pk)
+        serializer = SiteSerializer(site, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

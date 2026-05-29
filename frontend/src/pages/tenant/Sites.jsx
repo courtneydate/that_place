@@ -148,6 +148,14 @@ function EditSiteRow({ site, onDone }) {
   const [longitude, setLongitude] = useState(
     site.longitude !== null && site.longitude !== undefined ? String(site.longitude) : ''
   );
+  const [isHierarchical, setIsHierarchical] = useState(!!site.is_hierarchical);
+  const [tolerance, setTolerance] = useState(
+    site.reconciliation_tolerance_percent ?? '1.5',
+  );
+  const [apportionment, setApportionment] = useState(
+    site.common_area_apportionment_method || 'pro_rata_consumption',
+  );
+  const [exemptionId, setExemptionId] = useState(site.embedded_network_exemption_id || '');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
@@ -160,6 +168,10 @@ function EditSiteRow({ site, onDone }) {
         description: description.trim(),
         latitude: latitude !== '' ? latitude : null,
         longitude: longitude !== '' ? longitude : null,
+        is_hierarchical: isHierarchical,
+        reconciliation_tolerance_percent: tolerance,
+        common_area_apportionment_method: apportionment,
+        embedded_network_exemption_id: exemptionId.trim(),
       };
       await updateSite.mutateAsync(payload);
       onDone();
@@ -220,6 +232,69 @@ function EditSiteRow({ site, onDone }) {
               />
             </div>
           </div>
+          <fieldset style={{ border: '1px solid #E5E7EB', borderRadius: 6, padding: '0.75rem 1rem', marginTop: '0.5rem' }}>
+            <legend style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', padding: '0 0.4rem' }}>
+              Embedded-network / hierarchical metering
+            </legend>
+            <div className={styles.inlineFields}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`edit-hier-${site.id}`}>
+                  <input
+                    id={`edit-hier-${site.id}`}
+                    type="checkbox"
+                    checked={isHierarchical}
+                    onChange={(e) => setIsHierarchical(e.target.checked)}
+                    disabled={updateSite.isPending}
+                    style={{ marginRight: '0.4rem' }}
+                  />
+                  Hierarchical site
+                </label>
+                <small style={{ color: '#6B7280' }}>
+                  Enables gate / child / common-area meter roles.
+                </small>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`edit-tol-${site.id}`}>Reconciliation tolerance %</label>
+                <input
+                  id={`edit-tol-${site.id}`}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={tolerance}
+                  onChange={(e) => setTolerance(e.target.value)}
+                  className={styles.input}
+                  disabled={updateSite.isPending}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`edit-app-${site.id}`}>Common-area apportionment</label>
+                <select
+                  id={`edit-app-${site.id}`}
+                  value={apportionment}
+                  onChange={(e) => setApportionment(e.target.value)}
+                  className={styles.input}
+                  disabled={updateSite.isPending}
+                >
+                  <option value="pro_rata_consumption">Pro-rata by consumption</option>
+                  <option value="equal_share">Equal share</option>
+                  <option value="by_floor_area">By floor area (NLA)</option>
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`edit-exempt-${site.id}`}>AER exemption / registration ID</label>
+                <input
+                  id={`edit-exempt-${site.id}`}
+                  type="text"
+                  value={exemptionId}
+                  onChange={(e) => setExemptionId(e.target.value)}
+                  className={styles.input}
+                  placeholder="Optional reference"
+                  disabled={updateSite.isPending}
+                />
+              </div>
+            </div>
+          </fieldset>
           <div className={styles.actions}>
             <button
               type="submit"
@@ -251,6 +326,10 @@ EditSiteRow.propTypes = {
     description: PropTypes.string,
     latitude: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     longitude: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    is_hierarchical: PropTypes.bool,
+    reconciliation_tolerance_percent: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    common_area_apportionment_method: PropTypes.string,
+    embedded_network_exemption_id: PropTypes.string,
   }).isRequired,
   onDone: PropTypes.func.isRequired,
 };

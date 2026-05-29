@@ -15,11 +15,10 @@ Ref: SPEC.md § Feature: Derived / Computed Streams; ROADMAP Sprint 27
 """
 import logging
 from datetime import timedelta
-from typing import Iterable
 
 from celery import shared_task
 from django.db import transaction
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete
 from django.dispatch import receiver
 
 from .derived import (

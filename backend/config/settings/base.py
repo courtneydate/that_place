@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'apps.dashboards',
     'apps.notifications',
     'apps.feeds',
+    'apps.metering',
 ]
 
 MIDDLEWARE = [

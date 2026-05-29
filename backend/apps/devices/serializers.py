@@ -5,12 +5,87 @@ from .models import CommandLog, Device, DeviceHealth, DeviceType, Site
 
 
 class SiteSerializer(serializers.ModelSerializer):
-    """Serializer for Site CRUD."""
+    """Serializer for Site CRUD.
+
+    The hierarchical-metering fields (Sprint 29) are exposed here so a Tenant
+    Admin can flag a site as an embedded network and tune its reconciliation
+    behaviour. Toggling `is_hierarchical` once meters exist is gated by
+    `validate_is_hierarchical` to keep the MeterProfile invariants intact.
+    """
+
+    HIERARCHICAL_ROLES = ('gate', 'child', 'common_area')
 
     class Meta:
         model = Site
-        fields = ('id', 'name', 'description', 'latitude', 'longitude', 'created_at')
+        fields = (
+            'id', 'name', 'description', 'latitude', 'longitude',
+            'is_hierarchical',
+            'reconciliation_tolerance_percent',
+            'embedded_network_exemption_id',
+            'common_area_apportionment_method',
+            'created_at',
+        )
         read_only_fields = ('id', 'created_at')
+
+    def validate_reconciliation_tolerance_percent(self, value):
+        """Sane bounds — variance over 100% is a configuration mistake."""
+        if value is None:
+            return value
+        if value < 0 or value > 100:
+            raise serializers.ValidationError(
+                'reconciliation_tolerance_percent must be between 0 and 100.'
+            )
+        return value
+
+    def validate(self, attrs):
+        """Guard the `is_hierarchical` toggle against existing meter profiles.
+
+        Flipping the flag would either orphan hierarchical meters or create
+        invariant violations on existing child/common_area meters — both
+        cases need an explicit cleanup before the flag can move.
+        """
+        if self.instance is None:
+            return attrs
+        if 'is_hierarchical' not in attrs:
+            return attrs
+        new_value = attrs['is_hierarchical']
+        if new_value == self.instance.is_hierarchical:
+            return attrs
+
+        from apps.metering.models import MeterProfile
+
+        if new_value is False:
+            # hierarchical → flat — block if any hierarchical meters exist
+            existing = MeterProfile.objects.filter(
+                device__site_id=self.instance.id,
+                meter_role__in=self.HIERARCHICAL_ROLES,
+            )
+            count = existing.count()
+            if count:
+                raise serializers.ValidationError({
+                    'is_hierarchical': (
+                        f'Cannot disable hierarchical mode while {count} '
+                        'gate/child/common_area meter(s) exist on this site. '
+                        'Remove or reassign them first.'
+                    ),
+                })
+        else:
+            # flat → hierarchical — block if existing child/common_area meters
+            # lack a parent, because the invariant becomes load-bearing.
+            invalid = MeterProfile.objects.filter(
+                device__site_id=self.instance.id,
+                meter_role__in=('child', 'common_area'),
+                parent_meter__isnull=True,
+            ).count()
+            if invalid:
+                raise serializers.ValidationError({
+                    'is_hierarchical': (
+                        f'Cannot enable hierarchical mode: {invalid} child/'
+                        'common_area meter(s) on this site have no parent. '
+                        'Add a gate meter and assign parents first.'
+                    ),
+                })
+        return attrs
 
 
 class DeviceTypeSerializer(serializers.ModelSerializer):
@@ -52,6 +127,7 @@ class DeviceSerializer(serializers.ModelSerializer):
     device_type_name = serializers.CharField(source='device_type.name', read_only=True)
     device_type_commands = serializers.JSONField(source='device_type.commands', read_only=True)
     site_name = serializers.CharField(source='site.name', read_only=True)
+    site_is_hierarchical = serializers.BooleanField(source='site.is_hierarchical', read_only=True)
     tenant_name = serializers.CharField(source='tenant.name', read_only=True)
     health = serializers.SerializerMethodField()
 
@@ -75,6 +151,7 @@ class DeviceSerializer(serializers.ModelSerializer):
             'serial_number',
             'site',
             'site_name',
+            'site_is_hierarchical',
             'device_type',
             'device_type_name',
             'device_type_commands',
@@ -89,6 +166,7 @@ class DeviceSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'status', 'topic_format', 'created_at',
             'tenant_name', 'health', 'device_type_commands',
+            'site_is_hierarchical',
         )
 
     def validate_site(self, site):

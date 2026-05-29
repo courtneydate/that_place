@@ -185,7 +185,9 @@ def compute_aggregate(stream: Stream, period: str, period_start: datetime, kind:
     )
 
 
-def _upsert_aggregate(*, stream, period, period_start, kind, value, count, quality, quality_breakdown) -> IntervalAggregate:
+def _upsert_aggregate(
+    *, stream, period, period_start, kind, value, count, quality, quality_breakdown,
+) -> IntervalAggregate:
     obj, _ = IntervalAggregate.objects.update_or_create(
         stream=stream,
         period=period,

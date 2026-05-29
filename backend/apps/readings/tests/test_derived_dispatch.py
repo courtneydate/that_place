@@ -6,7 +6,7 @@ the upsert path, and the HTTP API.
 
 Ref: SPEC.md § Feature: Derived / Computed Streams; ROADMAP Sprint 27
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 from django.utils.text import slugify

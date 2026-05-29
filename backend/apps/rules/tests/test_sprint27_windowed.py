@@ -24,7 +24,6 @@ from apps.readings.models import RuleStreamIndex, Stream, StreamReading
 from apps.rules.evaluator import _eval_windowed_aggregate_condition
 from apps.rules.models import (
     Rule,
-    RuleAction,
     RuleCondition,
     RuleConditionGroup,
 )

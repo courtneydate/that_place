@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDevices, useCreateDevice, useDeleteDevice } from '../../hooks/useDevices';
 import { useDeviceTypes } from '../../hooks/useDeviceTypes';
 import { useSites } from '../../hooks/useSites';
+import MeterBulkUploadModal from '../../components/MeterBulkUploadModal';
 import styles from '../admin/AdminPage.module.css';
 
 const STATUS_LABELS = {
@@ -233,6 +234,7 @@ function Devices() {
   const deleteDevice = useDeleteDevice();
 
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showMeterImport, setShowMeterImport] = useState(false);
 
   const handleDelete = async (deviceId, deviceName) => {
     if (!window.confirm(`Delete device "${deviceName}"? This cannot be undone.`)) return;
@@ -248,14 +250,27 @@ function Devices() {
       <div className={styles.pageHeader}>
         <h1>Devices</h1>
         {isAdmin && (
-          <button
-            className={styles.primaryButton}
-            onClick={() => setShowRegisterForm((v) => !v)}
-          >
-            {showRegisterForm ? 'Cancel' : '+ Register device'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => setShowMeterImport(true)}
+              title="Upload meter profiles in bulk via CSV"
+            >
+              Bulk import meters
+            </button>
+            <button
+              className={styles.primaryButton}
+              onClick={() => setShowRegisterForm((v) => !v)}
+            >
+              {showRegisterForm ? 'Cancel' : '+ Register device'}
+            </button>
+          </div>
         )}
       </div>
+
+      {isAdmin && showMeterImport && (
+        <MeterBulkUploadModal onClose={() => setShowMeterImport(false)} />
+      )}
 
       {isAdmin && showRegisterForm && (
         <RegisterDeviceForm onDone={() => setShowRegisterForm(false)} />

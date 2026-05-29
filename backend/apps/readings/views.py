@@ -74,7 +74,7 @@ class StreamViewSet(viewsets.GenericViewSet):
 
     def get_permissions(self):
         """Writes require Tenant Admin; reads are open to all tenant roles."""
-        if self.action == 'update':
+        if self.action in ('update', 'partial_update'):
             return [IsAuthenticated(), IsTenantAdmin()]
         return [IsAuthenticated()]
 
@@ -93,7 +93,7 @@ class StreamViewSet(viewsets.GenericViewSet):
         return Response(StreamSerializer(stream).data)
 
     def update(self, request, pk=None):
-        """PUT /api/v1/streams/:id/ — update label, unit, display_enabled. Tenant Admin only."""
+        """PUT /api/v1/streams/:id/ — update label, unit, display_enabled, billing_role. Tenant Admin only."""
         stream = get_object_or_404(self.get_queryset(), pk=pk)
         serializer = StreamSerializer(stream, data=request.data, partial=False)
         serializer.is_valid(raise_exception=True)
@@ -103,6 +103,25 @@ class StreamViewSet(viewsets.GenericViewSet):
             stream.key,
             stream.device.serial_number,
             request.user.email,
+        )
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        """PATCH /api/v1/streams/:id/ — partial update (e.g. billing_role only). Tenant Admin only.
+
+        Added in Sprint 29 so the device Streams tab can flip a stream's
+        billing_role inline without re-sending label/unit/display_enabled.
+        """
+        stream = get_object_or_404(self.get_queryset(), pk=pk)
+        serializer = StreamSerializer(stream, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        logger.info(
+            'Stream "%s" on device "%s" patched by %s: %s',
+            stream.key,
+            stream.device.serial_number,
+            request.user.email,
+            list(request.data.keys()),
         )
         return Response(serializer.data)
 
@@ -153,7 +172,6 @@ class StreamViewSet(viewsets.GenericViewSet):
         """
         import base64
         import binascii
-        from .models import IntervalAggregate
 
         stream = get_object_or_404(self.get_queryset(), pk=pk)
         period = request.query_params.get('period')

@@ -24,13 +24,13 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import Tenant, TenantUser, User
 from apps.devices.models import Device, DeviceType, Site
+from apps.readings.aggregate_tasks import backfill_aggregates, maintain_interval_aggregates
 from apps.readings.aggregates import (
     clock_align,
     compute_aggregate,
     period_end,
     previous_period_start,
 )
-from apps.readings.aggregate_tasks import backfill_aggregates, maintain_interval_aggregates
 from apps.readings.models import (
     DerivedStream,
     IntervalAggregate,
@@ -208,8 +208,12 @@ def test_worst_input_quality_rolls_up_to_aggregate():
     stream = make_stream(make_device(tenant, make_site(tenant)))
     bucket = _ts(10, 5)
     StreamReading.objects.create(stream=stream, value=1.0, timestamp=bucket, quality='measured')
-    StreamReading.objects.create(stream=stream, value=2.0, timestamp=bucket + timedelta(seconds=60), quality='estimated')
-    StreamReading.objects.create(stream=stream, value=3.0, timestamp=bucket + timedelta(seconds=120), quality='substituted')
+    StreamReading.objects.create(
+        stream=stream, value=2.0, timestamp=bucket + timedelta(seconds=60), quality='estimated',
+    )
+    StreamReading.objects.create(
+        stream=stream, value=3.0, timestamp=bucket + timedelta(seconds=120), quality='substituted',
+    )
 
     agg = compute_aggregate(stream, '5min', bucket, 'mean')
     assert agg.quality == 'substituted'
@@ -224,7 +228,9 @@ def test_lgc_filter_by_measured_only():
     stream = make_stream(make_device(tenant, make_site(tenant)), kind='sum')
     bucket = _ts(10, 5)
     StreamReading.objects.create(stream=stream, value=1.0, timestamp=bucket, quality='measured')
-    StreamReading.objects.create(stream=stream, value=2.0, timestamp=bucket + timedelta(seconds=60), quality='estimated')
+    StreamReading.objects.create(
+        stream=stream, value=2.0, timestamp=bucket + timedelta(seconds=60), quality='estimated',
+    )
     compute_aggregate(stream, '5min', bucket, 'sum')
 
     measured_only = IntervalAggregate.objects.filter(

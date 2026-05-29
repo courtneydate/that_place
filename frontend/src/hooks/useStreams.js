@@ -34,3 +34,19 @@ export function useUpdateStream(deviceId) {
     },
   });
 }
+
+/**
+ * Partial-update a Stream (Sprint 29). Used by the device Streams tab to
+ * flip a single field — typically `billing_role` — without re-sending
+ * label/unit/display_enabled.
+ */
+export function usePatchStream(deviceId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ streamId, data }) =>
+      api.patch(`/api/v1/streams/${streamId}/`, data).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['device-streams', deviceId] });
+    },
+  });
+}

@@ -77,6 +77,7 @@ class StreamSerializer(serializers.ModelSerializer):
             'stream_type',
             'aggregation_kind_default',
             'display_enabled',
+            'billing_role',
             'latest_value',
             'latest_timestamp',
             'latest_quality',
@@ -261,7 +262,9 @@ class DerivedStreamSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from django.db import transaction
+
         from apps.devices.models import Device
+
         from .derived_dispatch import (
             get_or_create_site_composite_device,
             sources_span_multiple_devices,

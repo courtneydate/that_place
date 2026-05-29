@@ -13,7 +13,9 @@ from .views import (
 
 app_name = 'readings'
 
-stream_detail = StreamViewSet.as_view({'get': 'retrieve', 'put': 'update'})
+stream_detail = StreamViewSet.as_view({
+    'get': 'retrieve', 'put': 'update', 'patch': 'partial_update',
+})
 stream_readings = StreamViewSet.as_view({'get': 'readings'})
 stream_aggregates = StreamViewSet.as_view({'get': 'aggregates'})
 stream_aggregates_backfill = StreamViewSet.as_view({'post': 'aggregates_backfill'})

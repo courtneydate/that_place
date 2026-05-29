@@ -13,8 +13,9 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useDeviceHealth, useDevices, useUpdateDevice } from '../../hooks/useDevices';
 import { useCommandHistory, useSendCommand } from '../../hooks/useDeviceCommands';
-import { useDeviceStreams, useUpdateStream } from '../../hooks/useStreams';
+import { useDeviceStreams, usePatchStream, useUpdateStream } from '../../hooks/useStreams';
 import DerivedStreamBuilder from '../../components/DerivedStreamBuilder';
+import MeterProfilePanel from '../../components/MeterProfilePanel';
 import QualityBadge from '../../components/QualityBadge';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
@@ -66,9 +67,8 @@ function formatValue(value, dataType) {
 // ---------------------------------------------------------------------------
 
 function TabBar({ active, onChange, canControl }) {
-  const tabs = canControl
-    ? ['Info', 'Health', 'Streams', 'Commands']
-    : ['Info', 'Health', 'Streams'];
+  const baseTabs = ['Info', 'Health', 'Streams', 'Meter'];
+  const tabs = canControl ? [...baseTabs, 'Commands'] : baseTabs;
   return (
     <div className={detailStyles.tabBar}>
       {tabs.map((tab) => (
@@ -244,8 +244,21 @@ HealthTab.propTypes = { deviceId: PropTypes.oneOfType([PropTypes.string, PropTyp
 // Stream row — inline editing
 // ---------------------------------------------------------------------------
 
+const BILLING_ROLE_OPTIONS = [
+  { value: '', label: '— None —' },
+  { value: 'grid_import', label: 'Grid import' },
+  { value: 'grid_export', label: 'Grid export' },
+  { value: 'generation', label: 'Generation' },
+  { value: 'bess_charge', label: 'BESS charge' },
+  { value: 'bess_discharge', label: 'BESS discharge' },
+  { value: 'consumption', label: 'Consumption' },
+  { value: 'consumption_from_solar', label: 'Consumption from solar' },
+  { value: 'net', label: 'Net' },
+];
+
 function StreamRow({ stream, canEdit, deviceId }) {
   const updateStream = useUpdateStream(deviceId);
+  const patchStream = usePatchStream(deviceId);
   const [label, setLabel] = useState(stream.label);
   const [unit, setUnit] = useState(stream.unit);
   const [dirty, setDirty] = useState(false);
@@ -261,7 +274,11 @@ function StreamRow({ stream, canEdit, deviceId }) {
     try {
       await updateStream.mutateAsync({
         streamId: stream.id,
-        data: { label, unit, display_enabled: stream.display_enabled },
+        data: {
+          label, unit,
+          display_enabled: stream.display_enabled,
+          billing_role: stream.billing_role || null,
+        },
       });
       setDirty(false);
     } catch {
@@ -277,7 +294,27 @@ function StreamRow({ stream, canEdit, deviceId }) {
     try {
       await updateStream.mutateAsync({
         streamId: stream.id,
-        data: { label, unit, display_enabled: !stream.display_enabled },
+        data: {
+          label, unit,
+          display_enabled: !stream.display_enabled,
+          billing_role: stream.billing_role || null,
+        },
+      });
+    } catch {
+      setError('Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBillingRoleChange = async (e) => {
+    const next = e.target.value || null;
+    setSaving(true);
+    setError('');
+    try {
+      await patchStream.mutateAsync({
+        streamId: stream.id,
+        data: { billing_role: next },
       });
     } catch {
       setError('Save failed.');
@@ -349,6 +386,27 @@ function StreamRow({ stream, canEdit, deviceId }) {
           </span>
         )}
       </td>
+      <td>
+        {canEdit ? (
+          <select
+            value={stream.billing_role || ''}
+            onChange={handleBillingRoleChange}
+            disabled={saving}
+            className={detailStyles.inlineInput}
+            title="Billing role — Sprint 29"
+          >
+            {BILLING_ROLE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ color: stream.billing_role ? '#111827' : '#9CA3AF', fontSize: '0.8125rem' }}>
+            {stream.billing_role
+              ? BILLING_ROLE_OPTIONS.find((o) => o.value === stream.billing_role)?.label || stream.billing_role
+              : '—'}
+          </span>
+        )}
+      </td>
       {canEdit && (
         <td>
           {dirty && (
@@ -415,6 +473,7 @@ function StreamsTab({ deviceId, canEdit }) {
           <th>Provenance</th>
           <th>Latest value</th>
           <th>Dashboard</th>
+          <th>Billing role</th>
           {canEdit && <th></th>}
         </tr>
       </thead>
@@ -709,6 +768,12 @@ function DeviceDetail() {
         )}
         {activeTab === 'Health' && <HealthTab deviceId={id} />}
         {activeTab === 'Streams' && <StreamsTab deviceId={id} canEdit={isAdmin} />}
+        {activeTab === 'Meter' && device && (
+          <MeterProfilePanel device={device} canEdit={isAdmin} />
+        )}
+        {activeTab === 'Meter' && !device && !devicesLoading && (
+          <p className={styles.empty}>Device not found.</p>
+        )}
         {activeTab === 'Commands' && canControl && (
           <CommandsTab
             device={device ? { ...device, device_type_commands: commands } : null}

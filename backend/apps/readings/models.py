@@ -44,6 +44,23 @@ class Stream(models.Model):
         MAX = 'max', 'Maximum'
         LAST = 'last', 'Last (cumulative)'
 
+    class BillingRole(models.TextChoices):
+        """Sprint 29 — flags this Stream as a billable quantity for the billing engine.
+
+        `bess_charge` / `bess_discharge` are kept distinct (rather than a signed
+        `net`) so LGC / STC accounting stays clean — LGCs attach to
+        `generation`, never to `bess_discharge`.
+        """
+
+        GRID_IMPORT = 'grid_import', 'Grid import (kWh consumed from grid)'
+        GRID_EXPORT = 'grid_export', 'Grid export (kWh exported to grid)'
+        GENERATION = 'generation', 'Generation (solar kWh)'
+        BESS_CHARGE = 'bess_charge', 'BESS charge (kWh into battery)'
+        BESS_DISCHARGE = 'bess_discharge', 'BESS discharge (kWh out of battery)'
+        CONSUMPTION = 'consumption', 'Consumption (total kWh)'
+        CONSUMPTION_FROM_SOLAR = 'consumption_from_solar', 'Consumption from solar (kWh)'
+        NET = 'net', 'Net (signed kWh)'
+
     device = models.ForeignKey(
         'devices.Device',
         on_delete=models.CASCADE,
@@ -73,6 +90,17 @@ class Stream(models.Model):
     display_enabled = models.BooleanField(
         default=True,
         help_text='Controls dashboard visibility. Data is always stored regardless of this flag.',
+    )
+    billing_role = models.CharField(
+        max_length=32,
+        choices=BillingRole.choices,
+        null=True,
+        blank=True,
+        help_text=(
+            'Sprint 29: When set, marks this stream as a billable quantity '
+            'for the billing engine. Streams without a billing_role are '
+            'unaffected by billing runs.'
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

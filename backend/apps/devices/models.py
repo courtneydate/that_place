@@ -16,7 +16,16 @@ class Site(models.Model):
     """A physical location belonging to a tenant.
 
     Devices are deployed at Sites. Tenant A's Sites are invisible to Tenant B.
+
+    The hierarchical-metering fields (Sprint 29) are dormant on a flat site:
+    `is_hierarchical=False` and the apportionment / reconciliation fields are
+    only consulted by the billing engine when the site is hierarchical.
     """
+
+    class CommonAreaApportionmentMethod(models.TextChoices):
+        PRO_RATA_CONSUMPTION = 'pro_rata_consumption', 'Pro-rata by tenant consumption'
+        EQUAL_SHARE = 'equal_share', 'Equal share per tenant'
+        BY_FLOOR_AREA = 'by_floor_area', 'By tenant floor area (NLA)'
 
     tenant = models.ForeignKey(
         'accounts.Tenant',
@@ -32,6 +41,34 @@ class Site(models.Model):
     longitude = models.DecimalField(
         max_digits=9, decimal_places=6, null=True, blank=True,
         help_text='WGS84 decimal degrees.',
+    )
+    is_hierarchical = models.BooleanField(
+        default=False,
+        help_text=(
+            'True when this site is an embedded network — has a gate meter '
+            'parent and child meters that bill end customers separately.'
+        ),
+    )
+    reconciliation_tolerance_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=1.5,
+        help_text=(
+            'Percent variance between gate-meter energy and the sum of child + '
+            'common-area meters before a billing run is flagged for review.'
+        ),
+    )
+    embedded_network_exemption_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        help_text='AER embedded-network registration / exemption reference (free text).',
+    )
+    common_area_apportionment_method = models.CharField(
+        max_length=32,
+        choices=CommonAreaApportionmentMethod.choices,
+        default=CommonAreaApportionmentMethod.PRO_RATA_CONSUMPTION,
+        help_text='How common-area energy is split across tenant accounts at billing time.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
