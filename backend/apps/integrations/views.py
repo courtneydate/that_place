@@ -21,9 +21,16 @@ from apps.devices.models import Device, DeviceType, Site
 from apps.readings.models import Stream
 
 from .auth_handlers import AuthError, get_auth_session
-from .models import DataSource, DataSourceDevice, ThirdPartyAPIProvider
+from .models import (
+    DataSource,
+    DataSourceBackfillJob,
+    DataSourceDevice,
+    ThirdPartyAPIProvider,
+)
 from .serializers import (
+    BackfillJobCreateSerializer,
     ConnectDeviceSerializer,
+    DataSourceBackfillJobSerializer,
     DataSourceDeviceSerializer,
     DataSourceSerializer,
     ThirdPartyAPIProviderAdminSerializer,
@@ -163,6 +170,8 @@ class DataSourceViewSet(viewsets.GenericViewSet):
     def get_permissions(self):
         """Write actions require Tenant Admin; reads require any tenant user (not FM Admin)."""
         if self.action in ('list', 'retrieve', 'devices', 'device_detail'):
+            return [IsAuthenticated(), IsViewOnly()]
+        if self.action == 'backfill' and self.request.method == 'GET':
             return [IsAuthenticated(), IsViewOnly()]
         return [IsAuthenticated(), IsTenantAdmin()]
 
@@ -493,3 +502,77 @@ class DataSourceViewSet(viewsets.GenericViewSet):
             dsd.pk, request.user.email, dsd.external_device_id,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get', 'post'], url_path='backfill')
+    def backfill(self, request, pk=None):
+        """GET /api/v1/data-sources/:id/backfill/ — list backfill jobs (any role).
+        POST /api/v1/data-sources/:id/backfill/ — create + dispatch a backfill job (Tenant Admin).
+
+        Sprint 29a. POST validates the provider supports history, refuses to
+        queue a second job while one is queued|running on this data source,
+        and dispatches `integrations.run_backfill_job` asynchronously.
+        """
+        ds = get_object_or_404(self.get_queryset(), pk=pk)
+        if request.method == 'GET':
+            return self._list_backfill_jobs(ds)
+        return self._create_backfill_job(request, ds)
+
+    def _list_backfill_jobs(self, ds: DataSource) -> Response:
+        """Return backfill jobs for this DataSource, newest first."""
+        jobs = ds.backfill_jobs.select_related('created_by').all()
+        return Response(DataSourceBackfillJobSerializer(jobs, many=True).data)
+
+    def _create_backfill_job(self, request, ds: DataSource) -> Response:
+        """Validate, create, and dispatch a DataSourceBackfillJob."""
+        if not ds.provider.supports_history:
+            return Response(
+                {
+                    'error': {
+                        'code': 'history_not_supported',
+                        'message': (
+                            f'Provider "{ds.provider.name}" does not support '
+                            'historical backfill.'
+                        ),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        active_job = ds.backfill_jobs.filter(
+            status__in=[
+                DataSourceBackfillJob.Status.QUEUED,
+                DataSourceBackfillJob.Status.RUNNING,
+            ],
+        ).first()
+        if active_job is not None:
+            return Response(
+                {
+                    'error': {
+                        'code': 'backfill_in_progress',
+                        'message': (
+                            f'Backfill job {active_job.pk} is already '
+                            f'{active_job.status} for this data source.'
+                        ),
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = BackfillJobCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = DataSourceBackfillJob.objects.create(
+            datasource=ds,
+            date_from=serializer.validated_data['date_from'],
+            date_to=serializer.validated_data['date_to'],
+            created_by=request.user,
+        )
+        from .tasks import run_backfill_job
+        run_backfill_job.delay(job.pk)
+        logger.info(
+            'Backfill job %d dispatched on DataSource %d (%s→%s) by %s',
+            job.pk, ds.pk, job.date_from, job.date_to, request.user.email,
+        )
+        return Response(
+            DataSourceBackfillJobSerializer(job).data,
+            status=status.HTTP_202_ACCEPTED,
+        )

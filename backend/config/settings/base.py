@@ -209,6 +209,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'integrations.poll_datasource_devices',
         'schedule': 30.0,  # every 30 seconds — task self-throttles per device interval
     },
+    # Integrations — Sprint 29a: janitor for orphaned backfill flags
+    'reconcile-backfill-flags': {
+        'task': 'integrations.reconcile_backfill_flags',
+        'schedule': 300.0,  # every 5 minutes
+    },
     # Feeds app — Sprint 15a
     'poll-system-feeds': {
         'task': 'feeds.poll_system_feeds',

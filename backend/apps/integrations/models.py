@@ -107,6 +107,36 @@ class ThirdPartyAPIProvider(models.Model):
             '{key, label, unit, data_type, jsonpath}.'
         ),
     )
+    supports_history = models.BooleanField(
+        default=False,
+        help_text=(
+            'Whether the provider exposes a history endpoint that supports '
+            'tenant-driven backfill over a date range (Sprint 29a). '
+            'Must be True for `history_endpoint` to be honoured.'
+        ),
+    )
+    history_endpoint = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Optional history endpoint config (Sprint 29a). Schema: '
+            '{path_template (with {device_id}), method (default GET), '
+            'params (optional dict — values may contain {from_iso}/{to_iso}/'
+            '{from_unix}/{to_unix} tokens, interpolated per chunk), '
+            'response_root_jsonpath (default "$[*]" — iterates rows), '
+            'timestamp_jsonpath (per-row, ISO 8601 or unix int)}. '
+            'Per-row value extraction reuses available_streams[*].jsonpath '
+            'evaluated relative to each iterated row.'
+        ),
+    )
+    history_chunk_days = models.PositiveSmallIntegerField(
+        default=7,
+        validators=[MinValueValidator(1)],
+        help_text=(
+            'Day-window size the backfill task uses when splitting a request '
+            'into successive history endpoint calls (Sprint 29a). Default 7.'
+        ),
+    )
     default_poll_interval_seconds = models.PositiveIntegerField(
         default=300,
         validators=[MinValueValidator(30)],
@@ -235,6 +265,16 @@ class DataSourceDevice(models.Model):
         default=True,
         help_text='False = deactivated. Polling stops but history is retained.',
     )
+    is_backfilling = models.BooleanField(
+        default=False,
+        help_text=(
+            'True while a DataSourceBackfillJob owns this device (Sprint 29a). '
+            'The beat task skips devices with this flag set so live polling '
+            'and backfill cannot run concurrently against the same provider '
+            'endpoint for one device. A janitor task reconciles orphaned flags '
+            'against DataSourceBackfillJob.status after a worker crash.'
+        ),
+    )
 
     class Meta:
         ordering = ['-datasource__created_at']
@@ -249,3 +289,78 @@ class DataSourceDevice(models.Model):
         """Return string representation."""
         name = self.external_device_name or self.external_device_id
         return f'{name} (ds={self.datasource_id})'
+
+
+class DataSourceBackfillJob(models.Model):
+    """A tenant-requested historical-data backfill over a date range (Sprint 29a).
+
+    One job spans an entire DataSource — the Celery task walks every active
+    DataSourceDevice under it, sets `is_backfilling=True` per device while it
+    fetches chunks, then clears the flag. The job tracks aggregate progress
+    (rows fetched and stored across all devices and all chunks).
+
+    Concurrency: at most one queued or running job per DataSource — enforced
+    at the endpoint (creating a second one returns 409).
+
+    Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
+         ROADMAP Sprint 29a
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        RUNNING = 'running', 'Running'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    datasource = models.ForeignKey(
+        DataSource,
+        on_delete=models.CASCADE,
+        related_name='backfill_jobs',
+    )
+    date_from = models.DateField(
+        help_text='Backfill window start (inclusive, in tenant timezone).',
+    )
+    date_to = models.DateField(
+        help_text='Backfill window end (inclusive, in tenant timezone).',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    rows_fetched = models.PositiveIntegerField(
+        default=0,
+        help_text='Total rows iterated from provider responses across all chunks.',
+    )
+    rows_stored = models.PositiveIntegerField(
+        default=0,
+        help_text='Total new StreamReadings created (rows_fetched minus dedup hits).',
+    )
+    error_detail = models.TextField(
+        blank=True,
+        default='',
+        help_text='Populated on failure with the exception summary.',
+    )
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='datasource_backfill_jobs',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['datasource', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        """Return string representation."""
+        return (
+            f'BackfillJob(ds={self.datasource_id}, '
+            f'{self.date_from}→{self.date_to}, {self.status})'
+        )

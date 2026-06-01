@@ -6,11 +6,22 @@ poll_datasource_devices — beat task, runs every 30 s. Finds all active
 poll_single_device — polls one DataSourceDevice, extracts values via JSONPath,
     stores StreamReadings, handles auth failures and retry tracking.
 
+run_backfill_job — Sprint 29a. Walks each DataSourceDevice on the data source,
+    splits the date range into chunks, calls the provider history endpoint,
+    iterates rows with provider-supplied timestamps, dedupes against existing
+    StreamReadings, and tracks aggregate progress on DataSourceBackfillJob.
+
+reconcile_backfill_flags — Sprint 29a. Janitor beat task; clears
+    `is_backfilling=True` on DataSourceDevices whose data source has no
+    queued/running job. Recovers from worker crashes that left the flag set.
+
 Ref: SPEC.md § Feature: Data Ingestion — 3rd Party APIs
+     ROADMAP Sprint 29a
 """
 import logging
 import time as time_lib
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from datetime import timezone as dt_timezone
 
 import requests as http_requests
 from celery import shared_task
@@ -53,7 +64,11 @@ def poll_datasource_devices() -> None:
 
     devices = (
         DataSourceDevice.objects
-        .filter(is_active=True, datasource__is_active=True)
+        .filter(
+            is_active=True,
+            datasource__is_active=True,
+            is_backfilling=False,
+        )
         .select_related('datasource__provider')
     )
 
@@ -462,3 +477,375 @@ def _maybe_notify_provider_outage(provider) -> None:
         '— %d tenant(s) affected',
         provider.name, provider.pk, tenant_count,
     )
+
+
+# ---------------------------------------------------------------------------
+# Sprint 29a — 3rd-party API history / backfill
+# ---------------------------------------------------------------------------
+
+# HTTP timeout for provider history calls (seconds). Longer than live-poll
+# because some history endpoints aggregate large windows on the server.
+HISTORY_REQUEST_TIMEOUT = 60
+
+
+@shared_task(name='integrations.run_backfill_job', max_retries=0)
+def run_backfill_job(job_id: int) -> None:
+    """Run a DataSourceBackfillJob to completion (Sprint 29a).
+
+    Walks every active DataSourceDevice on the job's data source. For each
+    device, splits the [date_from, date_to] window into chunks of
+    `provider.history_chunk_days`, calls the provider history endpoint per
+    chunk with `{from_iso}/{to_iso}` interpolated into `params`, iterates the
+    response rows, extracts a per-row timestamp + per-stream values, and
+    creates StreamReadings deduplicated against (stream, timestamp).
+
+    `is_backfilling=True` is set on each DataSourceDevice for the duration of
+    its chunk loop so the live-poll beat task skips it. The flag is cleared
+    in a `finally` block so a worker crash leaves at most a transient orphan
+    that `reconcile_backfill_flags` later cleans up.
+    """
+    from apps.readings.models import Stream, StreamReading
+
+    from .auth_handlers import AuthError, get_auth_session
+    from .models import DataSourceBackfillJob, DataSourceDevice
+
+    try:
+        job = (
+            DataSourceBackfillJob.objects
+            .select_related('datasource__provider', 'datasource')
+            .get(pk=job_id)
+        )
+    except DataSourceBackfillJob.DoesNotExist:
+        logger.warning('Backfill job %d not found — skipping', job_id)
+        return
+
+    provider = job.datasource.provider
+    history_cfg = provider.history_endpoint or {}
+    if not provider.supports_history or not history_cfg.get('path_template'):
+        _fail_job(job, 'Provider does not support history backfill.')
+        return
+
+    job.status = DataSourceBackfillJob.Status.RUNNING
+    job.started_at = timezone.now()
+    job.save(update_fields=['status', 'started_at'])
+
+    credentials = job.datasource.credentials or {}
+    devices = list(
+        DataSourceDevice.objects
+        .filter(datasource=job.datasource, is_active=True)
+        .select_related('virtual_device')
+    )
+
+    chunk_days = max(provider.history_chunk_days or 7, 1)
+    chunks = list(_iter_date_chunks(job.date_from, job.date_to, chunk_days))
+    streams_defs = {s['key']: s for s in (provider.available_streams or [])}
+
+    total_fetched = 0
+    total_stored = 0
+
+    try:
+        for dsd in devices:
+            dsd.is_backfilling = True
+            dsd.save(update_fields=['is_backfilling'])
+            try:
+                stream_lookup = _stream_lookup_for_device(Stream, dsd)
+                for chunk_start, chunk_end in chunks:
+                    fetched, stored = _backfill_one_chunk(
+                        provider=provider,
+                        datasource=job.datasource,
+                        dsd=dsd,
+                        history_cfg=history_cfg,
+                        credentials=credentials,
+                        chunk_start=chunk_start,
+                        chunk_end=chunk_end,
+                        stream_lookup=stream_lookup,
+                        streams_defs=streams_defs,
+                        get_auth_session=get_auth_session,
+                        AuthError=AuthError,
+                        StreamReading=StreamReading,
+                    )
+                    total_fetched += fetched
+                    total_stored += stored
+            finally:
+                dsd.is_backfilling = False
+                dsd.save(update_fields=['is_backfilling'])
+
+        job.rows_fetched = total_fetched
+        job.rows_stored = total_stored
+        job.status = DataSourceBackfillJob.Status.COMPLETED
+        job.finished_at = timezone.now()
+        job.save(update_fields=[
+            'rows_fetched', 'rows_stored', 'status', 'finished_at',
+        ])
+        logger.info(
+            'Backfill job %d completed: %d rows fetched, %d stored',
+            job.pk, total_fetched, total_stored,
+        )
+    except Exception as exc:  # noqa: BLE001 — fail the job on any error
+        logger.exception('Backfill job %d failed', job.pk)
+        job.rows_fetched = total_fetched
+        job.rows_stored = total_stored
+        _fail_job(job, str(exc))
+
+
+def _fail_job(job, error: str) -> None:
+    """Mark a DataSourceBackfillJob failed with an error string."""
+    from .models import DataSourceBackfillJob
+
+    job.status = DataSourceBackfillJob.Status.FAILED
+    job.error_detail = error[:5000]
+    job.finished_at = timezone.now()
+    job.save(update_fields=[
+        'status', 'error_detail', 'finished_at',
+        'rows_fetched', 'rows_stored',
+    ])
+    # Also clear any is_backfilling flags this job may have left set.
+    from .models import DataSourceDevice
+    DataSourceDevice.objects.filter(
+        datasource=job.datasource, is_backfilling=True,
+    ).update(is_backfilling=False)
+
+
+def _stream_lookup_for_device(Stream, dsd):
+    """Return a {stream_key: Stream} mapping for the device's active streams."""
+    return {
+        s.key: s
+        for s in Stream.objects.filter(
+            device=dsd.virtual_device, key__in=dsd.active_stream_keys,
+        )
+    }
+
+
+def _iter_date_chunks(date_from, date_to, chunk_days):
+    """Split [date_from, date_to] (inclusive) into (start_dt, end_dt) chunks.
+
+    Yields aware UTC datetimes — start at 00:00:00 of the chunk's first day,
+    end at 23:59:59.999999 of the chunk's last day. The final chunk may be
+    shorter than `chunk_days`.
+    """
+    cursor = date_from
+    delta = timedelta(days=chunk_days)
+    while cursor <= date_to:
+        chunk_end = min(cursor + delta - timedelta(days=1), date_to)
+        start_dt = datetime.combine(cursor, time.min, tzinfo=dt_timezone.utc)
+        end_dt = datetime.combine(chunk_end, time.max, tzinfo=dt_timezone.utc)
+        yield start_dt, end_dt
+        cursor = chunk_end + timedelta(days=1)
+
+
+def _backfill_one_chunk(
+    *,
+    provider,
+    datasource,
+    dsd,
+    history_cfg,
+    credentials,
+    chunk_start,
+    chunk_end,
+    stream_lookup,
+    streams_defs,
+    get_auth_session,
+    AuthError,
+    StreamReading,
+):
+    """Fetch one chunk for one device and persist deduplicated readings.
+
+    Returns (rows_fetched, rows_stored).
+    """
+    token_cache = datasource.auth_token_cache or {}
+    try:
+        headers, base_params, updated_cache = get_auth_session(
+            provider, credentials, token_cache,
+        )
+    except AuthError as exc:
+        raise RuntimeError(
+            f'Auth failure during backfill on device {dsd.pk}: {exc}',
+        ) from exc
+
+    if updated_cache is not None:
+        datasource.auth_token_cache = updated_cache
+        datasource.save(update_fields=['auth_token_cache'])
+
+    path_template = history_cfg.get('path_template', '')
+    method = history_cfg.get('method', 'GET').upper()
+    path = path_template.replace('{device_id}', str(dsd.external_device_id))
+    url = provider.base_url.rstrip('/') + '/' + path.lstrip('/')
+    time_params = _build_time_params_for_window(
+        history_cfg, chunk_start, chunk_end,
+    )
+
+    try:
+        resp = http_requests.request(
+            method, url,
+            headers=headers, params={**base_params, **time_params},
+            timeout=HISTORY_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except http_requests.RequestException as exc:
+        raise RuntimeError(
+            f'History request failed for device {dsd.pk} '
+            f'({chunk_start.date()}→{chunk_end.date()}): {exc}',
+        ) from exc
+
+    root_path = history_cfg.get('response_root_jsonpath', '$[*]')
+    ts_path = history_cfg.get('timestamp_jsonpath')
+    if not ts_path:
+        raise RuntimeError(
+            'Provider history_endpoint is missing timestamp_jsonpath.',
+        )
+
+    try:
+        rows = [m.value for m in jp_parse(root_path).find(data)]
+    except Exception as exc:
+        raise RuntimeError(
+            f'response_root_jsonpath failed on chunk response: {exc}',
+        ) from exc
+
+    fetched = len(rows)
+    if not rows:
+        return 0, 0
+
+    # Build the per-row timestamp + per-stream value extractors.
+    ts_expr = jp_parse(ts_path)
+    stream_exprs = {}
+    for key in dsd.active_stream_keys:
+        if key not in stream_lookup or key not in streams_defs:
+            continue
+        path_expr = streams_defs[key].get('jsonpath')
+        if not path_expr:
+            continue
+        try:
+            stream_exprs[key] = jp_parse(path_expr)
+        except Exception as exc:
+            logger.warning(
+                'JSONPath parse failed for stream "%s" on backfill device %d: %s',
+                key, dsd.pk, exc,
+            )
+
+    # Collect candidate (stream_id, ts, value) tuples from this chunk.
+    candidates_by_stream: dict[int, list[tuple]] = {}
+    for row in rows:
+        ts_matches = ts_expr.find(row)
+        if not ts_matches:
+            continue
+        ts = _parse_provider_timestamp(ts_matches[0].value)
+        if ts is None:
+            continue
+        for key, expr in stream_exprs.items():
+            stream = stream_lookup[key]
+            matches = expr.find(row)
+            if not matches:
+                continue
+            candidates_by_stream.setdefault(stream.pk, []).append((ts, matches[0].value, stream))
+
+    if not candidates_by_stream:
+        return fetched, 0
+
+    # Dedup: per stream, fetch existing timestamps in the chunk window and skip
+    # any candidate whose timestamp already exists.
+    new_readings = []
+    for stream_pk, items in candidates_by_stream.items():
+        candidate_ts = {ts for ts, _, _ in items}
+        existing_ts = set(
+            StreamReading.objects.filter(
+                stream_id=stream_pk,
+                timestamp__in=candidate_ts,
+            ).values_list('timestamp', flat=True)
+        )
+        for ts, value, stream in items:
+            if ts in existing_ts:
+                continue
+            new_readings.append(StreamReading(
+                stream=stream, value=value, timestamp=ts,
+            ))
+
+    if new_readings:
+        with transaction.atomic():
+            StreamReading.objects.bulk_create(new_readings)
+
+    return fetched, len(new_readings)
+
+
+def _build_time_params_for_window(cfg: dict, from_dt, to_dt) -> dict:
+    """Like _build_time_params but with explicit window endpoints.
+
+    The live-poll variant infers `from` from `last_polled_at`. The backfill
+    variant uses the chunk boundaries directly.
+    """
+    raw_params = cfg.get('params')
+    if not raw_params:
+        return {}
+
+    tokens = {
+        '{from_unix}': str(int(from_dt.timestamp())),
+        '{to_unix}': str(int(to_dt.timestamp())),
+        '{from_iso}': from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        '{to_iso}': to_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+    }
+    result = {}
+    for key, value in raw_params.items():
+        for token, replacement in tokens.items():
+            value = str(value).replace(token, replacement)
+        result[key] = value
+    return result
+
+
+def _parse_provider_timestamp(raw):
+    """Parse a provider-supplied timestamp to an aware UTC datetime.
+
+    Accepts ISO 8601 strings (with or without trailing Z) and integer Unix
+    timestamps (seconds since epoch). Returns None on failure so the row can
+    be skipped without aborting the chunk.
+    """
+    if isinstance(raw, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(raw), tz=dt_timezone.utc)
+        except (ValueError, OSError):
+            return None
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    if text.endswith('Z'):
+        text = text[:-1] + '+00:00'
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=dt_timezone.utc)
+    return dt.astimezone(dt_timezone.utc)
+
+
+@shared_task(name='integrations.reconcile_backfill_flags')
+def reconcile_backfill_flags() -> None:
+    """Janitor beat task — clears orphaned `is_backfilling` flags.
+
+    Recovers from worker crashes that left `is_backfilling=True` on a
+    DataSourceDevice with no live job. A flag is considered orphaned when its
+    data source has no queued or running DataSourceBackfillJob. Runs every
+    5 minutes via Celery beat.
+    """
+    from .models import DataSourceBackfillJob, DataSourceDevice
+
+    active_ds_ids = set(
+        DataSourceBackfillJob.objects
+        .filter(status__in=[
+            DataSourceBackfillJob.Status.QUEUED,
+            DataSourceBackfillJob.Status.RUNNING,
+        ])
+        .values_list('datasource_id', flat=True)
+    )
+    cleared = (
+        DataSourceDevice.objects
+        .filter(is_backfilling=True)
+        .exclude(datasource_id__in=active_ds_ids)
+        .update(is_backfilling=False)
+    )
+    if cleared:
+        logger.warning(
+            'reconcile_backfill_flags: cleared is_backfilling on %d orphan(s)',
+            cleared,
+        )

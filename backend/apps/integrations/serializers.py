@@ -14,7 +14,12 @@ from rest_framework import serializers
 
 from apps.devices.serializers import DeviceSerializer
 
-from .models import DataSource, DataSourceDevice, ThirdPartyAPIProvider
+from .models import (
+    DataSource,
+    DataSourceBackfillJob,
+    DataSourceDevice,
+    ThirdPartyAPIProvider,
+)
 
 
 class MultipartJSONField(serializers.JSONField):
@@ -57,6 +62,8 @@ class ThirdPartyAPIProviderAdminSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.logo.url)
         return obj.logo.url
 
+    history_endpoint = MultipartJSONField(default=dict, required=False)
+
     class Meta:
         model = ThirdPartyAPIProvider
         fields = (
@@ -74,6 +81,9 @@ class ThirdPartyAPIProviderAdminSerializer(serializers.ModelSerializer):
             'discovery_endpoint',
             'detail_endpoint',
             'available_streams',
+            'supports_history',
+            'history_endpoint',
+            'history_chunk_days',
             'default_poll_interval_seconds',
             'max_requests_per_second',
             'is_active',
@@ -127,6 +137,7 @@ class ThirdPartyAPIProviderTenantSerializer(serializers.ModelSerializer):
             'logo_url',
             'auth_param_schema',
             'available_streams',
+            'supports_history',
             'default_poll_interval_seconds',
         )
         read_only_fields = fields
@@ -225,6 +236,65 @@ class DataSourceDeviceSerializer(serializers.ModelSerializer):
             'last_poll_error',
             'consecutive_poll_failures',
         )
+
+
+class DataSourceBackfillJobSerializer(serializers.ModelSerializer):
+    """Read-only serializer for a backfill job (Sprint 29a)."""
+
+    created_by_email = serializers.EmailField(
+        source='created_by.email', read_only=True, default=None,
+    )
+
+    class Meta:
+        model = DataSourceBackfillJob
+        fields = (
+            'id',
+            'date_from',
+            'date_to',
+            'status',
+            'rows_fetched',
+            'rows_stored',
+            'error_detail',
+            'created_by',
+            'created_by_email',
+            'created_at',
+            'started_at',
+            'finished_at',
+        )
+        read_only_fields = fields
+
+
+class BackfillJobCreateSerializer(serializers.Serializer):
+    """Validates a POST /api/v1/data-sources/:id/backfill/ request (Sprint 29a).
+
+    `date_from` and `date_to` are inclusive. The window must be ≤ 365 days to
+    cap a single job's blast radius — operators wanting more should split it.
+    """
+
+    MAX_RANGE_DAYS = 365
+
+    date_from = serializers.DateField()
+    date_to = serializers.DateField()
+
+    def validate(self, attrs):
+        """Enforce date_from ≤ date_to and the 365-day window cap."""
+        date_from = attrs['date_from']
+        date_to = attrs['date_to']
+        if date_from > date_to:
+            raise serializers.ValidationError(
+                {'date_to': 'date_to must be on or after date_from.'},
+            )
+        span_days = (date_to - date_from).days + 1
+        if span_days > self.MAX_RANGE_DAYS:
+            raise serializers.ValidationError(
+                {
+                    'date_to': (
+                        f'Backfill window cannot exceed {self.MAX_RANGE_DAYS} days '
+                        f'(requested {span_days}). Split it into multiple jobs.'
+                    ),
+                },
+            )
+        return attrs
 
 
 class ConnectDeviceSerializer(serializers.Serializer):

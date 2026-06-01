@@ -18,6 +18,8 @@ Data Sources (Tenant Admin):
     POST   /api/v1/data-sources/{id}/devices/           — connect devices (wizard)
     PATCH  /api/v1/data-sources/{id}/devices/{did}/     — update stream keys
     DELETE /api/v1/data-sources/{id}/devices/{did}/     — deactivate device
+    GET    /api/v1/data-sources/{id}/backfill/          — list backfill jobs (Sprint 29a)
+    POST   /api/v1/data-sources/{id}/backfill/          — create + dispatch backfill job
 """
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter

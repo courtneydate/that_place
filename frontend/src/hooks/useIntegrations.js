@@ -167,3 +167,44 @@ export function useDeactivateDataSourceDevice(dsId) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Backfill jobs — Sprint 29a
+// ---------------------------------------------------------------------------
+
+const backfillJobsKey = (dsId) => ['data-sources', dsId, 'backfill'];
+
+const JOB_ACTIVE_STATUSES = new Set(['queued', 'running']);
+
+/**
+ * List backfill jobs for a data source. While any job is queued or running,
+ * the query refetches every 5s so the UI tracks completion live.
+ */
+export function useBackfillJobs(dsId, { enabled = true } = {}) {
+  return useQuery({
+    queryKey: backfillJobsKey(dsId),
+    queryFn: () =>
+      api.get(`/api/v1/data-sources/${dsId}/backfill/`).then((r) => r.data),
+    enabled: enabled && dsId != null,
+    refetchInterval: (data) => {
+      const jobs = Array.isArray(data) ? data : data?.state?.data;
+      if (!Array.isArray(jobs)) return false;
+      return jobs.some((j) => JOB_ACTIVE_STATUSES.has(j.status)) ? 5000 : false;
+    },
+  });
+}
+
+export function useStartBackfillJob(dsId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dateFrom, dateTo }) =>
+      api
+        .post(`/api/v1/data-sources/${dsId}/backfill/`, {
+          date_from: dateFrom,
+          date_to: dateTo,
+        })
+        .then((r) => r.data),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: backfillJobsKey(dsId) }),
+  });
+}

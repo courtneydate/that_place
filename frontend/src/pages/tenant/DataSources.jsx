@@ -20,6 +20,7 @@ import {
   useProviders,
 } from '../../hooks/useIntegrations';
 import { useCreateDataSource, useUpdateDataSource } from '../../hooks/useIntegrations';
+import BackfillPanel from '../../components/BackfillPanel';
 import styles from '../admin/AdminPage.module.css';
 
 const POLL_STATUS_LABELS = {
@@ -852,6 +853,7 @@ function DataSources() {
   const [expandedId, setExpandedId] = useState(null);
   const [addingDevicesForId, setAddingDevicesForId] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [backfillForId, setBackfillForId] = useState(null);
   const [deleteError, setDeleteError] = useState('');
 
   const handleDelete = async (ds) => {
@@ -950,12 +952,31 @@ function DataSources() {
                         onClick={() => {
                           setEditingId(editingId === ds.id ? null : ds.id);
                           setAddingDevicesForId(null);
+                          setBackfillForId(null);
                           setShowWizard(false);
                         }}
                         style={{ fontSize: '0.85rem' }}
                       >
                         {editingId === ds.id ? 'Cancel edit' : 'Edit'}
                       </button>
+                      {(() => {
+                        const dsProvider = providers.find((p) => p.id === ds.provider);
+                        if (!dsProvider?.supports_history) return null;
+                        return (
+                          <button
+                            className={styles.secondaryButton}
+                            onClick={() => {
+                              setBackfillForId(backfillForId === ds.id ? null : ds.id);
+                              setEditingId(null);
+                              setAddingDevicesForId(null);
+                              setShowWizard(false);
+                            }}
+                            style={{ fontSize: '0.85rem' }}
+                          >
+                            {backfillForId === ds.id ? 'Hide backfill' : 'Backfill'}
+                          </button>
+                        );
+                      })()}
                       <button
                         className={styles.dangerButton}
                         onClick={() => handleDelete(ds)}
@@ -1008,6 +1029,13 @@ function DataSources() {
                     <tr>
                       <td colSpan={5} style={{ padding: 0 }}>
                         <ConnectedDevicesPanel ds={ds} />
+                      </td>
+                    </tr>
+                  )}
+                  {backfillForId === ds.id && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 0 }}>
+                        <BackfillPanel ds={ds} />
                       </td>
                     </tr>
                   )}

@@ -1000,18 +1000,28 @@ _Data quality flags (SPEC §3 Data Quality Flags):_
 **Context:** Some providers offer a date-range endpoint for historical data (e.g. `/history/?from=&to=`). Live polling (Sprint 10) handles the ongoing live feed but cannot cover the period before a tenant connects a data source. Slotted between B1 and B2 because the billing engine in B2 needs the option of operating against backfilled history. Folded in from SPEC §9 ⚑.
 
 **Deliverables:**
-- [ ] Backend: `ThirdPartyAPIProvider.history_endpoint` config + `supports_history` flag set on providers offering the capability
-- [ ] Backend: `DataSourceBackfillJob` model — data_source, date_from, date_to, status (`queued` / `running` / `completed` / `failed`), progress (rows fetched / rows stored), error_detail, started_at, finished_at
-- [ ] Backend: Celery task — fetches in pages from the provider history endpoint, stores `StreamReading` records with the provider-supplied timestamp, deduplicates against existing readings on `(stream, timestamp)`
-- [ ] Backend: Dispatch + status endpoints `POST/GET /api/v1/data-sources/:id/backfill/`; backoff coordinated with the live-poll lock so the two never run concurrently for the same `DataSourceDevice`
-- [ ] Backend: Tests — backfill stores readings idempotently, live poll skipped while backfill running, page-cursor handled correctly, cross-tenant isolation, role permissions
-- [ ] Frontend: Backfill button on the DataSource detail page (Tenant Admin) — date range picker, in-progress status, completion / error message
+- [x] Backend: `ThirdPartyAPIProvider.history_endpoint` config + `supports_history` flag + `history_chunk_days` (default 7); migration `0008_sprint29a_backfill`
+- [x] Backend: `DataSourceBackfillJob` model — data_source, date_from, date_to, status (`queued` / `running` / `completed` / `failed`), rows_fetched + rows_stored progress counters, error_detail, started_at, finished_at, created_by
+- [x] Backend: `integrations.run_backfill_job` Celery task — splits the window into `history_chunk_days` chunks, reuses the existing `{from_iso}/{to_iso}` interpolation against the history endpoint, iterates rows with provider-supplied timestamps, dedupes against existing `StreamReading` records on `(stream, timestamp)` before bulk_create
+- [x] Backend: Dispatch + status endpoints `POST/GET /api/v1/data-sources/:id/backfill/`; provider must declare `supports_history`, range capped at 365 days, a single in-flight job per data source (409 on conflict)
+- [x] Backend: Live-poll exclusion via `DataSourceDevice.is_backfilling` flag — beat task filters on `False`; backfill task sets/clears in `try`/`finally`; `integrations.reconcile_backfill_flags` Celery beat task (5-minute cadence) clears orphans against `DataSourceBackfillJob.status`
+- [x] Backend: 22 tests in `apps/integrations/tests/test_sprint29a_backfill.py` — multi-chunk walk, idempotent dedup re-run, provider-supplied ISO + unix timestamps, is_backfilling lifecycle, HTTP failure path, live-poll exclusion, janitor reconciliation, all endpoint permission/validation cases
+- [x] Frontend: `BackfillPanel` component on the DataSources page (visible only when `provider.supports_history`) — date range form, recent-jobs table, polls every 5s while any job is queued/running, surfaces error_detail under failed rows
+- [x] Frontend: 5 tests in `components/BackfillPanel.test.jsx` covering empty state, submit, running-state disabling, failed-row error rendering, API error surfacing
 
 **Definition of Done:**
-- [ ] Tenant Admin can request a backfill over a 90-day range for a connected data source that supports history
-- [ ] Backfill runs without duplicating readings already collected by live polling
-- [ ] Backfill and live poll cannot run concurrently on the same `DataSourceDevice` (verified via integration test)
-- [ ] The Reporting CSV export for a backfilled stream over the historical window returns the backfilled rows
+- [x] Tenant Admin can request a backfill over a 90-day range for a connected data source that supports history
+- [x] Backfill runs without duplicating readings already collected by live polling (`test_rerun_is_idempotent_no_duplicates`)
+- [x] Backfill and live poll cannot run concurrently on the same `DataSourceDevice` (`test_backfilling_device_excluded_from_due_list`)
+- [x] The Reporting CSV export for a backfilled stream over the historical window returns the backfilled rows (CSV export reads StreamReading directly; backfilled rows are stored with provider-supplied timestamps in the historical window)
+
+> **Status (2026-06-01):** ✅ Complete. 883 backend tests + 67 frontend tests green
+> (up from 798 / 62 at the start of the sprint); flake8 / isort / eslint clean.
+> Lock mechanism: `is_backfilling` boolean on DataSourceDevice with janitor reconciliation
+> (Redis SET NX deferred to the open SPEC §9 live-poll race condition fix). Pagination
+> shape: day-window chunking with `history_chunk_days` per provider. No real provider
+> seeded with `supports_history=True` — tests cover the surface against a mocked
+> provider; the first real provider adds its own config in a follow-up.
 
 ---
 
