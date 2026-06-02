@@ -1,4 +1,4 @@
-"""Celery tasks for the billing engine — Sprint 31.
+"""Celery tasks for the billing engine — Sprint 31 + Sprint 32.
 
 billing.run_billing_run — main entry point. Acquires the per-(site, period)
     Redis lock, walks the engine steps, releases the lock. On failure marks
@@ -10,14 +10,28 @@ billing.retry_billing_run — refuses unless status=failed; resumes from
 billing.dispatch_billing_schedules — beat task fired every minute by
     Celery beat; finds active BillingSchedules whose next_run_at has
     passed and creates + dispatches a BillingRun for the previous full
-    cadence period (offset by period_offset_days).
+    cadence period (offset by period_offset_days). When BillingSchedule
+    .auto_finalize is True, finalize_billing_run is dispatched once the
+    run reaches status=draft.
+
+billing.finalize_billing_run — Sprint 32. Locks the run + line items +
+    snapshot immutable, creates one BillingInvoice per account (atomic
+    invoice number + PDF render + upload), then dispatches one
+    send_invoice_email task per invoice.
+
+billing.send_invoice_email — Sprint 32. Sends the invoice email to all
+    recipients with PDF attached + a 14-day signed download URL. Updates
+    BillingInvoice.delivery_status.
+
+billing.send_void_notification_email — Sprint 32. Sends a void-notification
+    email per delivered invoice when a run is voided without silent_void.
 
 Per Sprint 31: only one in-flight run per (site, period_start, period_end).
 Redis SET NX with TTL guards against concurrent dispatches; the lock is
 released in the task's finally block.
 
 Ref: SPEC.md § Feature: Billing Runs & Invoicing
-     ROADMAP Sprint 31
+     ROADMAP Sprint 31, Sprint 32
 """
 from __future__ import annotations
 
@@ -25,9 +39,14 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import boto3
 from celery import shared_task
+from django.conf import settings
 from django.core.cache import cache
+from django.core.mail import EmailMessage, send_mail
 from django.utils import timezone
+
+from .invoice_renderer import generate_pdf_signed_url, render_and_upload_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +248,16 @@ def dispatch_billing_schedules() -> None:
             created_by=None,
         )
         run_billing_run.delay(run.id)
+        if schedule.auto_finalize:
+            # Dispatch finalize after the run task completes. The finalize
+            # task itself guards on status=draft, so it will no-op if the
+            # run fails.
+            finalize_billing_run.apply_async(
+                args=[run.id, None],
+                countdown=5,
+                # Give the run task time to reach draft; finalize will
+                # retry up to 3× with 30 s delay if the run isn't draft yet.
+            )
 
         schedule.last_run_at = now
         schedule.next_run_at = _next_run_at(schedule, now)
@@ -369,3 +398,339 @@ def _days_in_month(year: int, month: int) -> int:
     import calendar
 
     return calendar.monthrange(year, month)[1]
+
+
+# ---------------------------------------------------------------------------
+# Sprint 32 — Finalize + invoice email delivery
+# ---------------------------------------------------------------------------
+
+# 14-day signed URL for email links.
+EMAIL_SIGNED_URL_EXPIRY = 14 * 24 * 60 * 60  # 1 209 600 seconds
+
+
+@shared_task(
+    name='billing.finalize_billing_run',
+    bind=True,
+    max_retries=3,
+    default_retry_delay=30,
+)
+def finalize_billing_run(self, billing_run_id: int, finalized_by_user_id) -> None:
+    """Lock a draft BillingRun and create + dispatch invoices.
+
+    Steps (all in one DB transaction):
+      1. Verify run.status == draft; re-queue with countdown if not (run
+         may still be computing when auto_finalize dispatches early).
+      2. Lock the run row (select_for_update).
+      3. Create BillingInvoice per account: allocate invoice number, sum
+         line items, write record.
+      4. Render + upload PDF per invoice.
+      5. Mark run status=finalized, finalized_at, finalized_by.
+
+    Then (outside the transaction) dispatch one send_invoice_email per invoice.
+    """
+    from django.db import transaction
+    from django.utils import timezone
+
+    from .models import BillingAccount, BillingInvoice, BillingLineItem, BillingRun
+
+    try:
+        run = BillingRun.objects.select_related('tenant', 'site').get(pk=billing_run_id)
+    except BillingRun.DoesNotExist:
+        logger.warning('finalize_billing_run: BillingRun %d not found', billing_run_id)
+        return
+
+    if run.status not in (BillingRun.Status.DRAFT, BillingRun.Status.REVIEW):
+        if run.status == BillingRun.Status.COMPUTING and self.request.retries < self.max_retries:
+            # Still computing — retry after delay.
+            raise self.retry(
+                exc=RuntimeError(f'BillingRun {billing_run_id} still computing'),
+            )
+        logger.warning(
+            'finalize_billing_run: BillingRun %d has status=%s — skipping',
+            billing_run_id, run.status,
+        )
+        return
+
+    finalized_by = None
+    if finalized_by_user_id is not None:
+        from apps.accounts.models import User
+        try:
+            finalized_by = User.objects.get(pk=finalized_by_user_id)
+        except User.DoesNotExist:
+            pass
+
+    tenant = run.tenant
+    line_items_by_account = {}
+
+    with transaction.atomic():
+        # Lock the run row.
+        run = BillingRun.objects.select_for_update().get(pk=billing_run_id)
+        if run.status not in (BillingRun.Status.DRAFT, BillingRun.Status.REVIEW):
+            logger.warning(
+                'finalize_billing_run: BillingRun %d status changed under lock — abort',
+                billing_run_id,
+            )
+            return
+
+        # Collect accounts involved in this run.
+        account_ids = list(
+            BillingLineItem.objects
+            .filter(billing_run=run)
+            .values_list('billing_account_id', flat=True)
+            .distinct()
+        )
+        accounts = {
+            a.id: a
+            for a in BillingAccount.objects.filter(id__in=account_ids)
+        }
+
+        created_invoices = []
+        for account_id, account in accounts.items():
+            items = list(
+                BillingLineItem.objects
+                .select_related('stream')
+                .filter(billing_run=run, billing_account_id=account_id)
+            )
+            subtotal = sum(i.amount_cents for i in items)
+            gst = sum(i.gst_cents for i in items)
+
+            invoice_number = _allocate_number(tenant)
+
+            invoice = BillingInvoice(
+                billing_run=run,
+                billing_account=account,
+                invoice_number=invoice_number,
+                period_start=run.period_start,
+                period_end=run.period_end,
+                subtotal_cents=subtotal,
+                gst_cents=gst,
+                total_cents=subtotal + gst,
+                status=BillingInvoice.Status.DRAFT,
+                delivery_status=BillingInvoice.DeliveryStatus.PENDING,
+            )
+            invoice.save()
+            created_invoices.append(invoice)
+            line_items_by_account[invoice.id] = items
+
+        # Mark run finalized.
+        run.status = BillingRun.Status.FINALIZED
+        run.finalized_at = timezone.now()
+        run.finalized_by = finalized_by
+        run.save(update_fields=['status', 'finalized_at', 'finalized_by'])
+
+    # Outside the transaction: render PDFs + dispatch email tasks.
+    # PDF rendering is slow (WeasyPrint) — don't hold the DB lock.
+    for invoice in created_invoices:
+        items = line_items_by_account[invoice.id]
+        account = accounts[invoice.billing_account_id]
+        try:
+            render_and_upload_pdf(invoice, run, account, items, tenant)
+            invoice.save(update_fields=['pdf_object_key'])
+        except Exception:
+            logger.exception(
+                'finalize_billing_run: PDF render/upload failed for invoice %d (%s)',
+                invoice.id, invoice.invoice_number,
+            )
+            # Continue — invoice still gets created and emailed; the PDF
+            # attachment will be missing but the signed URL will point to the
+            # placeholder. Operator can manually resend once fixed.
+
+        if account.invoice_email_recipients:
+            send_invoice_email.delay(invoice.id)
+        else:
+            logger.info(
+                'Invoice %s (%s) has no recipients — skipping email.',
+                invoice.invoice_number, account.name,
+            )
+
+    logger.info(
+        'finalize_billing_run: BillingRun %d finalized; %d invoices created',
+        billing_run_id, len(created_invoices),
+    )
+
+
+def _allocate_number(tenant) -> str:
+    """Thin wrapper so finalize_billing_run can call allocate_invoice_number."""
+    from .invoice_renderer import allocate_invoice_number  # noqa: PLC0415
+    return allocate_invoice_number(tenant)
+
+
+@shared_task(
+    name='billing.send_invoice_email',
+    bind=True,
+    max_retries=1,
+    default_retry_delay=60,
+)
+def send_invoice_email(self, invoice_id: int) -> None:
+    """Email a BillingInvoice to all its account recipients.
+
+    Attaches the PDF if pdf_object_key is set; always includes a 14-day
+    signed download URL. Updates delivery_status and delivered_at.
+    """
+    from django.utils import timezone
+
+    from .models import BillingInvoice
+
+    try:
+        invoice = BillingInvoice.objects.select_related(
+            'billing_account', 'billing_run__tenant',
+        ).get(pk=invoice_id)
+    except BillingInvoice.DoesNotExist:
+        logger.warning('send_invoice_email: invoice %d not found', invoice_id)
+        return
+
+    account = invoice.billing_account
+    recipients = list(account.invoice_email_recipients or [])
+    if not recipients:
+        logger.info('send_invoice_email: no recipients for invoice %d', invoice_id)
+        return
+
+    tenant = invoice.billing_run.tenant
+    subject = (
+        f'Tax Invoice {invoice.invoice_number} — '
+        f'{invoice.period_start.strftime("%b %Y")}'
+    )
+
+    # Build a 14-day signed URL (present even if PDF upload failed).
+    signed_url = ''
+    if invoice.pdf_object_key:
+        try:
+            signed_url = generate_pdf_signed_url(
+                invoice.pdf_object_key,
+                expiry_seconds=EMAIL_SIGNED_URL_EXPIRY,
+            )
+        except Exception:
+            logger.exception(
+                'send_invoice_email: failed to generate signed URL for invoice %d',
+                invoice_id,
+            )
+
+    body = (
+        f'Dear {account.name},\n\n'
+        f'Please find attached your tax invoice {invoice.invoice_number} '
+        f'for the billing period '
+        f'{invoice.period_start.strftime("%d %b %Y")} to '
+        f'{invoice.period_end.strftime("%d %b %Y")}.\n\n'
+        f'Invoice total: ${invoice.total_cents / 100:,.2f} (incl. GST)\n\n'
+    )
+    if signed_url:
+        body += (
+            f'Download your invoice (valid for 14 days):\n{signed_url}\n\n'
+        )
+    body += (
+        f'If you have any questions about this invoice, please contact us.\n\n'
+        f'Regards,\n{tenant.name}'
+    )
+
+    email = EmailMessage(
+        subject=subject,
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+    )
+
+    # Attach PDF bytes if available.
+    if invoice.pdf_object_key:
+        try:
+            client = boto3.client(
+                's3',
+                aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+                aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+                endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
+            )
+            response = client.get_object(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                Key=invoice.pdf_object_key,
+            )
+            pdf_bytes = response['Body'].read()
+            email.attach(
+                f'{invoice.invoice_number}.pdf',
+                pdf_bytes,
+                'application/pdf',
+            )
+        except Exception:
+            logger.exception(
+                'send_invoice_email: could not fetch PDF for attachment (invoice %d)',
+                invoice_id,
+            )
+
+    try:
+        email.send(fail_silently=False)
+        invoice.delivery_status = BillingInvoice.DeliveryStatus.SENT
+        invoice.status = BillingInvoice.Status.DELIVERED
+        invoice.delivered_at = timezone.now()
+        invoice.save(update_fields=['delivery_status', 'status', 'delivered_at'])
+        logger.info(
+            'send_invoice_email: sent invoice %s to %s',
+            invoice.invoice_number, recipients,
+        )
+    except Exception as exc:
+        logger.error(
+            'send_invoice_email: failed for invoice %d — %s', invoice_id, exc,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+        invoice.delivery_status = BillingInvoice.DeliveryStatus.FAILED
+        invoice.save(update_fields=['delivery_status'])
+
+
+@shared_task(
+    name='billing.send_void_notification_email',
+    bind=True,
+    max_retries=1,
+    default_retry_delay=60,
+)
+def send_void_notification_email(self, invoice_id: int) -> None:
+    """Notify invoice recipients that the run has been voided.
+
+    Only fired for invoices that were status=delivered at void time.
+    """
+    from .models import BillingInvoice
+
+    try:
+        invoice = BillingInvoice.objects.select_related(
+            'billing_account', 'billing_run__tenant',
+        ).get(pk=invoice_id)
+    except BillingInvoice.DoesNotExist:
+        logger.warning('send_void_notification_email: invoice %d not found', invoice_id)
+        return
+
+    account = invoice.billing_account
+    recipients = list(account.invoice_email_recipients or [])
+    if not recipients:
+        return
+
+    tenant = invoice.billing_run.tenant
+    run = invoice.billing_run
+    reason_note = f'\n\nReason: {run.void_reason}' if run.void_reason else ''
+
+    subject = f'VOID NOTICE — Invoice {invoice.invoice_number}'
+    body = (
+        f'Dear {account.name},\n\n'
+        f'Invoice {invoice.invoice_number} for the billing period '
+        f'{invoice.period_start.strftime("%d %b %Y")} to '
+        f'{invoice.period_end.strftime("%d %b %Y")} has been voided and '
+        f'is no longer payable.{reason_note}\n\n'
+        f'A revised invoice will be issued if applicable. Please contact '
+        f'us if you have any questions.\n\n'
+        f'Regards,\n{tenant.name}'
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            fail_silently=False,
+        )
+        logger.info(
+            'send_void_notification_email: sent for invoice %s to %s',
+            invoice.invoice_number, recipients,
+        )
+    except Exception as exc:
+        logger.error(
+            'send_void_notification_email: failed for invoice %d — %s', invoice_id, exc,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)

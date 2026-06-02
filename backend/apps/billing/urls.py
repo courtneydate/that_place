@@ -1,4 +1,4 @@
-"""URL patterns for the billing app — Sprint 30 + Sprint 31.
+"""URL patterns for the billing app — Sprint 30 + Sprint 31 + Sprint 32.
 
 Sprint 30 routes (BillingAccount + meters + tariff assignments):
     GET    /api/v1/billing-accounts/
@@ -39,6 +39,16 @@ Sprint 31 routes (BillingRun + BillingSchedule):
     PUT    /api/v1/billing-schedules/{id}/
     PATCH  /api/v1/billing-schedules/{id}/
     DELETE /api/v1/billing-schedules/{id}/
+
+Sprint 32 routes (finalize + void + invoices + CSV export):
+    POST   /api/v1/billing-runs/{id}/finalize/         — lock run + issue invoices
+    POST   /api/v1/billing-runs/{id}/void/             — void finalized run
+    GET    /api/v1/billing-runs/{id}/line-items.csv    — streaming CSV export
+
+    GET    /api/v1/invoices/                           — ?billing_account=, ?run=
+    GET    /api/v1/invoices/{id}/
+    GET    /api/v1/invoices/{id}/pdf/                  — 15-min signed URL
+    POST   /api/v1/invoices/{id}/resend/               — re-queue email
 """
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
@@ -47,6 +57,7 @@ from .views import (
     BillingAccountMeterView,
     BillingAccountTariffAssignmentView,
     BillingAccountViewSet,
+    BillingInvoiceViewSet,
     BillingRunViewSet,
     BillingScheduleViewSet,
 )
@@ -55,6 +66,7 @@ router = DefaultRouter()
 router.register('billing-accounts', BillingAccountViewSet, basename='billing-account')
 router.register('billing-runs', BillingRunViewSet, basename='billing-run')
 router.register('billing-schedules', BillingScheduleViewSet, basename='billing-schedule')
+router.register('invoices', BillingInvoiceViewSet, basename='billing-invoice')
 
 app_name = 'billing'
 

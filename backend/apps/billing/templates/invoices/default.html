@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
+  .page { padding: 32px 40px; max-width: 800px; margin: 0 auto; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 2px solid #0f4c81; padding-bottom: 20px; }
+  .header-brand { font-size: 22px; font-weight: 700; color: #0f4c81; letter-spacing: -0.5px; }
+  .header-meta { text-align: right; }
+  .header-meta .invoice-label { font-size: 20px; font-weight: 700; color: #0f4c81; }
+  .header-meta .invoice-number { font-size: 13px; color: #555; margin-top: 2px; }
+
+  /* Addresses */
+  .addresses { display: flex; gap: 40px; margin-bottom: 24px; }
+  .address-block { flex: 1; }
+  .address-block .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #777; margin-bottom: 5px; }
+  .address-block .name { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .address-block .detail { color: #444; line-height: 1.5; }
+
+  /* Run summary */
+  .run-summary { background: #f4f7fb; border: 1px solid #d8e3f0; border-radius: 4px; padding: 12px 16px; margin-bottom: 24px; display: flex; gap: 32px; }
+  .run-summary .item .lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #777; }
+  .run-summary .item .val { font-size: 11px; color: #1a1a1a; margin-top: 2px; }
+
+  /* Line items */
+  .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #777; margin-bottom: 8px; }
+  table.line-items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  table.line-items thead th { background: #0f4c81; color: #fff; padding: 7px 8px; text-align: left; font-size: 10px; font-weight: 600; }
+  table.line-items thead th.right { text-align: right; }
+  table.line-items tbody tr:nth-child(even) { background: #f9fafb; }
+  table.line-items tbody td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 10px; vertical-align: top; }
+  table.line-items tbody td.right { text-align: right; }
+  table.line-items tbody td.kind { color: #555; font-style: italic; }
+  .quality-flag { display: inline-block; font-size: 8px; padding: 1px 4px; border-radius: 2px; background: #fef3cd; color: #856404; margin-left: 4px; }
+
+  /* Totals */
+  .totals { display: flex; justify-content: flex-end; margin-bottom: 28px; }
+  .totals-table { width: 240px; }
+  .totals-table tr td { padding: 4px 8px; font-size: 11px; }
+  .totals-table tr td.lbl { color: #555; }
+  .totals-table tr td.amt { text-align: right; font-weight: 600; }
+  .totals-table tr.total-row td { border-top: 2px solid #0f4c81; font-size: 13px; font-weight: 700; color: #0f4c81; padding-top: 6px; }
+
+  /* Payment instructions */
+  .payment { margin-bottom: 24px; padding: 12px 16px; border-left: 3px solid #0f4c81; background: #f4f7fb; }
+  .payment .lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #777; margin-bottom: 4px; }
+
+  /* Quality summary */
+  .quality-summary { margin-bottom: 20px; font-size: 10px; color: #666; }
+
+  /* Disclaimer footer */
+  .disclaimer { margin-top: 28px; padding: 10px 14px; border: 1px solid #e0c97f; background: #fffbea; border-radius: 4px; font-size: 9px; color: #6b5800; line-height: 1.5; }
+  .disclaimer strong { display: block; margin-bottom: 3px; }
+
+  /* Footer */
+  .footer { margin-top: 24px; border-top: 1px solid #eee; padding-top: 10px; font-size: 9px; color: #aaa; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-brand">{{ tenant.name }}</div>
+    <div class="header-meta">
+      <div class="invoice-label">TAX INVOICE</div>
+      <div class="invoice-number">{{ invoice.invoice_number }}</div>
+      {% if tenant.abn %}<div style="font-size:10px;color:#555;margin-top:2px;">ABN {{ tenant.abn }}</div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Addresses -->
+  <div class="addresses">
+    <div class="address-block">
+      <div class="label">From</div>
+      <div class="name">{{ tenant.name }}</div>
+      <div class="detail">
+        {% if tenant.invoice_settlement_disclaimer %}{{ tenant.name }}{% endif %}
+      </div>
+    </div>
+    <div class="address-block">
+      <div class="label">Bill To</div>
+      <div class="name">{{ account.name }}</div>
+      {% if account.abn %}<div class="detail">ABN {{ account.abn }}</div>{% endif %}
+      {% if account.billing_address %}
+      <div class="detail">
+        {% if account.billing_address.street %}{{ account.billing_address.street }}<br>{% endif %}
+        {% if account.billing_address.suburb %}{{ account.billing_address.suburb }}{% endif %}
+        {% if account.billing_address.state %} {{ account.billing_address.state }}{% endif %}
+        {% if account.billing_address.postcode %} {{ account.billing_address.postcode }}{% endif %}
+      </div>
+      {% endif %}
+      {% if account.contact_email %}<div class="detail" style="margin-top:4px;">{{ account.contact_email }}</div>{% endif %}
+    </div>
+    <div class="address-block">
+      <div class="label">Invoice Details</div>
+      <div class="detail">
+        <strong>Issue date:</strong> {{ invoice.issued_at|date:"j F Y" }}<br>
+        {% if account.customer_reference %}<strong>Reference:</strong> {{ account.customer_reference }}<br>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Run summary -->
+  <div class="run-summary">
+    <div class="item">
+      <div class="lbl">Billing Period</div>
+      <div class="val">{{ run.period_start|date:"j M Y" }} – {{ run.period_end|date:"j M Y" }}</div>
+    </div>
+    <div class="item">
+      <div class="lbl">Site</div>
+      <div class="val">{{ run.site.name }}</div>
+    </div>
+    <div class="item">
+      <div class="lbl">Timezone</div>
+      <div class="val">{{ run.timezone_snapshot }}</div>
+    </div>
+  </div>
+
+  <!-- Line items -->
+  <div class="section-title">Charges</div>
+  <table class="line-items">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Period</th>
+        <th class="right">kWh</th>
+        <th class="right">Rate (c/kWh)</th>
+        <th class="right">Amount</th>
+        <th class="right">GST</th>
+        <th class="right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in line_items %}
+      <tr>
+        <td>
+          {{ item.line_kind_display }}
+          {% if item.stream %}
+          <span style="color:#888;"> — {{ item.stream.label }}</span>
+          {% endif %}
+          {% if item.quality_summary and item.quality_summary.gap %}
+          <span class="quality-flag">{{ item.quality_summary.gap }} gap interval(s)</span>
+          {% endif %}
+        </td>
+        <td class="kind">{{ item.period_name|default:"—" }}</td>
+        <td class="right">{% if item.kwh is not None %}{{ item.kwh|floatformat:3 }}{% else %}—{% endif %}</td>
+        <td class="right">{% if item.rate_cents_per_kwh is not None %}{{ item.rate_cents_per_kwh|floatformat:4 }}{% else %}—{% endif %}</td>
+        <td class="right">{{ item.amount_dollars }}</td>
+        <td class="right">{{ item.gst_dollars }}</td>
+        <td class="right">{{ item.total_dollars }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals">
+    <table class="totals-table">
+      <tr><td class="lbl">Subtotal (excl. GST)</td><td class="amt">{{ subtotal_display }}</td></tr>
+      <tr><td class="lbl">GST ({{ gst_rate_pct }}%)</td><td class="amt">{{ gst_display }}</td></tr>
+      <tr class="total-row"><td class="lbl">Total (incl. GST)</td><td class="amt">{{ total_display }}</td></tr>
+    </table>
+  </div>
+
+  <!-- Data quality note if any gaps present -->
+  {% if has_quality_issues %}
+  <div class="quality-summary">
+    <strong>Data quality note:</strong> One or more intervals in this billing period contain estimated or gap-quality readings.
+    These are flagged on the relevant line items above. Contact your network operator if you have questions.
+  </div>
+  {% endif %}
+
+  <!-- Settlement-grade disclaimer (en_tenant accounts only) -->
+  {% if show_disclaimer %}
+  <div class="disclaimer">
+    <strong>Settlement-grade disclaimer</strong>
+    {% if disclaimer_text %}{{ disclaimer_text }}{% else %}This invoice is produced from interval meter data processed by the That Place metering platform. It is invoice-grade billing output only and is not AEMO-MDP-accredited settlement data. Readings are subject to revision if a meter exchange, data recovery, or comms-loss substitution is applied in a subsequent billing period.{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="footer">
+    Generated by That Place &middot; {{ invoice.invoice_number }} &middot; {{ invoice.issued_at|date:"j F Y" }}
+  </div>
+
+</div>
+</body>
+</html>

@@ -1084,7 +1084,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 - [ ] On finalize the run locks (run + line items + invoices + snapshot all immutable) and each invoice is emailed to its recipients as its own Celery task (PDF attached + a 14-day signed URL) so one bad address does not fail the run
 - [ ] Manual resend is available per invoice
 - [ ] A `draft` / `review` run can be recomputed; a `finalized` run can only be voided (Tenant Admin only) and re-run — voided runs and their line items, invoices, and allocations are retained immutably
-- [ ] On void, invoices already `delivered` get an automatic void-notification email unless a `silent_void` flag is set; there is no formal credit-note entity in v1
+- [ ] On void, invoices already `delivered` get an automatic void-notification email unless a `silent_void` flag is set on the void request (the flag is a request-body option on the void endpoint, not a persisted run attribute — it describes *how the void was performed* and is captured in the void audit record alongside an optional operator `reason` string). There is no formal credit-note entity in v1.
 - [ ] CSV export of all line items in a run
 
 ---
@@ -1190,7 +1190,7 @@ Values below `warning_threshold` = normal (green); between `warning_threshold` a
 | BillingRun | belongs to Tenant | id, tenant_id, site_id (nullable), billing_account_ids (int array — empty = all active accounts in scope), period_start (UTC), period_end (UTC), timezone (snapshot of tenant tz at run time), status (draft/computing/review/finalized/voided/failed), created_by (FK → User), created_at, computed_at (nullable), finalized_at (nullable), finalized_by (nullable FK → User), reconciliation_status (nullable — ok/variance_within_tolerance/variance_exceeded), notes (text) |
 | BillingRunSnapshot | belongs to BillingRun; refs Stream + StreamReading | id, billing_run_id, stream_id, period_start_reading_id (nullable FK → StreamReading), period_end_reading_id (FK → StreamReading), interval_aggregate_ids (int array), computed_kwh (numeric), quality_summary (JSONB) |
 | BillingLineItem | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, stream_id (nullable — for supply/common-area/adjustment lines), line_kind (energy/supply/discount/adjustment/credit/common_area_share), period_name (peak/off_peak/flat/...), kwh (nullable for non-energy lines), rate_cents_per_kwh (nullable for non-energy lines), amount_cents, gst_cents, quality_summary (JSONB), source_account_id (nullable — set when apportioned from another account, e.g. common-area share) |
-| BillingInvoice | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, invoice_number (unique per tenant), period_start, period_end, subtotal_cents, gst_cents, total_cents, pdf_object_key (S3/MinIO path), issued_at, delivered_at (nullable), delivery_status (pending/sent/delivered/failed) |
+| BillingInvoice | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, invoice_number (unique per tenant), period_start, period_end, subtotal_cents, gst_cents, total_cents, pdf_object_key (S3/MinIO path), issued_at, delivered_at (nullable), voided_at (nullable), status (draft/delivered/void — invoice lifecycle: `draft` on creation at run finalize; `delivered` on first successful email send; `void` when the parent run is voided), delivery_status (pending/sent/delivered/failed — last email-send attempt outcome; v1 treats `sent` as the success terminal — `delivered` is reserved for a future bounce/return-receipt integration via SES notifications) |
 | SolarAllocationRecord | belongs to BillingRun + BillingAccount | id, billing_run_id, billing_account_id, interval_start (UTC), allocated_kwh (numeric), allocation_method (pro_rata_consumption/equal_share/fixed_proportion) |
 | ReconciliationReport | belongs to BillingRun | id, billing_run_id, site_id, gate_import_kwh, gate_export_kwh, generation_kwh, sum_child_import_kwh, common_area_kwh, computed_loss_kwh, variance_percent, status (ok/within_tolerance/exceeded) |
 | BillingSchedule | belongs to Tenant | id, tenant_id, name, site_id (nullable), billing_account_ids (int array), cadence (monthly_calendar/monthly_anchor/quarterly/custom_cron), anchor_day (nullable int 1–31), period_offset_days (int), auto_finalize (bool), is_active |
@@ -1491,12 +1491,12 @@ POST   /api/v1/billing-runs/                    # create + dispatch computation
 GET    /api/v1/billing-runs/:id/
 POST   /api/v1/billing-runs/:id/recompute/      # only if status in (draft, review)
 POST   /api/v1/billing-runs/:id/finalize/       # locks the run + sends invoices
-POST   /api/v1/billing-runs/:id/void/           # only if status = finalized — Tenant Admin only
+POST   /api/v1/billing-runs/:id/void/           # only if status = finalized — Tenant Admin only; body: {silent_void?: bool (default false — suppress automatic void-notification emails), reason?: string (optional audit string captured on the run)}
 GET    /api/v1/billing-runs/:id/line-items/
 GET    /api/v1/billing-runs/:id/snapshot/
 GET    /api/v1/billing-runs/:id/reconciliation/ # hierarchical sites only
 GET    /api/v1/billing-runs/:id/allocations/    # hierarchical sites only
-GET    /api/v1/billing-runs/:id/export.csv      # streaming CSV of all line items
+GET    /api/v1/billing-runs/:id/line-items-csv/ # streaming CSV of all line items
 
 # Compliance data export (embedded-network operators)
 GET    /api/v1/sites/:id/compliance-export/     # ?period_start=&period_end= — per-account energy, solar allocation, reconciliation, comms-loss, disconnections, disputes

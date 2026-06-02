@@ -357,8 +357,22 @@ function TenantLayout() {
             to="/app/billing-accounts"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
           >
-            Billing
+            Accounts
           </NavLink>
+          <NavLink
+            to="/app/billing-runs"
+            className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+          >
+            Runs
+          </NavLink>
+          {user?.role === 'admin' && (
+            <NavLink
+              to="/app/billing-schedules"
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
+            >
+              Schedules
+            </NavLink>
+          )}
           <NavLink
             to="/app/tariffs"
             className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}

@@ -1,15 +1,19 @@
-"""Views for the billing app — Sprint 30.
+"""Views for the billing app — Sprint 30 + Sprint 31 + Sprint 32.
 
 The viewset-level dance with `set_audit_actor` is what lets the signal
 handler tag every audit log row with the user that triggered the change —
 Django signals don't see request context on their own.
 
 Ref: SPEC.md § Feature: Billing Accounts & Tariffs
-     ROADMAP.md § Sprint 30
+     SPEC.md § Feature: Billing Runs & Invoicing
+     ROADMAP.md § Sprint 30, Sprint 31, Sprint 32
 """
+import csv
 import logging
 
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -18,11 +22,13 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsTenantAdmin, IsViewOnly
 
+from .invoice_renderer import generate_pdf_signed_url
 from .models import (
     BillingAccount,
     BillingAccountAuditLog,
     BillingAccountMeter,
     BillingAccountTariffAssignment,
+    BillingInvoice,
     BillingLineItem,
     BillingRun,
     BillingRunSnapshot,
@@ -33,6 +39,7 @@ from .serializers import (
     BillingAccountMeterSerializer,
     BillingAccountSerializer,
     BillingAccountTariffAssignmentSerializer,
+    BillingInvoiceSerializer,
     BillingLineItemSerializer,
     BillingRunCreateSerializer,
     BillingRunSerializer,
@@ -41,6 +48,14 @@ from .serializers import (
     BulkBillingAccountImportSerializer,
 )
 from .signals import clear_audit_actor, set_audit_actor
+from .tasks import (
+    _next_run_at,
+    finalize_billing_run,
+    retry_billing_run,
+    run_billing_run,
+    send_invoice_email,
+    send_void_notification_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +327,7 @@ class BillingRunViewSet(viewsets.GenericViewSet):
 
     def get_permissions(self):
         """Read = any tenant user; write = Tenant Admin."""
-        if self.action in ('list', 'retrieve', 'line_items', 'snapshot'):
+        if self.action in ('list', 'retrieve', 'line_items', 'snapshot', 'line_items_csv'):
             return [IsAuthenticated(), IsViewOnly()]
         return [IsAuthenticated(), IsTenantAdmin()]
 
@@ -348,8 +363,6 @@ class BillingRunViewSet(viewsets.GenericViewSet):
         """
         from apps.devices.models import Site
 
-        from .tasks import run_billing_run
-
         tenant = request.user.tenantuser.tenant
         serializer = BillingRunCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -384,8 +397,6 @@ class BillingRunViewSet(viewsets.GenericViewSet):
 
         Refuses unless status=failed. Resumes from `failed_step`.
         """
-        from .tasks import retry_billing_run
-
         run = get_object_or_404(self._qs(request), pk=pk)
         if run.status != BillingRun.Status.FAILED:
             return Response(
@@ -408,8 +419,6 @@ class BillingRunViewSet(viewsets.GenericViewSet):
         `resolve_scope`; existing snapshot + line items are deleted at the
         start of each step.
         """
-        from .tasks import run_billing_run
-
         run = get_object_or_404(self._qs(request), pk=pk)
         if run.status != BillingRun.Status.DRAFT:
             return Response(
@@ -450,6 +459,128 @@ class BillingRunViewSet(viewsets.GenericViewSet):
         )
         return Response(BillingRunSnapshotSerializer(snaps, many=True).data)
 
+    @action(detail=True, methods=['post'])
+    def finalize(self, request, pk=None):
+        """POST /api/v1/billing-runs/:id/finalize/ — lock the run and issue invoices.
+
+        Tenant Admin only. Accepts draft and review runs. Dispatches
+        billing.finalize_billing_run asynchronously.
+        """
+        run = get_object_or_404(self._qs(request), pk=pk)
+        if run.status not in (BillingRun.Status.DRAFT, BillingRun.Status.REVIEW):
+            return Response(
+                {
+                    'error': {
+                        'code': 'invalid_status',
+                        'message': (
+                            f'Only draft or review runs can be finalized '
+                            f'(current: {run.status}).'
+                        ),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        finalize_billing_run.delay(run.id, request.user.id)
+        logger.info('BillingRun %d finalize dispatched by %s', run.id, request.user.email)
+        return Response(BillingRunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=['post'])
+    def void(self, request, pk=None):
+        """POST /api/v1/billing-runs/:id/void/ — void a finalized run.
+
+        Tenant Admin only. Body: {silent_void?: bool, reason?: string}.
+        Marks the run + all its invoices voided. Unless silent_void=true,
+        dispatches a void-notification email per delivered invoice.
+        """
+        run = get_object_or_404(self._qs(request), pk=pk)
+        if run.status != BillingRun.Status.FINALIZED:
+            return Response(
+                {
+                    'error': {
+                        'code': 'invalid_status',
+                        'message': f'Only finalized runs can be voided (current: {run.status}).',
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        silent_void = bool(request.data.get('silent_void', False))
+        reason = str(request.data.get('reason', '') or '')
+
+        now = timezone.now()
+        run.status = BillingRun.Status.VOIDED
+        run.voided_at = now
+        run.void_reason = reason
+        run.save(update_fields=['status', 'voided_at', 'void_reason'])
+
+        # Void all invoices; collect those that were delivered for notifications.
+        invoices_to_notify = []
+        for invoice in run.invoices.all():
+            was_delivered = invoice.status == BillingInvoice.Status.DELIVERED
+            invoice.status = BillingInvoice.Status.VOID
+            invoice.voided_at = now
+            invoice.save(update_fields=['status', 'voided_at'])
+            if was_delivered and not silent_void:
+                invoices_to_notify.append(invoice.id)
+
+        for invoice_id in invoices_to_notify:
+            send_void_notification_email.delay(invoice_id)
+
+        logger.info(
+            'BillingRun %d voided by %s (silent=%s, notified=%d invoices)',
+            run.id, request.user.email, silent_void, len(invoices_to_notify),
+        )
+        return Response(BillingRunSerializer(run).data)
+
+    @action(detail=True, methods=['get'], url_path='line-items-csv')
+    def line_items_csv(self, request, pk=None):
+        """GET /api/v1/billing-runs/:id/line-items.csv — streaming CSV export.
+
+        Admin only (checked at get_permissions). Uses Django's StreamingHttpResponse
+        to avoid loading all rows into memory.
+        """
+        run = get_object_or_404(self._qs(request), pk=pk)
+        items = (
+            BillingLineItem.objects
+            .filter(billing_run=run)
+            .select_related('billing_account', 'stream')
+            .order_by('billing_account__name', 'line_kind', 'period_name')
+        )
+
+        def _rows():
+            header = [
+                'account_name', 'customer_reference', 'line_kind',
+                'period_name', 'kwh', 'rate_cents_per_kwh',
+                'amount_cents', 'gst_cents', 'total_cents', 'quality_summary',
+            ]
+            yield header
+            for item in items.iterator(chunk_size=500):
+                yield [
+                    item.billing_account.name,
+                    item.billing_account.customer_reference,
+                    item.line_kind,
+                    item.period_name,
+                    str(item.kwh) if item.kwh is not None else '',
+                    str(item.rate_cents_per_kwh) if item.rate_cents_per_kwh is not None else '',
+                    str(item.amount_cents),
+                    str(item.gst_cents),
+                    str(item.amount_cents + item.gst_cents),
+                    str(item.quality_summary) if item.quality_summary else '',
+                ]
+
+        class _Echo:
+            def write(self, value):
+                return value
+
+        writer = csv.writer(_Echo())
+        response = StreamingHttpResponse(
+            (writer.writerow(row) for row in _rows()),
+            content_type='text/csv',
+        )
+        filename = f'billing-run-{run.id}-line-items.csv'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
 
 class BillingScheduleViewSet(viewsets.GenericViewSet):
     """CRUD for BillingSchedule.
@@ -480,8 +611,6 @@ class BillingScheduleViewSet(viewsets.GenericViewSet):
 
         next_run_at defaults to the next cadence boundary in tenant time.
         """
-        from .tasks import _next_run_at
-
         tenant = request.user.tenantuser.tenant
         serializer = BillingScheduleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -513,6 +642,75 @@ class BillingScheduleViewSet(viewsets.GenericViewSet):
         sched = get_object_or_404(self._qs(request), pk=pk)
         sched.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BillingInvoiceViewSet(viewsets.GenericViewSet):
+    """Invoice list, detail, PDF preview, and resend.
+
+    All reads: any authenticated tenant user.
+    Resend: Tenant Admin only.
+    """
+
+    def get_permissions(self):
+        if self.action == 'resend':
+            return [IsAuthenticated(), IsTenantAdmin()]
+        return [IsAuthenticated(), IsViewOnly()]
+
+    def _qs(self, request):
+        qs = BillingInvoice.objects.select_related(
+            'billing_account', 'billing_run', 'billing_run__tenant',
+        )
+        if not request.user.is_that_place_admin:
+            qs = qs.filter(billing_run__tenant=request.user.tenantuser.tenant)
+        return qs
+
+    def list(self, request):
+        """GET /api/v1/invoices/ — ?billing_account=, ?run=."""
+        qs = self._qs(request)
+        if ba := request.query_params.get('billing_account'):
+            qs = qs.filter(billing_account_id=ba)
+        if run := request.query_params.get('run'):
+            qs = qs.filter(billing_run_id=run)
+        return Response(BillingInvoiceSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        """GET /api/v1/invoices/:id/."""
+        invoice = get_object_or_404(self._qs(request), pk=pk)
+        return Response(BillingInvoiceSerializer(invoice).data)
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """GET /api/v1/invoices/:id/pdf/ — 15-minute pre-signed URL."""
+        invoice = get_object_or_404(self._qs(request), pk=pk)
+        if not invoice.pdf_object_key:
+            return Response(
+                {'error': {'code': 'pdf_not_ready', 'message': 'PDF has not been generated yet.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            url = generate_pdf_signed_url(invoice.pdf_object_key, expiry_seconds=900)
+        except Exception:
+            logger.exception('Failed to generate signed URL for invoice %d', invoice.id)
+            return Response(
+                {'error': {'code': 'storage_error', 'message': 'Could not generate download URL.'}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response({'url': url, 'expires_in': 900})
+
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        """POST /api/v1/invoices/:id/resend/ — re-queue email delivery."""
+        invoice = get_object_or_404(self._qs(request), pk=pk)
+        if invoice.status == BillingInvoice.Status.VOID:
+            return Response(
+                {'error': {'code': 'invoice_voided', 'message': 'Voided invoices cannot be resent.'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        invoice.delivery_status = BillingInvoice.DeliveryStatus.PENDING
+        invoice.save(update_fields=['delivery_status'])
+        send_invoice_email.delay(invoice.id)
+        logger.info('Invoice %s resend dispatched by %s', invoice.invoice_number, request.user.email)
+        return Response(BillingInvoiceSerializer(invoice).data, status=status.HTTP_202_ACCEPTED)
 
 
 # Lint silences: BillingAccountMeter / BillingAccountAuditLog /

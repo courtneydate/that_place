@@ -1,4 +1,4 @@
-"""Billing app models — Sprint 30 (accounts) + Sprint 31 (runs).
+"""Billing app models — Sprint 30 (accounts) + Sprint 31 (runs) + Sprint 32 (invoices).
 
 Sprint 30 models the customer the operator-tenant invoices: BillingAccount,
 BillingAccountMeter (links to billable Streams), BillingAccountTariffAssignment
@@ -10,12 +10,18 @@ reproducible), BillingLineItem (per-(account, stream, TOU period) energy /
 supply / credit lines with per-line GST), and BillingSchedule (recurring
 runs via Celery beat).
 
+Sprint 32 adds invoice rendering and delivery — InvoicePDFTemplate (per-tenant
+HTML/CSS templates), BillingInvoice (one per account per run; atomic invoice
+number; PDF stored in object storage; email delivery lifecycle). Also adds
+void_reason to BillingRun and wires BillingSchedule.auto_finalize.
+
 Ref: SPEC.md § Feature: Billing Accounts & Tariffs
      SPEC.md § Feature: Billing Runs & Invoicing
      SPEC.md § Data Model — BillingAccount / BillingAccountMeter /
          BillingAccountTariffAssignment / BillingAccountAuditLog
          BillingRun / BillingRunSnapshot / BillingLineItem / BillingSchedule
-     ROADMAP.md § Sprint 30, Sprint 31
+         InvoicePDFTemplate / BillingInvoice
+     ROADMAP.md § Sprint 30, Sprint 31, Sprint 32
 """
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -269,6 +275,46 @@ class BillingAccountAuditLog(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Sprint 32 — Invoice PDF Templates
+# ---------------------------------------------------------------------------
+
+
+class InvoicePDFTemplate(models.Model):
+    """Per-tenant HTML/CSS invoice template (Sprint 32).
+
+    Tenant.invoice_pdf_template_id (raw int, nullable) points to one of these.
+    Null means the platform default applies — the renderer falls back to the
+    bundled default.html template in apps/billing/templates/invoices/.
+
+    Sprint 35 adds the template management UI and multiple-templates-per-tenant
+    support. Sprint 32 ships the model and the default template.
+    """
+
+    tenant = models.ForeignKey(
+        'accounts.Tenant',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='invoice_pdf_templates',
+        help_text='Null = platform-wide default (accessible to all tenants).',
+    )
+    name = models.CharField(max_length=120)
+    html_content = models.TextField(
+        help_text='Full HTML/CSS template rendered by WeasyPrint. May use Django template tags.',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self) -> str:
+        tenant_label = self.tenant.slug if self.tenant_id else 'platform default'
+        return f'{self.name} ({tenant_label})'
+
+
+# ---------------------------------------------------------------------------
 # Sprint 31 — Billing Run Engine
 # ---------------------------------------------------------------------------
 
@@ -378,6 +424,11 @@ class BillingRun(models.Model):
         blank=True,
         related_name='billing_runs_finalized',
         help_text='Set when Sprint 32 finalize runs.',
+    )
+    void_reason = models.TextField(
+        blank=True,
+        default='',
+        help_text='Operator-supplied reason captured when the run is voided (Sprint 32).',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     computed_at = models.DateTimeField(null=True, blank=True)
@@ -630,3 +681,103 @@ class BillingSchedule(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.cadence})'
+
+
+# ---------------------------------------------------------------------------
+# Sprint 32 — Invoices
+# ---------------------------------------------------------------------------
+
+
+class BillingInvoice(models.Model):
+    """One invoice per BillingAccount per BillingRun (Sprint 32).
+
+    Lifecycle (status):
+      draft     — created at finalize time, before email is sent.
+      delivered — first successful email send to at least one recipient.
+      void      — parent BillingRun was voided.
+
+    Delivery tracking (delivery_status):
+      pending   — not yet attempted.
+      sent      — Celery task completed successfully (v1 success terminal).
+      delivered — reserved for future SES bounce/receipt integration.
+      failed    — SMTP error on last attempt; resend resets to pending.
+
+    invoice_number is unique per tenant and allocated atomically via
+    SELECT FOR UPDATE on Tenant.invoice_number_sequence at finalize time.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        DELIVERED = 'delivered', 'Delivered'
+        VOID = 'void', 'Void'
+
+    class DeliveryStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        SENT = 'sent', 'Sent'
+        DELIVERED = 'delivered', 'Delivered (receipt confirmed)'
+        FAILED = 'failed', 'Failed'
+
+    billing_run = models.ForeignKey(
+        BillingRun,
+        on_delete=models.CASCADE,
+        related_name='invoices',
+    )
+    billing_account = models.ForeignKey(
+        BillingAccount,
+        on_delete=models.PROTECT,
+        related_name='invoices',
+    )
+    invoice_number = models.CharField(
+        max_length=120,
+        help_text='Formatted per Tenant.invoice_number_format; unique per tenant.',
+    )
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    subtotal_cents = models.IntegerField(default=0)
+    gst_cents = models.IntegerField(default=0)
+    total_cents = models.IntegerField(default=0)
+    pdf_object_key = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text='S3/MinIO object key where the PDF is stored.',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    delivery_status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+    )
+    issued_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When the invoice record was created (at run finalize).',
+    )
+    delivered_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the first successful email send completed.',
+    )
+    voided_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the parent run was voided.',
+    )
+
+    class Meta:
+        ordering = ['-issued_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['billing_run', 'billing_account'],
+                name='billing_invoice_unique_per_run_account',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['billing_run', 'billing_account']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.invoice_number} ({self.billing_account.name})'

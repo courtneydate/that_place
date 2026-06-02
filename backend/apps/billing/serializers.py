@@ -25,6 +25,7 @@ from .models import (
     BillingAccountAuditLog,
     BillingAccountMeter,
     BillingAccountTariffAssignment,
+    BillingInvoice,
     BillingLineItem,
     BillingRun,
     BillingRunSnapshot,
@@ -575,3 +576,41 @@ class BillingScheduleSerializer(serializers.ModelSerializer):
                     {'custom_cron': 'custom_cron is required for custom_cron cadence.'},
                 )
         return attrs
+
+
+class BillingInvoiceSerializer(serializers.ModelSerializer):
+    """Read-only serializer for BillingInvoice (Sprint 32)."""
+
+    billing_account_name = serializers.CharField(
+        source='billing_account.name', read_only=True,
+    )
+    billing_run_period_start = serializers.DateTimeField(
+        source='billing_run.period_start', read_only=True,
+    )
+    billing_run_period_end = serializers.DateTimeField(
+        source='billing_run.period_end', read_only=True,
+    )
+
+    class Meta:
+        model = BillingInvoice
+        fields = (
+            'id',
+            'billing_run',
+            'billing_account',
+            'billing_account_name',
+            'billing_run_period_start',
+            'billing_run_period_end',
+            'invoice_number',
+            'period_start',
+            'period_end',
+            'subtotal_cents',
+            'gst_cents',
+            'total_cents',
+            'pdf_object_key',
+            'status',
+            'delivery_status',
+            'issued_at',
+            'delivered_at',
+            'voided_at',
+        )
+        read_only_fields = fields

@@ -37,6 +37,10 @@ import AlertDetail from './pages/tenant/AlertDetail';
 import Reporting from './pages/tenant/Reporting';
 import BillingAccounts from './pages/tenant/BillingAccounts';
 import BillingAccountDetail from './pages/tenant/BillingAccountDetail';
+import BillingRuns from './pages/tenant/BillingRuns';
+import BillingRunDetail from './pages/tenant/BillingRunDetail';
+import BillingSchedules from './pages/tenant/BillingSchedules';
+import InvoiceDetail from './pages/tenant/InvoiceDetail';
 import Tariffs from './pages/tenant/Tariffs';
 
 function App() {
@@ -98,6 +102,10 @@ function App() {
         <Route path="reporting" element={<Reporting />} />
         <Route path="billing-accounts" element={<BillingAccounts />} />
         <Route path="billing-accounts/:id" element={<BillingAccountDetail />} />
+        <Route path="billing-runs" element={<BillingRuns />} />
+        <Route path="billing-runs/:id" element={<BillingRunDetail />} />
+        <Route path="billing-schedules" element={<BillingSchedules />} />
+        <Route path="invoices/:id" element={<InvoiceDetail />} />
         <Route path="tariffs" element={<Tariffs />} />
         <Route path="settings" element={<Settings />} />
       </Route>
