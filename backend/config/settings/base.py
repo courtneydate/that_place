@@ -247,6 +247,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'readings.maintain_interval_aggregates',
         'schedule': 60.0,  # every 60 seconds — task only writes completed buckets
     },
+    # Billing — Sprint 31: dispatch BillingSchedule cadences
+    'dispatch-billing-schedules': {
+        'task': 'billing.dispatch_billing_schedules',
+        'schedule': 60.0,  # every 60 seconds
+    },
 }
 
 # ---------------------------------------------------------------------------

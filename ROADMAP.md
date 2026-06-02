@@ -1064,26 +1064,77 @@ _Data quality flags (SPEC §3 Data Quality Flags):_
 
 **Goal:** Run a billing period over an account set and produce reconciled, auditable per-customer line items. Snapshots the readings used so the run is reproducible. Non-hierarchical (PPA / single-tier) only — embedded-network logic lands in B3.
 
+**Pre-sprint design decisions (locked 2026-05-29):**
+- Aggregate period is run-level: `BillingRun.aggregate_period` ∈ {5min, 30min, 1h}, defaults to 30min.
+- Run scope: `site_id` required in v1; `billing_account_ids` filters within the site (empty = all active). Lock key is `(site, period_start, period_end)`. Cross-site / portfolio runs deferred to v1.1.
+- Mid-cycle pro-rata: engine clamps each account's billable window to `[activated_at, deactivated_at] ∩ run period`.
+- Feed-in modeling: explicit `BillingAccountTariffAssignment` per account; engine emits `credit` line whenever the resolved tariff is on a `billing_role=grid_export` stream.
+- GST: per-line `gst_cents = amount_cents × Tenant.gst_rate` (half-up rounding); summed to invoice totals (not a separate aggregate GST line).
+- Retry checkpoints: 4 coarse named steps — `resolve_scope → snapshot → compute_line_items → mark_draft`. Each is one DB transaction. `failed_step` records which one threw; retry resumes from there; recompute (draft only) restarts from `resolve_scope`.
+- Tariff precedence: stream-specific assignment beats catch-all (`stream=null`) for the same account + effective window.
+- TOU handling: split intervals at peak/off-peak boundaries (line items aggregated per (account, stream, period_name) across the run).
+
+**Scope note:** `finalize` and `void` endpoints land in Sprint 32 (coupled with invoice rendering). Sprint 31 takes runs as far as `draft`/`failed`; `retry` and `recompute` are wired. The `finalized` / `voided` status values are reserved in the enum but never set by Sprint 31 code.
+
 **Deliverables:**
-- [ ] Backend: `BillingRun` model — period_start, period_end, timezone_snapshot, scope (site or account set), status (`draft` / `computing` / `review` / `finalized` / `voided` / `failed`), failed_step (nullable), created_by, created_at
-- [ ] Backend: `BillingRunSnapshot` model — exact `StreamReading` / `IntervalAggregate` IDs and computed kWh per stream
-- [ ] Backend: `BillingLineItem` model — billing_run, billing_account, line_kind (`energy` / `supply` / `discount` / `adjustment` / `credit` / `common_area_share`), tou_period_name, kwh, rate, amount, gst_amount, quality_summary JSONB
-- [ ] Backend: Idempotent Celery task chain dispatched on `BillingRun.objects.create` — resolves accounts in scope, walks each account's billed streams, fetches `IntervalAggregate`s for the period, applies the assigned tariff row (with TOU period resolution in tenant timezone), produces `BillingLineItem` rows
-- [ ] Backend: Redis `SET NX` lock — only one in-flight run per `(site, period_start, period_end)`
-- [ ] Backend: GST line — subtotal × `Tenant.gst_rate`
-- [ ] Backend: Solar feed-in / buyback emits a `credit` line item against a `grid_export` stream
-- [ ] Backend: Failure handling — `failed_step` recorded; manual `retry_run` endpoint restarts from the last successful step (idempotent)
-- [ ] Backend: `BillingSchedule` model + Celery beat task — cadence (`monthly_calendar` / `monthly_anchor` / `quarterly` / `custom_cron`), period_offset_days, auto_finalize
-- [ ] Backend: Endpoints — `POST /api/v1/billing-runs/` (create + dispatch), `GET /api/v1/billing-runs/:id/`, `GET /api/v1/billing-runs/:id/line-items/`, `POST /api/v1/billing-runs/:id/retry/`, `POST /api/v1/billing-runs/:id/recompute/` (draft only), `POST /api/v1/billing-runs/:id/void/` (finalized, Tenant Admin only)
-- [ ] Backend: Tests — happy-path single-account run, multi-account run, TOU resolution in tenant timezone, idempotency on rerun, Redis lock prevents concurrent runs on same (site, period), failure mid-step + retry, void of finalized run, cross-tenant isolation
+
+_Models + migration:_
+- [x] `BillingRun` (tenant FK, site FK, billing_account_ids array, period_start/end, timezone_snapshot, aggregate_period enum, status enum, failed_step enum, failure_detail text, created_by, finalized_by, computed_at, finalized_at, voided_at)
+- [x] `BillingRunSnapshot` (run FK, billing_account FK, stream FK, interval_aggregate_ids array, computed_kwh decimal, quality_summary JSONB) with unique `(run, account, stream)` constraint
+- [x] `BillingLineItem` (run FK, billing_account FK, stream FK nullable, line_kind enum, period_name, kwh, rate_cents_per_kwh, amount_cents, gst_cents, quality_summary JSONB, source_account FK nullable)
+- [x] `BillingSchedule` (tenant FK, name, site FK, billing_account_ids, aggregate_period, cadence enum, anchor_day, period_offset_days, custom_cron, auto_finalize, is_active, last_run_at, next_run_at)
+- [x] Migration `0002_sprint31_runs`
+
+_Engine (apps/billing/engine.py + tariff_resolver.py):_
+- [x] `find_assignment(account, stream, on_date)` — stream-specific beats catch-all; raises on overlapping configurations
+- [x] `split_interval(assignment, start_utc, end_utc, tenant_tz)` — minute-by-minute walk in tenant local time; yields `(row, fraction)` segments at TOU boundaries
+- [x] Step 1 `resolve_scope`: validates site, finds active accounts, clamps each account's window
+- [x] Step 2 `snapshot`: walks each account's billed streams, fetches `IntervalAggregate`s (`aggregation_kind=sum`) over the clamped window, writes `BillingRunSnapshot` rows; fails on streams linked to multiple accounts
+- [x] Step 3 `compute_line_items`: per interval, resolves tariff + splits at TOU boundaries, accumulates per `(stream, period_name)`, writes one `BillingLineItem` per group; emits `credit` (sign-flipped) for `grid_export` streams; emits one `supply` line per account summed across billable days
+- [x] Step 4 `mark_draft`: status=draft, computed_at=now
+- [x] Per-line GST: `amount_cents × Tenant.gst_rate`, half-up rounding (Australian standard)
+- [x] StepError surfaces failing step + message; engine writes status=failed, failed_step, failure_detail; recompute deletes prior snapshot/line items so re-runs are idempotent
+
+_Celery tasks (apps/billing/tasks.py):_
+- [x] `billing.run_billing_run` — Redis `SET NX` lock on `billing:run:lock:{site}:{period_start}:{period_end}` with 1h TTL; releases in `finally`; marks run failed on lock contention with a clear failure_detail
+- [x] `billing.retry_billing_run` — refuses unless status=failed; resumes from `failed_step`
+- [x] `billing.dispatch_billing_schedules` — beat task (60s cadence); creates + dispatches a `BillingRun` for the previous full cadence period in tenant tz; advances `next_run_at`
+- [x] `_previous_period` + `_next_run_at` math for `monthly_calendar` / `monthly_anchor` / `quarterly` / `custom_cron` (custom_cron falls back to monthly_calendar in v1)
+
+_API (apps/billing/views.py + serializers.py + urls.py):_
+- [x] `BillingRunViewSet` with `list`, `retrieve`, `create` (Tenant Admin), `retry` (Tenant Admin, failed only), `recompute` (Tenant Admin, draft only), `line-items` (read), `snapshot` (read)
+- [x] `BillingScheduleViewSet` with full CRUD (Tenant Admin); validates anchor_day required for `monthly_anchor`, custom_cron required for `custom_cron`
+- [x] Cross-tenant access returns 404; ViewOnly can read, cannot write
+
+_Beat config:_
+- [x] `dispatch-billing-schedules` registered in `CELERY_BEAT_SCHEDULE` at 60s
+
+_Tests (apps/billing/tests/test_sprint31_engine.py — 17 tests):_
+- [x] Engine happy path: PPA flat tariff, 24h × 48 30-min intervals → energy + supply lines with correct GST
+- [x] TOU split correctness across a 21:00 peak/off-peak boundary (1-hour interval splits 50/50)
+- [x] Mid-cycle pro-rata: `deactivated_at` clamps the billable window
+- [x] Stream-specific tariff beats catch-all on the same account
+- [x] Same stream linked to two accounts → snapshot step raises with clear message
+- [x] Feed-in `credit` line emitted (sign-negated) on `grid_export` stream
+- [x] Per-line GST including negative GST on credit lines
+- [x] API: admin creates run (202 + dispatch), operator blocked, cross-tenant 404, retry/recompute reject wrong-status, line-items list
+- [x] Redis lock prevents concurrent runs on same (site, period) — second attempt marked failed
+- [x] Retry resumes from `failed_step` (snapshot pre-populated, retry only re-runs compute_line_items)
+- [x] BillingSchedule cadence math for `monthly_calendar`; `_next_run_at` advances; dispatcher creates a BillingRun on a past `next_run_at`
 
 **Definition of Done:**
-- [ ] A PPA billing run over a 1-month period for one `ppa_host` account produces correct line items at the assigned generation tariff rate
-- [ ] A draft run can be recomputed; a finalized run can only be voided
-- [ ] Two concurrent run attempts on the same (site, period) — exactly one succeeds, the other returns 409
-- [ ] A failed Celery step records the failing step; `retry` resumes from there without recomputing prior steps
-- [ ] `BillingSchedule` cron triggers an auto-finalize run on the cadence
-- [ ] Line items carry `quality_summary` rolled up from the source aggregates
+- [x] A PPA billing run over a 1-day period for one `ppa_host` account produces correct line items at the assigned generation tariff rate (24h, 48 × 30-min, 20 c/kWh → 960c energy + 200c supply + 10% GST per line)
+- [x] A draft run can be recomputed; retry resumes from the failed step (`finalize` / `void` ship with Sprint 32)
+- [x] Two concurrent run attempts on the same (site, period) — exactly one succeeds; the other is marked failed with a clear `failure_detail`
+- [x] A failed engine step records `failed_step`; `retry` resumes from there without re-running prior steps
+- [x] `BillingSchedule` dispatcher creates + dispatches a BillingRun when `next_run_at` has passed
+- [x] Line items carry `quality_summary` rolled up from the source aggregates' `quality_breakdown`
+
+> **Status (2026-06-02):** ✅ Complete. 900 backend tests passing under
+> `pytest --cov=apps/` (the exact CI command); flake8 / isort clean over
+> `apps/ config/`. Sprint 32 (Invoice Rendering, Delivery & Audit) introduces
+> `finalize` / `void` and reuses the run's `BillingRunSnapshot` +
+> `BillingLineItem`s unchanged.
 
 ---
 

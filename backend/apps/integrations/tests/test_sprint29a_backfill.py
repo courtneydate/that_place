@@ -35,6 +35,7 @@ from apps.readings.models import Stream, StreamReading
 # Helpers (kept self-contained; mirrors the patterns in test_datasources.py)
 # ---------------------------------------------------------------------------
 
+
 def make_tenant(name='Acme'):
     return Tenant.objects.create(name=name, slug=slugify(name))
 

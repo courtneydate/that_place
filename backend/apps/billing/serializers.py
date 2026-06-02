@@ -25,6 +25,10 @@ from .models import (
     BillingAccountAuditLog,
     BillingAccountMeter,
     BillingAccountTariffAssignment,
+    BillingLineItem,
+    BillingRun,
+    BillingRunSnapshot,
+    BillingSchedule,
 )
 
 # CSV import limits — mirror feeds / metering for consistency
@@ -420,3 +424,154 @@ def _flatten_error(detail) -> str:
     if isinstance(detail, (list, tuple)):
         return '; '.join(str(m) for m in detail)
     return str(detail)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 31 — billing run + schedule serializers
+# ---------------------------------------------------------------------------
+
+
+class BillingLineItemSerializer(serializers.ModelSerializer):
+    """Read-only line item serializer."""
+
+    class Meta:
+        model = BillingLineItem
+        fields = (
+            'id',
+            'billing_account',
+            'stream',
+            'line_kind',
+            'period_name',
+            'kwh',
+            'rate_cents_per_kwh',
+            'amount_cents',
+            'gst_cents',
+            'quality_summary',
+            'source_account',
+        )
+        read_only_fields = fields
+
+
+class BillingRunSnapshotSerializer(serializers.ModelSerializer):
+    """Read-only snapshot serializer."""
+
+    class Meta:
+        model = BillingRunSnapshot
+        fields = (
+            'id',
+            'billing_account',
+            'stream',
+            'interval_aggregate_ids',
+            'computed_kwh',
+            'quality_summary',
+        )
+        read_only_fields = fields
+
+
+class BillingRunSerializer(serializers.ModelSerializer):
+    """Read serializer for BillingRun. Writes go through `BillingRunCreateSerializer`."""
+
+    created_by_email = serializers.EmailField(
+        source='created_by.email', read_only=True, default=None,
+    )
+    finalized_by_email = serializers.EmailField(
+        source='finalized_by.email', read_only=True, default=None,
+    )
+
+    class Meta:
+        model = BillingRun
+        fields = (
+            'id',
+            'tenant',
+            'site',
+            'billing_account_ids',
+            'period_start',
+            'period_end',
+            'timezone_snapshot',
+            'aggregate_period',
+            'status',
+            'failed_step',
+            'failure_detail',
+            'created_by',
+            'created_by_email',
+            'finalized_by',
+            'finalized_by_email',
+            'created_at',
+            'computed_at',
+            'finalized_at',
+            'voided_at',
+        )
+        read_only_fields = fields
+
+
+class BillingRunCreateSerializer(serializers.Serializer):
+    """Validates POST /api/v1/billing-runs/ input."""
+
+    site = serializers.IntegerField()
+    billing_account_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        default=list,
+        help_text='Optional explicit account filter within the site. Empty = all active.',
+    )
+    period_start = serializers.DateTimeField()
+    period_end = serializers.DateTimeField()
+    aggregate_period = serializers.ChoiceField(
+        choices=BillingRun.AggregatePeriod.choices,
+        default=BillingRun.AggregatePeriod.THIRTY_MIN,
+    )
+
+    def validate(self, attrs):
+        """Enforce period_end > period_start."""
+        if attrs['period_end'] <= attrs['period_start']:
+            raise serializers.ValidationError(
+                {'period_end': 'period_end must be strictly after period_start.'},
+            )
+        return attrs
+
+
+class BillingScheduleSerializer(serializers.ModelSerializer):
+    """CRUD serializer for BillingSchedule."""
+
+    class Meta:
+        model = BillingSchedule
+        fields = (
+            'id',
+            'tenant',
+            'name',
+            'site',
+            'billing_account_ids',
+            'aggregate_period',
+            'cadence',
+            'anchor_day',
+            'period_offset_days',
+            'custom_cron',
+            'auto_finalize',
+            'is_active',
+            'last_run_at',
+            'next_run_at',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'tenant', 'last_run_at', 'created_at', 'updated_at')
+
+    def validate(self, attrs):
+        """Enforce anchor_day required for monthly_anchor; custom_cron for custom_cron."""
+        cadence = attrs.get('cadence') or getattr(self.instance, 'cadence', None)
+        if cadence == BillingSchedule.Cadence.MONTHLY_ANCHOR:
+            anchor = attrs.get('anchor_day')
+            if anchor is None and not getattr(self.instance, 'anchor_day', None):
+                raise serializers.ValidationError(
+                    {'anchor_day': 'anchor_day is required for monthly_anchor cadence.'},
+                )
+            if anchor is not None and not (1 <= anchor <= 31):
+                raise serializers.ValidationError(
+                    {'anchor_day': 'anchor_day must be between 1 and 31.'},
+                )
+        if cadence == BillingSchedule.Cadence.CUSTOM_CRON:
+            cron = attrs.get('custom_cron') or getattr(self.instance, 'custom_cron', '')
+            if not cron:
+                raise serializers.ValidationError(
+                    {'custom_cron': 'custom_cron is required for custom_cron cadence.'},
+                )
+        return attrs
