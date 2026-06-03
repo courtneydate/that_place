@@ -180,7 +180,11 @@ class ReferenceDatasetAdminSerializer(serializers.ModelSerializer):
 
 
 class ReferenceDatasetPublicSerializer(serializers.ModelSerializer):
-    """Public ReferenceDataset serializer for Tenant Admins (read-only)."""
+    """Public ReferenceDataset serializer for Tenant Admins (read-only).
+
+    Includes `scope` so the frontend can distinguish system vs tenant datasets
+    (e.g. the Tariffs page filters to scope=tenant; Dataset Assignments shows all).
+    """
 
     class Meta:
         model = ReferenceDataset
@@ -188,6 +192,7 @@ class ReferenceDatasetPublicSerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'description',
             'dimension_schema', 'value_schema',
             'has_time_of_use', 'has_version',
+            'scope', 'is_active',
         ]
         read_only_fields = fields
 

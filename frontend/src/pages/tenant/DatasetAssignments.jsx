@@ -2,31 +2,25 @@
  * Dataset Assignments — Tenant Admin page.
  *
  * Allows Tenant Admins to assign reference datasets to their tenant (or a
- * specific site), configure dimension filters (e.g. DNSP + tariff type), pin
- * a version, and preview the currently resolved values.
+ * specific site), configure dimension filters via per-key dropdowns (values
+ * sourced from the dataset's actual rows), pin a version, and preview the
+ * currently resolved values.
  *
  * Ref: SPEC.md § Feature: Reference Datasets — Tenant Dataset Assignments
  */
+import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { useSites } from '../../hooks/useSites';
 import {
   useCreateDatasetAssignment,
   useDatasetAssignments,
+  useDatasetDimensionValues,
   useDeleteDatasetAssignment,
   useReferenceDatasets,
   useResolveAssignment,
   useUpdateDatasetAssignment,
 } from '../../hooks/useFeeds';
 import styles from '../admin/AdminPage.module.css';
-
-const EMPTY_FORM = {
-  dataset: '',
-  site: '',
-  dimension_filter: '{}',
-  version: '',
-  effective_from: '',
-  effective_to: '',
-};
 
 // ---------------------------------------------------------------------------
 // Resolve preview — shows the currently resolved row values
@@ -42,63 +36,123 @@ function ResolvePreview({ assignmentId }) {
   }
   if (!data) return null;
 
+  // Endpoint returns { resolved_values: { key: value, ... } }
+  const values = data.resolved_values ?? data;
+
   return (
-    <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#F0FDF4', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
+    <div style={{
+      marginTop: '0.5rem', padding: '0.75rem', background: '#F0FDF4',
+      borderRadius: '6px', border: '1px solid #BBF7D0',
+    }}>
       <p style={{ margin: '0 0 0.5rem', fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>
         Currently resolved values
       </p>
       <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.25rem 1rem' }}>
-        {Object.entries(data).map(([k, v]) => (
-          <>
-            <dt key={`k-${k}`} style={{ fontSize: '0.8125rem', color: '#6B7280', margin: 0 }}>{k}</dt>
-            <dd key={`v-${k}`} style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, fontFamily: 'monospace' }}>{String(v)}</dd>
-          </>
+        {Object.entries(values).map(([k, v]) => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt style={{ fontSize: '0.8125rem', color: '#6B7280', margin: 0 }}>{k}</dt>
+            <dd style={{ fontSize: '0.8125rem', color: '#111827', margin: 0, fontFamily: 'monospace' }}>
+              {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+            </dd>
+          </div>
         ))}
       </dl>
     </div>
   );
 }
+ResolvePreview.propTypes = { assignmentId: PropTypes.number.isRequired };
 
 // ---------------------------------------------------------------------------
-// Assignment form
+// Dimension filter — per-key dropdowns populated from the dataset's rows
+// ---------------------------------------------------------------------------
+
+function DimensionFilterInputs({ datasetId, dimSchema, value, onChange }) {
+  const { data: dimValues = {}, isLoading } = useDatasetDimensionValues(datasetId);
+  const keys = Object.keys(dimSchema || {});
+
+  if (!keys.length) return null;
+
+  const handleKeyChange = (key, val) => {
+    onChange({ ...value, [key]: val });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {keys.map((key) => {
+        const options = dimValues[key] ?? [];
+        const current = value[key] ?? '';
+        return (
+          <div key={key} className={styles.field}>
+            <label className={styles.label}>{key}</label>
+            {isLoading ? (
+              <select className={styles.input} disabled>
+                <option>Loading…</option>
+              </select>
+            ) : options.length > 0 ? (
+              <select
+                className={styles.input}
+                value={current}
+                onChange={(e) => handleKeyChange(key, e.target.value)}
+                required
+              >
+                <option value="">— select {key} —</option>
+                {options.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : (
+              /* Fall back to text input if no rows exist yet */
+              <input
+                className={styles.input}
+                value={current}
+                onChange={(e) => handleKeyChange(key, e.target.value)}
+                placeholder={`Enter ${key}`}
+                required
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+DimensionFilterInputs.propTypes = {
+  datasetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  dimSchema: PropTypes.object,
+  value: PropTypes.object.isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
+// Assignment form (create + edit)
 // ---------------------------------------------------------------------------
 
 function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, error }) {
-  const [form, setForm] = useState(
-    initial
-      ? {
-          dataset: initial.dataset,
-          site: initial.site ?? '',
-          dimension_filter: JSON.stringify(initial.dimension_filter ?? {}, null, 2),
-          version: initial.version ?? '',
-          effective_from: initial.effective_from ?? '',
-          effective_to: initial.effective_to ?? '',
-        }
-      : EMPTY_FORM
-  );
-  const [filterError, setFilterError] = useState('');
+  const [dataset, setDataset] = useState(initial ? String(initial.dataset) : '');
+  const [site, setSite] = useState(initial?.site ? String(initial.site) : '');
+  const [dimFilter, setDimFilter] = useState(initial?.dimension_filter ?? {});
+  const [version, setVersion] = useState(initial?.version ?? '');
+  const [effectiveFrom, setEffectiveFrom] = useState(initial?.effective_from ?? '');
+  const [effectiveTo, setEffectiveTo] = useState(initial?.effective_to ?? '');
 
-  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  const selectedDataset = datasets.find((d) => String(d.id) === dataset);
+  const dimSchema = selectedDataset?.dimension_schema ?? {};
+  const hasVersion = selectedDataset?.has_version ?? false;
 
-  const selectedDataset = datasets.find((d) => String(d.id) === String(form.dataset));
+  const handleDatasetChange = (val) => {
+    setDataset(val);
+    setDimFilter({}); // reset filter when dataset changes
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    let dimension_filter = {};
-    try {
-      dimension_filter = JSON.parse(form.dimension_filter || '{}');
-      setFilterError('');
-    } catch {
-      setFilterError('Dimension filter is not valid JSON.');
-      return;
-    }
     onSave({
-      dataset: Number(form.dataset),
-      site: form.site ? Number(form.site) : null,
-      dimension_filter,
-      version: form.version || null,
-      effective_from: form.effective_from || null,
-      effective_to: form.effective_to || null,
+      dataset: Number(dataset),
+      site: site ? Number(site) : null,
+      dimension_filter: dimFilter,
+      version: version || null,
+      effective_from: effectiveFrom || null,
+      effective_to: effectiveTo || null,
     });
   };
 
@@ -108,8 +162,8 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
         <label className={styles.label}>Dataset</label>
         <select
           className={styles.input}
-          value={form.dataset}
-          onChange={(e) => set('dataset', e.target.value)}
+          value={dataset}
+          onChange={(e) => handleDatasetChange(e.target.value)}
           required
           disabled={!!initial}
         >
@@ -129,8 +183,8 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
         <label className={styles.label}>Site (leave blank for tenant-wide)</label>
         <select
           className={styles.input}
-          value={form.site}
-          onChange={(e) => set('site', e.target.value)}
+          value={site}
+          onChange={(e) => setSite(e.target.value)}
         >
           <option value="">Tenant-wide</option>
           {sites.map((s) => (
@@ -139,34 +193,29 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
         </select>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          Dimension filter (JSON)
-          {selectedDataset && (
-            <span style={{ fontWeight: 400, color: '#6B7280', marginLeft: '0.5rem' }}>
-              Keys: {Object.keys(selectedDataset.dimension_schema || {}).join(', ')}
-            </span>
-          )}
-        </label>
-        <textarea
-          className={styles.input}
-          style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}
-          value={form.dimension_filter}
-          onChange={(e) => set('dimension_filter', e.target.value)}
-          rows={4}
-          placeholder='{"state": "QLD", "dnsp": "Energex", "tariff_type": "residential_tou"}'
-        />
-        {filterError && <p className={styles.error}>{filterError}</p>}
-      </div>
-
-      {selectedDataset?.has_version && (
+      {dataset && Object.keys(dimSchema).length > 0 && (
         <div className={styles.field}>
-          <label className={styles.label}>Version pin (leave blank to use latest)</label>
+          <label className={styles.label}>Dimension filter</label>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.8125rem', color: '#6B7280' }}>
+            Select the values that identify the correct rows for this site.
+          </p>
+          <DimensionFilterInputs
+            datasetId={dataset}
+            dimSchema={dimSchema}
+            value={dimFilter}
+            onChange={setDimFilter}
+          />
+        </div>
+      )}
+
+      {hasVersion && (
+        <div className={styles.field}>
+          <label className={styles.label}>Version pin (leave blank to always use latest)</label>
           <input
             className={styles.input}
-            value={form.version}
-            onChange={(e) => set('version', e.target.value)}
-            placeholder="2025-26"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            placeholder="e.g. 2025-26"
           />
         </div>
       )}
@@ -177,8 +226,8 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
           <input
             type="date"
             className={styles.input}
-            value={form.effective_from}
-            onChange={(e) => set('effective_from', e.target.value)}
+            value={effectiveFrom}
+            onChange={(e) => setEffectiveFrom(e.target.value)}
             required
           />
         </div>
@@ -187,8 +236,8 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
           <input
             type="date"
             className={styles.input}
-            value={form.effective_to}
-            onChange={(e) => set('effective_to', e.target.value)}
+            value={effectiveTo}
+            onChange={(e) => setEffectiveTo(e.target.value)}
           />
         </div>
       </div>
@@ -205,6 +254,16 @@ function AssignmentForm({ initial, datasets, sites, onSave, onCancel, saving, er
     </form>
   );
 }
+
+AssignmentForm.propTypes = {
+  initial: PropTypes.object,
+  datasets: PropTypes.array.isRequired,
+  sites: PropTypes.array.isRequired,
+  onSave: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  saving: PropTypes.bool,
+  error: PropTypes.string,
+};
 
 // ---------------------------------------------------------------------------
 // Single assignment card
@@ -226,15 +285,32 @@ function AssignmentCard({ assignment, datasets, sites, onEdit, onDelete }) {
           <span style={{ fontSize: '0.875rem', color: '#6B7280' }}>
             {site ? site.name : 'Tenant-wide'}
           </span>
-          <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: '#6B7280' }}>
-            Filter: <span className={styles.mono}>{JSON.stringify(assignment.dimension_filter)}</span>
-            {assignment.version && <> · Version: <span className={styles.mono}>{assignment.version}</span></>}
-            {' · '}
-            From: <span className={styles.mono}>{assignment.effective_from}</span>
-            {assignment.effective_to && (
-              <> → <span className={styles.mono}>{assignment.effective_to}</span></>
+          <div style={{ marginTop: '0.375rem', fontSize: '0.8125rem', color: '#6B7280' }}>
+            {Object.entries(assignment.dimension_filter || {}).map(([k, v]) => (
+              <span key={k} style={{
+                display: 'inline-block', marginRight: '0.5rem',
+                background: '#F3F4F6', borderRadius: '4px', padding: '0.125rem 0.5rem',
+              }}>
+                <span style={{ fontWeight: 500 }}>{k}:</span>{' '}
+                <span className={styles.mono}>{String(v)}</span>
+              </span>
+            ))}
+            {assignment.version && (
+              <span style={{
+                display: 'inline-block', marginRight: '0.5rem',
+                background: '#EFF6FF', color: '#1D4ED8',
+                borderRadius: '4px', padding: '0.125rem 0.5rem',
+              }}>
+                v{assignment.version}
+              </span>
             )}
-          </p>
+            {assignment.effective_from && (
+              <span>From {assignment.effective_from}</span>
+            )}
+            {assignment.effective_to && (
+              <span> → {assignment.effective_to}</span>
+            )}
+          </div>
         </div>
         <button
           className={styles.secondaryButton}
@@ -250,6 +326,14 @@ function AssignmentCard({ assignment, datasets, sites, onEdit, onDelete }) {
     </div>
   );
 }
+
+AssignmentCard.propTypes = {
+  assignment: PropTypes.object.isRequired,
+  datasets: PropTypes.array.isRequired,
+  sites: PropTypes.array.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};
 
 // ---------------------------------------------------------------------------
 // Main page
@@ -317,8 +401,8 @@ function DatasetAssignments() {
 
       <p style={{ marginBottom: '1.5rem', color: '#6B7280', fontSize: '0.875rem' }}>
         Assign reference datasets (tariffs, CO2 factors, etc.) to this tenant or specific sites.
-        Rules with <strong>reference_value</strong> conditions will use these assignments to look up
-        current values.
+        Rules with <strong>reference_value</strong> conditions and the billing engine use these
+        assignments to look up current values.
       </p>
 
       {creating && (

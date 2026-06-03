@@ -320,6 +320,36 @@ class ReferenceDatasetViewSet(viewsets.GenericViewSet):
         dataset.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=['get'], url_path='dimension-values')
+    def dimension_values(self, request, pk=None):
+        """Return distinct values for every dimension key in this dataset.
+
+        Accessible to all authenticated users (same permission as list/retrieve).
+        Returns only the dimension keys and their known values — not the rate
+        data — so this endpoint is safe to expose to tenant users.
+
+        Response shape:
+            {
+                "distributor_slug": ["ausgrid", "energex", ...],
+                "tariff_code": ["EA305", "CAC", ...]
+            }
+        """
+        from apps.feeds.models import ReferenceDatasetRow
+
+        dataset = self.get_object()
+        dim_keys = list((dataset.dimension_schema or {}).keys())
+        result = {}
+        for key in dim_keys:
+            values = (
+                ReferenceDatasetRow.objects
+                .filter(dataset=dataset, is_active=True)
+                .values_list(f'dimensions__{key}', flat=True)
+                .distinct()
+                .order_by(f'dimensions__{key}')
+            )
+            result[key] = [v for v in values if v is not None]
+        return Response(result)
+
 
 class ReferenceDatasetRowViewSet(viewsets.GenericViewSet):
     """Reference dataset row management (That Place Admin only).

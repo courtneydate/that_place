@@ -144,6 +144,16 @@ export function useReferenceDataset(id) {
   });
 }
 
+export function useDatasetDimensionValues(datasetId) {
+  return useQuery({
+    queryKey: ['dataset-dimension-values', datasetId],
+    queryFn: () =>
+      api.get(`/api/v1/reference-datasets/${datasetId}/dimension-values/`).then((r) => r.data),
+    enabled: !!datasetId,
+    staleTime: 5 * 60 * 1000, // dimension values change rarely
+  });
+}
+
 export function useDatasetRows(datasetId, version) {
   return useQuery({
     queryKey: datasetRowsKey(datasetId, version),
