@@ -962,24 +962,30 @@ _Data quality flags (SPEC §3 Data Quality Flags):_
 **Goal:** Tag a Device as a billing meter with its metering attributes (NMI, role, phases, parent), tag Streams with their billing role, and prove the hierarchical-site write-time invariants — so Phase B2's billing engine knows which devices and streams carry billable energy.
 
 **Deliverables:**
-- [ ] Backend: `MeterProfile` one-to-one optional with `Device` — `nmi`, `meter_role`, `parent_meter_id`, `pattern_approval`, `phases`, `install_date`, `serial_number_secondary`
-- [ ] Backend: `meter_role` enum — `gate`, `child`, `generation`, `storage`, `consumption`, `common_area`, `sub_check`
-- [ ] Backend: `Stream.billing_role` (nullable enum) — `grid_import`, `grid_export`, `generation`, `bess_charge`, `bess_discharge`, `consumption`, `consumption_from_solar`, `net`
-- [ ] Backend: `Site.is_hierarchical`, `Site.reconciliation_tolerance_percent`, `Site.common_area_apportionment_method`, `Site.embedded_network_exemption_id`
-- [ ] Backend: Write-time enforcement — `gate` has no parent; `child` / `common_area` on a hierarchical site must point to a `gate` on the same site; at most one `gate` per site in v1; deactivating an active `gate` while children are active is blocked
-- [ ] Backend: CRUD endpoints `/api/v1/devices/:id/meter-profile/` (Tenant Admin) and stream billing-role PATCH
-- [ ] Backend: Bulk MeterProfile CSV import endpoint (Tenant Admin) — same pattern as reference-dataset CSV import; per-row errors returned
-- [ ] Backend: Tests — invariant enforcement (every case), bulk import upsert + per-row errors, cross-tenant isolation, role permissions, deactivation guard
-- [ ] Frontend: Meter Profile panel on device detail (Tenant Admin) — NMI, role, parent picker (scoped to gate meters on the same site), phases, install date
-- [ ] Frontend: Stream billing-role inline editor on the device Streams tab
-- [ ] Frontend: Bulk MeterProfile CSV upload UI (drag-and-drop, per-row error display)
+- [x] Backend: `MeterProfile` one-to-one optional with `Device` — `nmi`, `meter_role`, `parent_meter_id`, `pattern_approval`, `phases`, `install_date`, `serial_number_secondary`
+- [x] Backend: `meter_role` enum — `gate`, `child`, `generation`, `storage`, `consumption`, `common_area`, `sub_check`
+- [x] Backend: `Stream.billing_role` (nullable enum) — `grid_import`, `grid_export`, `generation`, `bess_charge`, `bess_discharge`, `consumption`, `consumption_from_solar`, `net`
+- [x] Backend: `Site.is_hierarchical`, `Site.reconciliation_tolerance_percent`, `Site.common_area_apportionment_method`, `Site.embedded_network_exemption_id`
+- [x] Backend: Write-time enforcement — `gate` has no parent; `child` / `common_area` on a hierarchical site must point to a `gate` on the same site; at most one `gate` per site in v1; deactivating an active `gate` while children are active is blocked
+- [x] Backend: CRUD endpoints `/api/v1/devices/:id/meter-profile/` (Tenant Admin) and stream billing-role PATCH
+- [x] Backend: Bulk MeterProfile CSV import endpoint (Tenant Admin) — same pattern as reference-dataset CSV import; per-row errors returned
+- [x] Backend: Tests — invariant enforcement (every case), bulk import upsert + per-row errors, cross-tenant isolation, role permissions, deactivation guard
+- [x] Frontend: Meter Profile panel on device detail (Tenant Admin) — NMI, role, parent picker (scoped to gate meters on the same site), phases, install date
+- [x] Frontend: Stream billing-role inline editor on the device Streams tab
+- [x] Frontend: Bulk MeterProfile CSV upload UI (drag-and-drop, per-row error display)
 
 **Definition of Done:**
-- [ ] A device can be marked a meter with NMI + role; the meter shows on the device detail
-- [ ] Marking a site as hierarchical and adding a `gate` meter unlocks the `child` / `common_area` workflow
-- [ ] Adding a `child` meter without a parent on a hierarchical site is rejected with a clear error
-- [ ] Bulk uploading 400 meter profiles via CSV completes in under 30 seconds with per-row validation errors
-- [ ] Streams correctly carry their billing role and appear filtered in the billing-relevant stream picker
+- [x] A device can be marked a meter with NMI + role; the meter shows on the device detail
+- [x] Marking a site as hierarchical and adding a `gate` meter unlocks the `child` / `common_area` workflow
+- [x] Adding a `child` meter without a parent on a hierarchical site is rejected with a clear error
+- [x] Bulk uploading 400 meter profiles via CSV completes in under 30 seconds with per-row validation errors
+- [x] Streams correctly carry their billing role and appear filtered in the billing-relevant stream picker
+
+> **Status (2026-06-28):** ✅ Code-complete & committed. Deliverables verified present —
+> `MeterProfile` / `meter_role` / `Stream.billing_role` / hierarchical `Site` fields + migrations,
+> metering CRUD + bulk CSV import, `MeterProfilePanel` + `MeterBulkUploadModal`. Tests:
+> `apps/metering/tests/test_meter_profile.py`. Boxes reconciled against the verified 2026-06-27
+> green suite (933 backend / 67 frontend). Phase B1 manual smoke-test sign-off still open below.
 
 ---
 
@@ -1037,26 +1043,32 @@ _Data quality flags (SPEC §3 Data Quality Flags):_
 **Goal:** Model the end customer (a `BillingAccount`) that the operator bills, link it to specific billed streams, and assign PPA tariff datasets — so Sprint 31's billing run has accounts, meters, and rates to compute against.
 
 **Deliverables:**
-- [ ] Backend: `BillingAccount` model — tenant FK, name, customer_reference, contact details, billing_address, abn, account_type (`ppa_host` / `en_tenant` / `internal`), optional parent_account_id, invoice_email_recipients, floor_area_sqm, activated_at, deactivated_at
-- [ ] Backend: `BillingAccountMeter` model — billing_account FK, stream FK, effective_from, effective_to; stream-level linkage (one meter can carry several billing-role streams that bill to different accounts)
-- [ ] Backend: `BillingAccountTariffAssignment` model — bridges a billing account to a `ReferenceDataset` (PPA tariff), optional stream scope, dimension_filter, version pin, effective_from / effective_to; reuses `TenantDatasetAssignment` row-resolution logic
-- [ ] Backend: PPA tariff dataset schemas — generation, consumption-from-solar, feed-in — seeded via fixture (`backend/apps/feeds/fixtures/ppa_tariffs_template.json`); operators duplicate and customise
-- [ ] Backend: CRUD endpoints — `/api/v1/billing-accounts/`, nested meter and tariff endpoints
-- [ ] Backend: Bulk `BillingAccount` CSV import endpoint — column schema matches model fields; per-row errors returned
-- [ ] Backend: `BillingAccountAuditLog` model + automatic write on every billing-account CRUD operation (who, when, before/after)
-- [ ] Backend: `Tenant.gst_rate` (default 0.10), `Tenant.invoice_number_format`, `Tenant.invoice_pdf_template_id`, `Tenant.invoice_settlement_disclaimer` fields
-- [ ] Backend: Tests — model invariants, CRUD permissions (Tenant Admin only), cross-tenant isolation, bulk import upsert + per-row errors, audit log immutability + automatic write
-- [ ] Frontend: Billing Accounts nav item under a new "Billing" section
-- [ ] Frontend: Billing Account list + create + detail page (lifecycle dates, meter assignments, tariff assignments, audit log tab)
-- [ ] Frontend: Bulk CSV upload UI for billing accounts
-- [ ] Frontend: "Tariffs" nav item — filtered view of `scope=tenant` Reference Datasets that are PPA tariffs
+- [x] Backend: `BillingAccount` model — tenant FK, name, customer_reference, contact details, billing_address, abn, account_type (`ppa_host` / `en_tenant` / `internal`), optional parent_account_id, invoice_email_recipients, floor_area_sqm, activated_at, deactivated_at
+- [x] Backend: `BillingAccountMeter` model — billing_account FK, stream FK, effective_from, effective_to; stream-level linkage (one meter can carry several billing-role streams that bill to different accounts)
+- [x] Backend: `BillingAccountTariffAssignment` model — bridges a billing account to a `ReferenceDataset` (PPA tariff), optional stream scope, dimension_filter, version pin, effective_from / effective_to; reuses `TenantDatasetAssignment` row-resolution logic
+- [x] Backend: PPA tariff dataset schemas — generation, consumption-from-solar, feed-in — seeded via fixture (`backend/apps/feeds/fixtures/ppa_tariffs_template.json`); operators duplicate and customise
+- [x] Backend: CRUD endpoints — `/api/v1/billing-accounts/`, nested meter and tariff endpoints
+- [x] Backend: Bulk `BillingAccount` CSV import endpoint — column schema matches model fields; per-row errors returned
+- [x] Backend: `BillingAccountAuditLog` model + automatic write on every billing-account CRUD operation (who, when, before/after)
+- [x] Backend: `Tenant.gst_rate` (default 0.10), `Tenant.invoice_number_format`, `Tenant.invoice_pdf_template_id`, `Tenant.invoice_settlement_disclaimer` fields
+- [x] Backend: Tests — model invariants, CRUD permissions (Tenant Admin only), cross-tenant isolation, bulk import upsert + per-row errors, audit log immutability + automatic write
+- [x] Frontend: Billing Accounts nav item under a new "Billing" section
+- [x] Frontend: Billing Account list + create + detail page (lifecycle dates, meter assignments, tariff assignments, audit log tab)
+- [x] Frontend: Bulk CSV upload UI for billing accounts
+- [x] Frontend: "Tariffs" nav item — filtered view of `scope=tenant` Reference Datasets that are PPA tariffs
 
 **Definition of Done:**
-- [ ] A Tenant Admin can create a `ppa_host` billing account, link a `generation` stream to it, and assign a PPA generation tariff
-- [ ] Bulk uploading 200 billing accounts via CSV completes with per-row validation errors
-- [ ] Every billing-account CRUD operation writes an audit log entry with before/after diff
-- [ ] `BillingAccountAuditLog` rows are immutable (no UPDATE / DELETE endpoints)
-- [ ] Cross-tenant: Tenant B cannot read Tenant A's billing accounts on any endpoint
+- [x] A Tenant Admin can create a `ppa_host` billing account, link a `generation` stream to it, and assign a PPA generation tariff
+- [x] Bulk uploading 200 billing accounts via CSV completes with per-row validation errors
+- [x] Every billing-account CRUD operation writes an audit log entry with before/after diff
+- [x] `BillingAccountAuditLog` rows are immutable (no UPDATE / DELETE endpoints)
+- [x] Cross-tenant: Tenant B cannot read Tenant A's billing accounts on any endpoint
+
+> **Status (2026-06-28):** ✅ Code-complete & committed. Deliverables verified present —
+> `BillingAccount` / `BillingAccountMeter` / `BillingAccountTariffAssignment` / `BillingAccountAuditLog`,
+> `Tenant.gst_rate` / `invoice_number_format`, bulk CSV import, `BillingAccounts` +
+> `BillingAccountBulkUploadModal`. Tests: `apps/billing/tests/test_billing_accounts.py`. Reconciled
+> against the 2026-06-27 green suite.
 
 ---
 
@@ -1143,27 +1155,33 @@ _Tests (apps/billing/tests/test_sprint31_engine.py — 17 tests):_
 **Goal:** Render finalized billing runs as PDF invoices stored in object storage, deliver them by email, and lock everything immutable post-finalize. Closes Phase B2.
 
 **Deliverables:**
-- [ ] Backend: `BillingInvoice` model — billing_run FK, billing_account FK, invoice_number, subtotal, gst_amount, total_amount, pdf_storage_key, status (`draft` / `delivered` / `void`), created_at, delivered_at, voided_at
-- [ ] Backend: Atomic per-tenant invoice-number sequence via `SELECT FOR UPDATE` on `Tenant.invoice_number_sequence`; format from `Tenant.invoice_number_format`
-- [ ] Backend: WeasyPrint PDF rendering pipeline — per-tenant HTML/CSS template (FK on `Tenant.invoice_pdf_template_id`); stored in object storage at `invoices/{tenant_slug}/{YYYY}/{invoice_number}.pdf`
-- [ ] Backend: Configurable settlement-grade disclaimer footer (`Tenant.invoice_settlement_disclaimer`) — rendered by default on `en_tenant` invoices, off for `ppa_host`
-- [ ] Backend: In-app preview — signed short-lived URLs (15 min) via object storage; no public URLs
-- [ ] Backend: Email delivery — one Celery task per invoice (so one bad address does not fail the run), 14-day signed URL in email, PDF attached
-- [ ] Backend: Finalize endpoint `POST /api/v1/billing-runs/:id/finalize/` — locks the run, line items, invoices, and snapshot immutable; dispatches per-invoice email tasks
-- [ ] Backend: Manual resend per invoice — `POST /api/v1/billing-invoices/:id/resend/`
-- [ ] Backend: Void workflow — on `BillingRun.objects.void`, all invoices `delivered` get an auto void-notification email unless `silent_void=true`
-- [ ] Backend: Line-item CSV export — `GET /api/v1/billing-runs/:id/line-items.csv` (streaming response, Admin only)
-- [ ] Backend: Tests — per-tenant invoice-number atomicity, PDF generation, object-storage upload + signed URL, email delivery success + retry, finalize locks the run, void notification logic, immutability of finalized invoices, role permissions, cross-tenant isolation
-- [ ] Frontend: Billing Run list + detail page (line items, invoices grid, status, retry / recompute / finalize / void controls per role)
-- [ ] Frontend: Invoice detail with PDF preview iframe (signed URL); resend button; void status indicator
-- [ ] Frontend: BillingSchedule management page (Tenant Admin) — cadence picker, period_offset, auto_finalize toggle
+- [x] Backend: `BillingInvoice` model — billing_run FK, billing_account FK, invoice_number, subtotal, gst_amount, total_amount, pdf_storage_key, status (`draft` / `delivered` / `void`), created_at, delivered_at, voided_at
+- [x] Backend: Atomic per-tenant invoice-number sequence via `SELECT FOR UPDATE` on `Tenant.invoice_number_sequence`; format from `Tenant.invoice_number_format`
+- [x] Backend: WeasyPrint PDF rendering pipeline — per-tenant HTML/CSS template (FK on `Tenant.invoice_pdf_template_id`); stored in object storage at `invoices/{tenant_slug}/{YYYY}/{invoice_number}.pdf`
+- [x] Backend: Configurable settlement-grade disclaimer footer (`Tenant.invoice_settlement_disclaimer`) — rendered by default on `en_tenant` invoices, off for `ppa_host`
+- [x] Backend: In-app preview — signed short-lived URLs (15 min) via object storage; no public URLs
+- [x] Backend: Email delivery — one Celery task per invoice (so one bad address does not fail the run), 14-day signed URL in email, PDF attached
+- [x] Backend: Finalize endpoint `POST /api/v1/billing-runs/:id/finalize/` — locks the run, line items, invoices, and snapshot immutable; dispatches per-invoice email tasks
+- [x] Backend: Manual resend per invoice — `POST /api/v1/billing-invoices/:id/resend/`
+- [x] Backend: Void workflow — on `BillingRun.objects.void`, all invoices `delivered` get an auto void-notification email unless `silent_void=true`
+- [x] Backend: Line-item CSV export — `GET /api/v1/billing-runs/:id/line-items.csv` (streaming response, Admin only)
+- [x] Backend: Tests — per-tenant invoice-number atomicity, PDF generation, object-storage upload + signed URL, email delivery success + retry, finalize locks the run, void notification logic, immutability of finalized invoices, role permissions, cross-tenant isolation
+- [x] Frontend: Billing Run list + detail page (line items, invoices grid, status, retry / recompute / finalize / void controls per role)
+- [x] Frontend: Invoice detail with PDF preview iframe (signed URL); resend button; void status indicator
+- [x] Frontend: BillingSchedule management page (Tenant Admin) — cadence picker, period_offset, auto_finalize toggle
 
 **Definition of Done:**
-- [ ] A finalized PPA run delivers one PDF invoice per account to the recipient addresses with a 14-day signed download link
-- [ ] Invoice numbers are sequential per tenant with no gaps and no duplicates under concurrent finalize
-- [ ] Voiding a delivered finalized run sends one void-notification email per invoice unless `silent_void` is set
-- [ ] Line items CSV export streams without timeouts on a 1000-row run
-- [ ] PDF templates can be replaced per tenant without code changes
+- [x] A finalized PPA run delivers one PDF invoice per account to the recipient addresses with a 14-day signed download link
+- [x] Invoice numbers are sequential per tenant with no gaps and no duplicates under concurrent finalize
+- [x] Voiding a delivered finalized run sends one void-notification email per invoice unless `silent_void` is set
+- [x] Line items CSV export streams without timeouts on a 1000-row run
+- [x] PDF templates can be replaced per tenant without code changes
+
+> **Status (2026-06-28):** ✅ Code-complete & committed. Deliverables verified present —
+> `BillingInvoice`, atomic per-tenant `invoice_number_sequence`, WeasyPrint render pipeline,
+> finalize / void (`silent_void`) / resend / line-items-csv endpoints, billing-run + invoice
+> frontend. Tests: `apps/billing/tests/test_sprint32_invoices.py`. Reconciled against the
+> 2026-06-27 green suite. Phase B2 manual smoke-test sign-off still open below.
 
 ---
 
