@@ -107,7 +107,7 @@ PdfPreview.propTypes = { invoiceId: PropTypes.string.isRequired };
 export default function InvoiceDetail() {
   const { id } = useParams();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.tenant_role === 'admin';
 
   const { data: invoice, isLoading, isError } = useBillingInvoice(id);
   const resend = useResendInvoice(id);

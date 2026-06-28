@@ -64,6 +64,7 @@ class StreamSerializer(serializers.ModelSerializer):
     device = serializers.IntegerField(source='device_id', read_only=True)
 
     latest_quality = serializers.SerializerMethodField()
+    derived_stream_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Stream
@@ -81,12 +82,22 @@ class StreamSerializer(serializers.ModelSerializer):
             'latest_value',
             'latest_timestamp',
             'latest_quality',
+            'derived_stream_id',
             'created_at',
         )
         read_only_fields = (
             'id', 'device', 'key', 'data_type', 'stream_type',
-            'latest_value', 'latest_timestamp', 'latest_quality', 'created_at',
+            'latest_value', 'latest_timestamp', 'latest_quality',
+            'derived_stream_id', 'created_at',
         )
+
+    def get_derived_stream_id(self, obj):
+        """Return the DerivedStream PK for a derived stream, else None.
+
+        Lets the frontend offer a backfill action on derived stream rows
+        (the backfill endpoint is keyed on DerivedStream, not Stream).
+        """
+        return obj.derived_config.id if hasattr(obj, 'derived_config') else None
 
     def get_latest_quality(self, obj):
         """Return the most recent reading's quality, or None."""
@@ -187,6 +198,16 @@ class DerivedStreamSerializer(serializers.ModelSerializer):
     key = serializers.CharField(write_only=True, max_length=255)
     label = serializers.CharField(write_only=True, max_length=255, required=False, allow_blank=True, default='')
     unit = serializers.CharField(write_only=True, max_length=50, required=False, allow_blank=True, default='')
+    aggregation_kind_default = serializers.ChoiceField(
+        choices=Stream.AggregationKind.choices,
+        write_only=True,
+        required=False,
+        default=Stream.AggregationKind.SUM,
+        help_text=(
+            'Aggregation kind for the output stream. Use sum for energy (kWh) '
+            'derived streams so the billing engine finds the correct aggregates.'
+        ),
+    )
 
     class Meta:
         model = DerivedStream
@@ -200,7 +221,7 @@ class DerivedStreamSerializer(serializers.ModelSerializer):
             # Output Stream — read-only fields exposed for the UI
             'stream_id', 'stream_key', 'stream_label', 'stream_unit', 'stream_device_id',
             # Output Stream creation — write-only
-            'key', 'label', 'unit',
+            'key', 'label', 'unit', 'aggregation_kind_default',
             # Sources
             'source_stream_ids', 'source_streams',
         )
@@ -275,6 +296,9 @@ class DerivedStreamSerializer(serializers.ModelSerializer):
         key = validated_data.pop('key')
         label = validated_data.pop('label', '') or key
         unit = validated_data.pop('unit', '')
+        aggregation_kind_default = validated_data.pop(
+            'aggregation_kind_default', Stream.AggregationKind.SUM,
+        )
 
         # Host device: own device for single-source / same-device sets; site
         # composite for cross-device sets.
@@ -292,6 +316,7 @@ class DerivedStreamSerializer(serializers.ModelSerializer):
                 unit=unit,
                 data_type=Stream.DataType.NUMERIC,
                 stream_type=Stream.StreamType.DERIVED,
+                aggregation_kind_default=aggregation_kind_default,
             )
             derived = DerivedStream.objects.create(
                 stream=output_stream,

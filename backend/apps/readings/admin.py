@@ -6,9 +6,9 @@ from .models import RuleStreamIndex, Stream, StreamReading
 
 @admin.register(Stream)
 class StreamAdmin(admin.ModelAdmin):
-    list_display = ('key', 'device', 'data_type', 'display_enabled', 'created_at')
+    list_display = ('key', 'device', 'data_type', 'display_enabled', 'created_at', 'id')
     list_filter = ('data_type', 'display_enabled')
-    search_fields = ('key', 'label', 'device__serial_number')
+    search_fields = ('key', 'label', 'device__serial_number', 'id')
     readonly_fields = ('device', 'key', 'data_type', 'created_at')
 
 

@@ -152,7 +152,7 @@ CreateRunForm.propTypes = { onDone: PropTypes.func.isRequired };
 
 export default function BillingRuns() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.tenant_role === 'admin';
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 

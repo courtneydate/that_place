@@ -305,7 +305,7 @@ DeleteButton.propTypes = { id: PropTypes.number.isRequired };
 
 export default function BillingSchedules() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.tenant_role === 'admin';
 
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState(null);

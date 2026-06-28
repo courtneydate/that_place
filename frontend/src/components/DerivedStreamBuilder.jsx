@@ -16,12 +16,20 @@ import { useDeviceStreams } from '../hooks/useStreams';
 import styles from '../pages/admin/AdminPage.module.css';
 
 const FORMULAS = [
-  { value: 'delta', label: 'Delta (interval from cumulative)', sources: 'one' },
-  { value: 'scale', label: 'Scale (source × factor)', sources: 'one' },
-  { value: 'sum', label: 'Sum (Σ at same minute, cross-device OK)', sources: 'one_or_more' },
-  { value: 'difference', label: 'Difference (A − B at same minute)', sources: 'exactly_two' },
-  { value: 'window_min', label: 'Rolling minimum over N minutes', sources: 'one' },
-  { value: 'window_max', label: 'Rolling maximum over N minutes', sources: 'one' },
+  { value: 'delta',      label: 'Delta (interval from cumulative)', sources: 'one',         defaultKind: 'sum'  },
+  { value: 'scale',      label: 'Scale (source × factor)',          sources: 'one',         defaultKind: 'mean' },
+  { value: 'sum',        label: 'Sum (Σ at same minute, cross-device OK)', sources: 'one_or_more', defaultKind: 'sum'  },
+  { value: 'difference', label: 'Difference (A − B at same minute)', sources: 'exactly_two', defaultKind: 'sum'  },
+  { value: 'window_min', label: 'Rolling minimum over N minutes',    sources: 'one',         defaultKind: 'min'  },
+  { value: 'window_max', label: 'Rolling maximum over N minutes',    sources: 'one',         defaultKind: 'max'  },
+];
+
+const AGG_KIND_OPTIONS = [
+  { value: 'sum',  label: 'Sum (energy, kWh)' },
+  { value: 'mean', label: 'Mean (instantaneous, e.g. power/voltage)' },
+  { value: 'min',  label: 'Min' },
+  { value: 'max',  label: 'Max' },
+  { value: 'last', label: 'Last (cumulative counter)' },
 ];
 
 const FORMULA_BY_VALUE = Object.fromEntries(FORMULAS.map((f) => [f.value, f]));
@@ -111,6 +119,7 @@ function DerivedStreamBuilder({ onDone }) {
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
   const [unit, setUnit] = useState('');
+  const [aggregationKind, setAggregationKind] = useState('sum'); // delta → sum by default
   const [sourceIds, setSourceIds] = useState([]);
   const [factor, setFactor] = useState('');
   const [windowMinutes, setWindowMinutes] = useState('');
@@ -152,6 +161,7 @@ function DerivedStreamBuilder({ onDone }) {
         label: label.trim(),
         unit: unit.trim(),
         formula,
+        aggregation_kind_default: aggregationKind,
         source_stream_ids: sourceIds,
         params,
       });
@@ -205,11 +215,36 @@ function DerivedStreamBuilder({ onDone }) {
           <select
             id="ds-formula"
             value={formula}
-            onChange={(e) => { setFormula(e.target.value); setSourceIds([]); }}
+            onChange={(e) => {
+              const f = FORMULA_BY_VALUE[e.target.value];
+              setFormula(e.target.value);
+              setSourceIds([]);
+              setAggregationKind(f?.defaultKind || 'sum');
+            }}
             className={styles.input}
           >
             {FORMULAS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="ds-agg-kind">
+            Aggregation kind
+            {' '}
+            <span style={{ color: '#6B7280', fontWeight: 400, fontSize: '0.8125rem' }}>
+              (how the beat task buckets readings — use Sum for energy)
+            </span>
+          </label>
+          <select
+            id="ds-agg-kind"
+            value={aggregationKind}
+            onChange={(e) => setAggregationKind(e.target.value)}
+            className={styles.input}
+          >
+            {AGG_KIND_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>

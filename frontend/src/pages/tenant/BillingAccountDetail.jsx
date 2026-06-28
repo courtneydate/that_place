@@ -24,6 +24,7 @@ import {
 } from '../../hooks/useBillingAccounts';
 import { useDevices } from '../../hooks/useDevices';
 import { useDeviceStreams } from '../../hooks/useStreams';
+import DimensionFilterInputs from '../../components/DimensionFilterInputs';
 import { useReferenceDatasets } from '../../hooks/useFeeds';
 import styles from '../admin/AdminPage.module.css';
 import detailStyles from './DeviceDetail.module.css';
@@ -450,45 +451,37 @@ function TariffsTab({ accountId, canEdit }) {
   const createAssignment = useCreateBillingAccountTariff(accountId);
   const deleteAssignment = useDeleteBillingAccountTariff(accountId);
 
+  // Tariff assignments only use scope=tenant datasets (PPA / retail rate templates).
   const tenantDatasets = datasets.filter((d) => d.scope === 'tenant');
 
   const [datasetId, setDatasetId] = useState('');
-  const [filterText, setFilterText] = useState('{}');
+  const [dimFilter, setDimFilter] = useState({});
   const [version, setVersion] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [error, setError] = useState('');
 
+  const selectedDataset = tenantDatasets.find((d) => String(d.id) === datasetId);
+  const dimSchema = selectedDataset?.dimension_schema ?? {};
+  const hasVersion = selectedDataset?.has_version ?? false;
+
+  const handleDatasetChange = (val) => {
+    setDatasetId(val);
+    setDimFilter({}); // reset filter when dataset changes
+  };
+
   const handleAdd = async () => {
     setError('');
-    if (!datasetId) {
-      setError('Select a tariff dataset.');
-      return;
-    }
-    if (!effectiveFrom) {
-      setError('Set an effective from date.');
-      return;
-    }
-    let filter = {};
-    if (filterText.trim()) {
-      try {
-        filter = JSON.parse(filterText);
-        if (typeof filter !== 'object' || Array.isArray(filter)) {
-          throw new Error('not an object');
-        }
-      } catch {
-        setError('dimension_filter must be a JSON object.');
-        return;
-      }
-    }
+    if (!datasetId) { setError('Select a tariff dataset.'); return; }
+    if (!effectiveFrom) { setError('Set an effective from date.'); return; }
     try {
       await createAssignment.mutateAsync({
         dataset: Number(datasetId),
-        dimension_filter: filter,
+        dimension_filter: dimFilter,
         version: version || null,
         effective_from: effectiveFrom,
       });
       setDatasetId('');
-      setFilterText('{}');
+      setDimFilter({});
       setVersion('');
       setEffectiveFrom('');
     } catch (err) {
@@ -517,15 +510,15 @@ function TariffsTab({ accountId, canEdit }) {
         <section className={styles.section} style={{ marginTop: 0 }}>
           <h3 style={{ fontSize: '0.9375rem', margin: '0 0 0.5rem' }}>Assign a tariff</h3>
           <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: '0 0 0.75rem' }}>
-            Only scope=tenant Reference Datasets (PPA / retail tariff templates) can be
-            assigned to a billing account.
+            Link a PPA or retail tariff dataset to this billing account. The billing engine
+            uses this rate when generating invoice line items.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', gap: '0.5rem', alignItems: 'flex-end' }}>
-            <div className={styles.field} style={{ marginBottom: 0 }}>
+          <div className={styles.form} style={{ maxWidth: '480px' }}>
+            <div className={styles.field}>
               <label className={styles.label}>Tariff dataset *</label>
               <select
                 value={datasetId}
-                onChange={(e) => setDatasetId(e.target.value)}
+                onChange={(e) => handleDatasetChange(e.target.value)}
                 className={styles.input}
               >
                 <option value="">— Select dataset —</option>
@@ -534,27 +527,36 @@ function TariffsTab({ accountId, canEdit }) {
                 ))}
               </select>
             </div>
-            <div className={styles.field} style={{ marginBottom: 0 }}>
-              <label className={styles.label}>dimension_filter (JSON)</label>
-              <input
-                type="text"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                className={styles.input}
-                placeholder='{"plan_code": "stage1-2026"}'
-              />
-            </div>
-            <div className={styles.field} style={{ marginBottom: 0 }}>
-              <label className={styles.label}>Version</label>
-              <input
-                type="text"
-                value={version}
-                onChange={(e) => setVersion(e.target.value)}
-                className={styles.input}
-                placeholder="latest"
-              />
-            </div>
-            <div className={styles.field} style={{ marginBottom: 0 }}>
+
+            {datasetId && Object.keys(dimSchema).length > 0 && (
+              <div className={styles.field}>
+                <label className={styles.label}>Dimension filter</label>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.8125rem', color: '#6B7280' }}>
+                  Select the values that identify the correct rate rows for this customer.
+                </p>
+                <DimensionFilterInputs
+                  datasetId={datasetId}
+                  dimSchema={dimSchema}
+                  value={dimFilter}
+                  onChange={setDimFilter}
+                />
+              </div>
+            )}
+
+            {hasVersion && (
+              <div className={styles.field}>
+                <label className={styles.label}>Version pin (blank = always use latest)</label>
+                <input
+                  type="text"
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  className={styles.input}
+                  placeholder="e.g. 2025-26"
+                />
+              </div>
+            )}
+
+            <div className={styles.field}>
               <label className={styles.label}>Effective from *</label>
               <input
                 type="date"
@@ -563,16 +565,16 @@ function TariffsTab({ accountId, canEdit }) {
                 className={styles.input}
               />
             </div>
+
+            {error && <p className={styles.error}>{error}</p>}
+            <button
+              className={styles.primaryButton}
+              onClick={handleAdd}
+              disabled={createAssignment.isPending}
+            >
+              {createAssignment.isPending ? 'Adding…' : 'Add tariff assignment'}
+            </button>
           </div>
-          <button
-            className={styles.primaryButton}
-            onClick={handleAdd}
-            disabled={createAssignment.isPending}
-            style={{ marginTop: '0.5rem' }}
-          >
-            {createAssignment.isPending ? 'Adding…' : 'Add tariff assignment'}
-          </button>
-          {error && <p className={styles.error}>{error}</p>}
         </section>
       )}
 
@@ -597,8 +599,17 @@ function TariffsTab({ accountId, canEdit }) {
             {assignments.map((a) => (
               <tr key={a.id}>
                 <td>{a.dataset_name}</td>
-                <td className={styles.mono} style={{ fontSize: '0.8125rem' }}>
-                  {JSON.stringify(a.dimension_filter || {})}
+                <td>
+                  {Object.entries(a.dimension_filter || {}).map(([k, v]) => (
+                    <span key={k} style={{
+                      display: 'inline-block', marginRight: '0.375rem',
+                      background: '#F3F4F6', borderRadius: '4px',
+                      padding: '0.125rem 0.5rem', fontSize: '0.8125rem',
+                    }}>
+                      <span style={{ fontWeight: 500 }}>{k}:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{String(v)}</span>
+                    </span>
+                  ))}
                 </td>
                 <td>{a.version || <em style={{ color: '#9CA3AF' }}>latest</em>}</td>
                 <td>{a.stream_label || <em style={{ color: '#9CA3AF' }}>all</em>}</td>

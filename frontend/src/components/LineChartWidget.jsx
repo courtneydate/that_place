@@ -54,7 +54,10 @@ function LineChartWidget({ config = {}, refetchInterval, canEdit, onRemove, onEd
   const [dateTo, setDateTo] = useState(config.date_to || '');
 
   const params = useMemo(
-    () => buildParams(preset, dateFrom, dateTo),
+    // Request the endpoint's max page size (1000). Without an explicit limit
+    // the readings endpoint defaults to 100 newest points, which at a 5-min
+    // cadence is only ~8 hours — so long ranges silently show almost nothing.
+    () => ({ ...buildParams(preset, dateFrom, dateTo), limit: 1000 }),
     [preset, dateFrom, dateTo],
   );
 

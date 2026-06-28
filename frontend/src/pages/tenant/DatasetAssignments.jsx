@@ -10,11 +10,11 @@
  */
 import PropTypes from 'prop-types';
 import { useState } from 'react';
+import DimensionFilterInputs from '../../components/DimensionFilterInputs';
 import { useSites } from '../../hooks/useSites';
 import {
   useCreateDatasetAssignment,
   useDatasetAssignments,
-  useDatasetDimensionValues,
   useDeleteDatasetAssignment,
   useReferenceDatasets,
   useResolveAssignment,
@@ -61,67 +61,6 @@ function ResolvePreview({ assignmentId }) {
   );
 }
 ResolvePreview.propTypes = { assignmentId: PropTypes.number.isRequired };
-
-// ---------------------------------------------------------------------------
-// Dimension filter — per-key dropdowns populated from the dataset's rows
-// ---------------------------------------------------------------------------
-
-function DimensionFilterInputs({ datasetId, dimSchema, value, onChange }) {
-  const { data: dimValues = {}, isLoading } = useDatasetDimensionValues(datasetId);
-  const keys = Object.keys(dimSchema || {});
-
-  if (!keys.length) return null;
-
-  const handleKeyChange = (key, val) => {
-    onChange({ ...value, [key]: val });
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {keys.map((key) => {
-        const options = dimValues[key] ?? [];
-        const current = value[key] ?? '';
-        return (
-          <div key={key} className={styles.field}>
-            <label className={styles.label}>{key}</label>
-            {isLoading ? (
-              <select className={styles.input} disabled>
-                <option>Loading…</option>
-              </select>
-            ) : options.length > 0 ? (
-              <select
-                className={styles.input}
-                value={current}
-                onChange={(e) => handleKeyChange(key, e.target.value)}
-                required
-              >
-                <option value="">— select {key} —</option>
-                {options.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            ) : (
-              /* Fall back to text input if no rows exist yet */
-              <input
-                className={styles.input}
-                value={current}
-                onChange={(e) => handleKeyChange(key, e.target.value)}
-                placeholder={`Enter ${key}`}
-                required
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-DimensionFilterInputs.propTypes = {
-  datasetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  dimSchema: PropTypes.object,
-  value: PropTypes.object.isRequired,
-  onChange: PropTypes.func.isRequired,
-};
 
 // ---------------------------------------------------------------------------
 // Assignment form (create + edit)

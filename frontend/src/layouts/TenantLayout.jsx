@@ -345,7 +345,7 @@ function TenantLayout() {
           >
             Datasets
           </NavLink>
-          {(user?.role === 'admin' || user?.role === 'operator') && (
+          {(user?.tenant_role === 'admin' || user?.tenant_role === 'operator') && (
             <NavLink
               to="/app/reporting"
               className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
@@ -365,7 +365,7 @@ function TenantLayout() {
           >
             Runs
           </NavLink>
-          {user?.role === 'admin' && (
+          {user?.tenant_role === 'admin' && (
             <NavLink
               to="/app/billing-schedules"
               className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}

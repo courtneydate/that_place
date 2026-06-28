@@ -381,7 +381,7 @@ SnapshotTab.propTypes = { runId: PropTypes.number.isRequired };
 export default function BillingRunDetail() {
   const { id } = useParams();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.tenant_role === 'admin';
 
   const [tab, setTab] = useState('Overview');
   const [showVoidModal, setShowVoidModal] = useState(false);

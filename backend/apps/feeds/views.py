@@ -245,8 +245,8 @@ class ReferenceDatasetViewSet(viewsets.GenericViewSet):
         return ReferenceDatasetPublicSerializer
 
     def get_permissions(self):
-        """CRUD requires That Place Admin; list/retrieve requires authentication."""
-        if self.action in ('list', 'retrieve'):
+        """CRUD requires That Place Admin; list/retrieve/dimension_values requires authentication."""
+        if self.action in ('list', 'retrieve', 'dimension_values'):
             return [IsAuthenticated()]
         return [IsThatPlaceAdmin()]
 

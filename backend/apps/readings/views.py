@@ -81,10 +81,14 @@ class StreamViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         """Return streams scoped to the requesting user's tenant."""
         if self.request.user.is_that_place_admin:
-            return _annotate_latest(Stream.objects.select_related('device'))
+            return _annotate_latest(
+                Stream.objects.select_related('device', 'derived_config')
+            )
         tenant = self.request.user.tenantuser.tenant
         return _annotate_latest(
-            Stream.objects.select_related('device').filter(device__tenant=tenant)
+            Stream.objects
+            .select_related('device', 'derived_config')
+            .filter(device__tenant=tenant)
         )
 
     def retrieve(self, request, pk=None):

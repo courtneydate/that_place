@@ -311,7 +311,7 @@ function Reporting() {
    * History tab for Admins only.
    */
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.tenant_role === 'admin';
   const [activeTab, setActiveTab] = useState('Export');
 
   const tabs = isAdmin ? ['Export', 'History'] : ['Export'];

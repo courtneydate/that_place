@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDeviceHealth, useDevices, useUpdateDevice } from '../../hooks/useDevices';
 import { useCommandHistory, useSendCommand } from '../../hooks/useDeviceCommands';
 import { useDeviceStreams, usePatchStream, useUpdateStream } from '../../hooks/useStreams';
+import { useBackfillDerivedStream } from '../../hooks/useDerivedStreams';
 import DerivedStreamBuilder from '../../components/DerivedStreamBuilder';
 import MeterProfilePanel from '../../components/MeterProfilePanel';
 import QualityBadge from '../../components/QualityBadge';
@@ -244,6 +245,14 @@ HealthTab.propTypes = { deviceId: PropTypes.oneOfType([PropTypes.string, PropTyp
 // Stream row — inline editing
 // ---------------------------------------------------------------------------
 
+const AGG_KIND_OPTIONS = [
+  { value: 'sum',  label: 'Sum' },
+  { value: 'mean', label: 'Mean' },
+  { value: 'min',  label: 'Min' },
+  { value: 'max',  label: 'Max' },
+  { value: 'last', label: 'Last' },
+];
+
 const BILLING_ROLE_OPTIONS = [
   { value: '', label: '— None —' },
   { value: 'grid_import', label: 'Grid import' },
@@ -256,9 +265,91 @@ const BILLING_ROLE_OPTIONS = [
   { value: 'net', label: 'Net' },
 ];
 
+function DerivedBackfillModal({ derivedStreamId, streamKey, onClose }) {
+  const backfill = useBackfillDerivedStream();
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!dateFrom || !dateTo) { setError('Both dates are required.'); return; }
+    try {
+      await backfill.mutateAsync({
+        id: derivedStreamId,
+        dateFrom: new Date(dateFrom).toISOString(),
+        dateTo: new Date(dateTo + 'T23:59:59').toISOString(),
+      });
+      setDone(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Backfill failed to dispatch.');
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div style={{ background: '#fff', borderRadius: 8, padding: '2rem', width: 460 }}>
+        <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.125rem', fontWeight: 700 }}>
+          Backfill derived stream
+        </h2>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: '#6B7280' }}>
+          Recompute <code>{streamKey}</code> over a date range from its source readings.
+          Runs in the background; existing values in range are recomputed idempotently.
+        </p>
+        {done ? (
+          <>
+            <p className={styles.success}>
+              Backfill dispatched. It runs in the background — refresh in a moment to see new values.
+            </p>
+            <div className={styles.actions}>
+              <button className={styles.primaryButton} onClick={onClose}>Close</button>
+            </div>
+          </>
+        ) : (
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <div className={styles.inlineFields}>
+              <div className={styles.field} style={{ flex: 1 }}>
+                <label className={styles.label}>From</label>
+                <input type="date" className={styles.input}
+                  value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} required />
+              </div>
+              <div className={styles.field} style={{ flex: 1 }}>
+                <label className={styles.label}>To</label>
+                <input type="date" className={styles.input}
+                  value={dateTo} onChange={(e) => setDateTo(e.target.value)} required />
+              </div>
+            </div>
+            {error && <p className={styles.error}>{error}</p>}
+            <div className={styles.actions}>
+              <button type="submit" className={styles.primaryButton} disabled={backfill.isPending}>
+                {backfill.isPending ? 'Dispatching…' : 'Run backfill'}
+              </button>
+              <button type="button" className={styles.secondaryButton} onClick={onClose}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+DerivedBackfillModal.propTypes = {
+  derivedStreamId: PropTypes.number.isRequired,
+  streamKey: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
 function StreamRow({ stream, canEdit, deviceId }) {
   const updateStream = useUpdateStream(deviceId);
   const patchStream = usePatchStream(deviceId);
+  const [showBackfill, setShowBackfill] = useState(false);
   const [label, setLabel] = useState(stream.label);
   const [unit, setUnit] = useState(stream.unit);
   const [dirty, setDirty] = useState(false);
@@ -315,6 +406,21 @@ function StreamRow({ stream, canEdit, deviceId }) {
       await patchStream.mutateAsync({
         streamId: stream.id,
         data: { billing_role: next },
+      });
+    } catch {
+      setError('Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAggKindChange = async (e) => {
+    setSaving(true);
+    setError('');
+    try {
+      await patchStream.mutateAsync({
+        streamId: stream.id,
+        data: { aggregation_kind_default: e.target.value },
       });
     } catch {
       setError('Save failed.');
@@ -389,6 +495,25 @@ function StreamRow({ stream, canEdit, deviceId }) {
       <td>
         {canEdit ? (
           <select
+            value={stream.aggregation_kind_default || 'mean'}
+            onChange={handleAggKindChange}
+            disabled={saving}
+            className={detailStyles.inlineInput}
+            title="Controls how readings are bucketed into interval aggregates"
+          >
+            {AGG_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
+            {stream.aggregation_kind_default || 'mean'}
+          </span>
+        )}
+      </td>
+      <td>
+        {canEdit ? (
+          <select
             value={stream.billing_role || ''}
             onChange={handleBillingRoleChange}
             disabled={saving}
@@ -409,17 +534,36 @@ function StreamRow({ stream, canEdit, deviceId }) {
       </td>
       {canEdit && (
         <td>
-          {dirty && (
-            <button
-              onClick={handleSave}
-              className={styles.primaryButton}
-              disabled={saving}
-              style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+          <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+            {dirty && (
+              <button
+                onClick={handleSave}
+                className={styles.primaryButton}
+                disabled={saving}
+                style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
+            {stream.stream_type === 'derived' && stream.derived_stream_id && (
+              <button
+                onClick={() => setShowBackfill(true)}
+                className={styles.secondaryButton}
+                style={{ padding: '0.375rem 0.75rem', fontSize: '0.8125rem' }}
+                title="Recompute this derived stream over a date range"
+              >
+                Backfill
+              </button>
+            )}
+            {error && <span className={styles.error}>{error}</span>}
+          </div>
+          {showBackfill && (
+            <DerivedBackfillModal
+              derivedStreamId={stream.derived_stream_id}
+              streamKey={stream.key}
+              onClose={() => setShowBackfill(false)}
+            />
           )}
-          {error && <span className={styles.error}>{error}</span>}
         </td>
       )}
     </tr>
@@ -473,6 +617,7 @@ function StreamsTab({ deviceId, canEdit }) {
           <th>Provenance</th>
           <th>Latest value</th>
           <th>Dashboard</th>
+          <th>Aggregation</th>
           <th>Billing role</th>
           {canEdit && <th></th>}
         </tr>

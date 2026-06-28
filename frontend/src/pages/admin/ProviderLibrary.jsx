@@ -203,6 +203,65 @@ AvailableStreamsEditor.propTypes = {
   disabled: PropTypes.bool,
 };
 
+function HistoryParamsEditor({ value, onChange, disabled }) {
+  /**
+   * Edits the history endpoint's query params as key/value rows.
+   * Values may contain time tokens ({from_unix}, {to_unix}, {from_iso}, {to_iso}).
+   * Serialized to a {key: value} object on submit.
+   */
+  const handleChange = (i, field, v) =>
+    onChange(value.map((p, idx) => (idx === i ? { ...p, [field]: v } : p)));
+
+  return (
+    <div>
+      {value.map((param, i) => (
+        <div key={i} className={styles.inlineFields} style={{ marginBottom: '0.4rem' }}>
+          <input
+            type="text"
+            placeholder="param name (e.g. fromTs)"
+            value={param.key || ''}
+            onChange={(e) => handleChange(i, 'key', e.target.value)}
+            className={styles.input}
+            disabled={disabled}
+            style={{ fontFamily: 'monospace' }}
+          />
+          <input
+            type="text"
+            placeholder="value (e.g. {from_unix})"
+            value={param.value || ''}
+            onChange={(e) => handleChange(i, 'value', e.target.value)}
+            className={styles.input}
+            disabled={disabled}
+            style={{ fontFamily: 'monospace' }}
+          />
+          <button
+            type="button"
+            className={styles.dangerButton}
+            onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+            disabled={disabled}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className={styles.secondaryButton}
+        onClick={() => onChange([...value, { key: '', value: '' }])}
+        disabled={disabled}
+      >
+        + Add parameter
+      </button>
+    </div>
+  );
+}
+
+HistoryParamsEditor.propTypes = {
+  value: PropTypes.arrayOf(PropTypes.object).isRequired,
+  onChange: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+};
+
 // ---------------------------------------------------------------------------
 // Shared form fields
 // ---------------------------------------------------------------------------
@@ -226,6 +285,13 @@ const EMPTY_FIELDS = {
   detail_path_template: '',
   detail_method: 'GET',
   available_streams: [],
+  supports_history: false,
+  history_path_template: '',
+  history_method: 'GET',
+  history_params: [],
+  history_root_jsonpath: '$[*]',
+  history_timestamp_jsonpath: '',
+  history_chunk_days: 7,
   default_poll_interval_seconds: 300,
   max_requests_per_second: '',
   is_active: true,
@@ -249,6 +315,15 @@ function fieldsFromProvider(p) {
     detail_path_template: p.detail_endpoint?.path_template || '',
     detail_method: p.detail_endpoint?.method || 'GET',
     available_streams: p.available_streams || [],
+    supports_history: p.supports_history ?? false,
+    history_path_template: p.history_endpoint?.path_template || '',
+    history_method: p.history_endpoint?.method || 'GET',
+    history_params: Object.entries(p.history_endpoint?.params || {}).map(
+      ([key, value]) => ({ key, value }),
+    ),
+    history_root_jsonpath: p.history_endpoint?.response_root_jsonpath || '$[*]',
+    history_timestamp_jsonpath: p.history_endpoint?.timestamp_jsonpath || '',
+    history_chunk_days: p.history_chunk_days ?? 7,
     default_poll_interval_seconds: p.default_poll_interval_seconds ?? 300,
     max_requests_per_second: p.max_requests_per_second ?? '',
     is_active: p.is_active ?? true,
@@ -323,6 +398,26 @@ function buildFormData(fields) {
     method: fields.detail_method,
   }));
   fd.append('available_streams', JSON.stringify(fields.available_streams));
+
+  // Historical endpoint (Sprint 29a — backfill). Only serialize a populated
+  // config when the provider supports history; otherwise send an empty object.
+  fd.append('supports_history', fields.supports_history ? 'true' : 'false');
+  fd.append('history_chunk_days', String(fields.history_chunk_days || 7));
+  if (fields.supports_history) {
+    const historyParams = {};
+    (fields.history_params || []).forEach(({ key, value }) => {
+      if (key && key.trim()) historyParams[key.trim()] = value;
+    });
+    fd.append('history_endpoint', JSON.stringify({
+      path_template: fields.history_path_template,
+      method: fields.history_method,
+      params: historyParams,
+      response_root_jsonpath: fields.history_root_jsonpath,
+      timestamp_jsonpath: fields.history_timestamp_jsonpath,
+    }));
+  } else {
+    fd.append('history_endpoint', JSON.stringify({}));
+  }
   fd.append('default_poll_interval_seconds', String(fields.default_poll_interval_seconds));
   if (fields.max_requests_per_second !== '' && fields.max_requests_per_second !== null) {
     fd.append('max_requests_per_second', String(fields.max_requests_per_second));
@@ -521,6 +616,102 @@ function ProviderFormFields({ fields, setFields, disabled }) {
           </select>
         </div>
       </div>
+
+      <p className={styles.label} style={{ marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 600 }}>
+        Historical endpoint (backfill)
+      </p>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+        <input
+          type="checkbox"
+          checked={fields.supports_history}
+          onChange={(e) => setFields((f) => ({ ...f, supports_history: e.target.checked }))}
+          disabled={disabled}
+        />
+        This provider supports historical backfill (date-range endpoint)
+      </label>
+
+      {fields.supports_history && (
+        <div style={{ borderLeft: '3px solid #E5E7EB', paddingLeft: '1rem', marginBottom: '0.5rem' }}>
+          <div className={styles.inlineFields}>
+            <div className={styles.field}>
+              <label className={styles.label}>Path template</label>
+              <input
+                type="text"
+                value={fields.history_path_template}
+                onChange={(e) => setFields((f) => ({ ...f, history_path_template: e.target.value }))}
+                className={styles.input}
+                placeholder="/modbus/{device_id}"
+                style={{ fontFamily: 'monospace' }}
+                disabled={disabled}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Method</label>
+              <select
+                value={fields.history_method}
+                onChange={(e) => setFields((f) => ({ ...f, history_method: e.target.value }))}
+                className={styles.input}
+                disabled={disabled}
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.field} style={{ marginTop: '0.75rem' }}>
+            <label className={styles.label}>Query parameters</label>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8125rem', color: '#6B7280' }}>
+              Time tokens (substituted per chunk):{' '}
+              <code>{'{from_unix}'}</code>, <code>{'{to_unix}'}</code>,{' '}
+              <code>{'{from_iso}'}</code>, <code>{'{to_iso}'}</code>
+            </p>
+            <HistoryParamsEditor
+              value={fields.history_params}
+              onChange={(v) => setFields((f) => ({ ...f, history_params: v }))}
+              disabled={disabled}
+            />
+          </div>
+
+          <div className={styles.inlineFields} style={{ marginTop: '0.75rem' }}>
+            <div className={styles.field}>
+              <label className={styles.label}>Response root JSONPath</label>
+              <input
+                type="text"
+                value={fields.history_root_jsonpath}
+                onChange={(e) => setFields((f) => ({ ...f, history_root_jsonpath: e.target.value }))}
+                className={styles.input}
+                placeholder="$[*]"
+                style={{ fontFamily: 'monospace' }}
+                disabled={disabled}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Timestamp JSONPath</label>
+              <input
+                type="text"
+                value={fields.history_timestamp_jsonpath}
+                onChange={(e) => setFields((f) => ({ ...f, history_timestamp_jsonpath: e.target.value }))}
+                className={styles.input}
+                placeholder="$.timestamp"
+                style={{ fontFamily: 'monospace' }}
+                disabled={disabled}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Chunk size (days)</label>
+              <input
+                type="number"
+                min="1"
+                value={fields.history_chunk_days}
+                onChange={(e) => setFields((f) => ({ ...f, history_chunk_days: Number(e.target.value) }))}
+                className={styles.input}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.field} style={{ marginTop: '1rem' }}>
         <p className={styles.label} style={{ marginBottom: '0.4rem' }}>Available streams</p>
