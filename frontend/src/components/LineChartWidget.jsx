@@ -49,6 +49,20 @@ function buildParams(preset, dateFrom, dateTo) {
 function LineChartWidget({ config = {}, refetchInterval, canEdit, onRemove, onEdit }) {
   const streamConfigs = useMemo(() => config.streams || [], [config.streams]);
 
+  // Heading so the chart is self-explanatory. Prefer an explicit config.title;
+  // otherwise derive one from the bound stream labels (1 → "A"; 2 → "A & B";
+  // 3+ → "A, B + N more") — mirrors the Sprint 19a auto-title convention.
+  const heading = useMemo(() => {
+    if (typeof config.title === 'string' && config.title.trim()) {
+      return config.title.trim();
+    }
+    const labels = streamConfigs.map((sc) => sc.label).filter(Boolean);
+    if (labels.length === 0) return 'Line chart';
+    if (labels.length === 1) return labels[0];
+    if (labels.length === 2) return `${labels[0]} & ${labels[1]}`;
+    return `${labels[0]}, ${labels[1]} + ${labels.length - 2} more`;
+  }, [config.title, streamConfigs]);
+
   const [preset, setPreset] = useState(config.time_range || '24h');
   const [dateFrom, setDateFrom] = useState(config.date_from || '');
   const [dateTo, setDateTo] = useState(config.date_to || '');
@@ -139,6 +153,7 @@ function LineChartWidget({ config = {}, refetchInterval, canEdit, onRemove, onEd
           <button className={styles.removeBtn} onClick={onRemove} title="Remove widget">×</button>
         </div>
       )}
+      <h3 className={styles.heading} title={heading}>{heading}</h3>
       <div className={styles.header}>
         <TimeRangeSelector
           preset={preset}

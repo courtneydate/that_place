@@ -83,6 +83,43 @@ describe('LineChartWidget', () => {
     expect(screen.queryByTitle('Remove widget')).not.toBeInTheDocument();
   });
 
+  it('renders a heading derived from a single stream label', () => {
+    useMultipleStreamReadings.mockReturnValue([
+      { isLoading: true, isError: false, data: null },
+    ]);
+    render(<LineChartWidget {...defaultProps} />);
+    expect(screen.getByRole('heading', { name: 'Temperature' })).toBeInTheDocument();
+  });
+
+  it('derives a combined heading from two stream labels', () => {
+    const twoStreamConfig = {
+      streams: [
+        { stream_id: 1, label: 'Temp' },
+        { stream_id: 2, label: 'Humidity' },
+      ],
+      time_range: '24h',
+    };
+    useMultipleStreamReadings.mockReturnValue([
+      { isLoading: true, isError: false, data: null },
+      { isLoading: true, isError: false, data: null },
+    ]);
+    render(<LineChartWidget {...defaultProps} config={twoStreamConfig} />);
+    expect(screen.getByRole('heading', { name: 'Temp & Humidity' })).toBeInTheDocument();
+  });
+
+  it('prefers an explicit config.title over derived stream labels', () => {
+    useMultipleStreamReadings.mockReturnValue([
+      { isLoading: true, isError: false, data: null },
+    ]);
+    render(
+      <LineChartWidget
+        {...defaultProps}
+        config={{ ...BASE_CONFIG, title: 'Greenhouse Climate' }}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Greenhouse Climate' })).toBeInTheDocument();
+  });
+
   it('passes series with one entry per stream to the chart', () => {
     const twoStreamConfig = {
       streams: [

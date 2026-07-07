@@ -33,6 +33,7 @@ from .models import (
     BillingRun,
     BillingRunSnapshot,
     BillingSchedule,
+    ReconciliationReport,
     SolarAllocationRecord,
 )
 from .serializers import (
@@ -47,6 +48,7 @@ from .serializers import (
     BillingRunSnapshotSerializer,
     BillingScheduleSerializer,
     BulkBillingAccountImportSerializer,
+    ReconciliationReportSerializer,
     SolarAllocationRecordSerializer,
 )
 from .signals import clear_audit_actor, set_audit_actor
@@ -331,7 +333,7 @@ class BillingRunViewSet(viewsets.GenericViewSet):
         """Read = any tenant user; write = Tenant Admin."""
         if self.action in (
             'list', 'retrieve', 'line_items', 'snapshot',
-            'line_items_csv', 'allocations',
+            'line_items_csv', 'allocations', 'reconciliation',
         ):
             return [IsAuthenticated(), IsViewOnly()]
         return [IsAuthenticated(), IsTenantAdmin()]
@@ -480,12 +482,38 @@ class BillingRunViewSet(viewsets.GenericViewSet):
         )
         return Response(SolarAllocationRecordSerializer(records, many=True).data)
 
+    @action(detail=True, methods=['get'])
+    def reconciliation(self, request, pk=None):
+        """GET /api/v1/billing-runs/:id/reconciliation/ — energy balance (Sprint 34).
+
+        Hierarchical sites only. Returns the ReconciliationReport (variance vs
+        tolerance) or 404 when none has been computed (e.g. a PPA run). Tenant-
+        scoped via ``_qs``; cross-tenant access 404s on the run lookup.
+        """
+        run = get_object_or_404(self._qs(request), pk=pk)
+        report = (
+            ReconciliationReport.objects
+            .filter(billing_run=run)
+            .select_related('site')
+            .first()
+        )
+        if report is None:
+            return Response(
+                {'error': {'code': 'not_found', 'message': 'No reconciliation report for this run.'}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(ReconciliationReportSerializer(report).data)
+
     @action(detail=True, methods=['post'])
     def finalize(self, request, pk=None):
         """POST /api/v1/billing-runs/:id/finalize/ — lock the run and issue invoices.
 
         Tenant Admin only. Accepts draft and review runs. Dispatches
         billing.finalize_billing_run asynchronously.
+
+        Sprint 34: a hierarchical run whose reconciliation variance exceeds
+        tolerance is blocked (moved to ``review``) unless the body supplies
+        ``force=true`` with a non-blank ``note`` (the mandatory justification).
         """
         run = get_object_or_404(self._qs(request), pk=pk)
         if run.status not in (BillingRun.Status.DRAFT, BillingRun.Status.REVIEW):
@@ -501,8 +529,23 @@ class BillingRunViewSet(viewsets.GenericViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        finalize_billing_run.delay(run.id, request.user.id)
-        logger.info('BillingRun %d finalize dispatched by %s', run.id, request.user.email)
+        force = bool(request.data.get('force', False))
+        note = str(request.data.get('note', '') or '').strip()
+        if force and not note:
+            return Response(
+                {
+                    'error': {
+                        'code': 'note_required',
+                        'message': 'A note is required when force-finalizing over tolerance.',
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        finalize_billing_run.delay(run.id, request.user.id, force, note)
+        logger.info(
+            'BillingRun %d finalize dispatched by %s (force=%s)',
+            run.id, request.user.email, force,
+        )
         return Response(BillingRunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=['post'])

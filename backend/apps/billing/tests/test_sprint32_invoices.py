@@ -529,7 +529,8 @@ def test_finalize_endpoint_202():
         resp = client.post(f'/api/v1/billing-runs/{run.id}/finalize/')
 
     assert resp.status_code == status.HTTP_202_ACCEPTED
-    mock_task.delay.assert_called_once_with(run.id, admin.id)
+    # Sprint 34: finalize now threads force + note (defaults on a normal finalize).
+    mock_task.delay.assert_called_once_with(run.id, admin.id, False, '')
 
 
 @pytest.mark.django_db

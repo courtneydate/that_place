@@ -368,6 +368,7 @@ class BillingRun(models.Model):
         SNAPSHOT = 'snapshot', 'Snapshot'
         ALLOCATE_SOLAR = 'allocate_solar', 'Allocate solar (hierarchical)'
         COMPUTE_LINE_ITEMS = 'compute_line_items', 'Compute line items'
+        RECONCILE = 'reconcile', 'Reconcile (hierarchical)'
         MARK_DRAFT = 'mark_draft', 'Mark draft'
 
     tenant = models.ForeignKey(
@@ -442,6 +443,15 @@ class BillingRun(models.Model):
         blank=True,
         default='',
         help_text='Operator-supplied reason captured when the run is voided (Sprint 32).',
+    )
+    notes = models.TextField(
+        blank=True,
+        default='',
+        help_text=(
+            'Free-text operator notes. Sprint 34: records the mandatory '
+            'justification when a run over reconciliation tolerance is '
+            'force-finalized.'
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
     computed_at = models.DateTimeField(null=True, blank=True)
@@ -881,4 +891,79 @@ class SolarAllocationRecord(models.Model):
             f'SolarAllocation(run={self.billing_run_id}, '
             f'account={self.billing_account_id}, {self.interval_start:%Y-%m-%d %H:%M}, '
             f'{self.allocated_kwh} kWh)'
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sprint 34 — Reconciliation
+# ---------------------------------------------------------------------------
+
+
+class ReconciliationReport(models.Model):
+    """Energy-balance check for a hierarchical billing run (Sprint 34).
+
+    Computed by the engine's ``reconcile`` step (draft-time, so the variance is
+    visible before finalize) and re-checked at finalize. For the whole run
+    period it balances what entered the embedded network against what was
+    metered out:
+
+        input  = gate_import + Σ generation − gate_export
+        output = Σ child_grid_import + common_area
+        losses = input − output            (unaccounted: line losses, unmetered)
+        variance_percent = |losses| / input × 100
+
+    ``within_tolerance`` is ``variance_percent <= Site.reconciliation_tolerance_percent``.
+    When false, finalize is blocked (run set to ``review``) until the operator
+    recomputes with corrected data or force-finalizes with a note.
+
+    One report per run (rewritten on every reconcile — reproducible).
+
+    Ref: SPEC.md § Feature: Embedded-Network Billing (Reconciliation)
+         ROADMAP Sprint 34
+    """
+
+    class ReconStatus(models.TextChoices):
+        OK = 'ok', 'Within tolerance'
+        EXCEEDED = 'exceeded', 'Variance exceeded'
+
+    billing_run = models.OneToOneField(
+        BillingRun,
+        on_delete=models.CASCADE,
+        related_name='reconciliation_report',
+    )
+    site = models.ForeignKey(
+        'devices.Site',
+        on_delete=models.PROTECT,
+        related_name='reconciliation_reports',
+    )
+    gate_import_kwh = models.DecimalField(max_digits=18, decimal_places=6, default=0)
+    generation_kwh = models.DecimalField(max_digits=18, decimal_places=6, default=0)
+    gate_export_kwh = models.DecimalField(max_digits=18, decimal_places=6, default=0)
+    child_grid_import_total_kwh = models.DecimalField(
+        max_digits=18, decimal_places=6, default=0,
+    )
+    common_area_total_kwh = models.DecimalField(
+        max_digits=18, decimal_places=6, default=0,
+    )
+    computed_losses_kwh = models.DecimalField(
+        max_digits=18, decimal_places=6, default=0,
+        help_text='input − output; the unaccounted residual (may be negative).',
+    )
+    variance_percent = models.DecimalField(
+        max_digits=9, decimal_places=4, default=0,
+        help_text='|losses| / input × 100.',
+    )
+    within_tolerance = models.BooleanField(default=True)
+    status = models.CharField(
+        max_length=12,
+        choices=ReconStatus.choices,
+        default=ReconStatus.OK,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return (
+            f'ReconciliationReport(run={self.billing_run_id}, '
+            f'variance={self.variance_percent}%, '
+            f'{"ok" if self.within_tolerance else "exceeded"})'
         )

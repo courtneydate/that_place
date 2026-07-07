@@ -659,6 +659,11 @@ def step_compute_line_items(billing_run) -> None:
                 quality_summary={},
             )
 
+        # Sprint 34 — common-area apportionment (hierarchical sites only).
+        _emit_common_area_shares(
+            billing_run, accounts_in_scope, tenant_tz, gst_rate,
+        )
+
 
 def _accumulate_split_legs(
     billing_run, account, stream, snap, mid, child_alloc, tenant_tz, buckets,
@@ -813,6 +818,322 @@ def _round_cents(decimal_value: Decimal) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Sprint 34 — common-area apportionment (folded into compute_line_items)
+# ---------------------------------------------------------------------------
+
+def _common_area_meter_devices(site):
+    """Devices on ``site`` whose MeterProfile role is common_area."""
+    from apps.metering.models import MeterProfile
+
+    return [
+        mp.device for mp in
+        MeterProfile.objects
+        .filter(device__site=site, meter_role=MeterProfile.MeterRole.COMMON_AREA)
+        .select_related('device')
+    ]
+
+
+def _meter_energy_stream_ids(device) -> list[int]:
+    """Energy stream ids on a meter device (consumption / grid_import roles)."""
+    from apps.readings.models import Stream
+
+    return list(
+        Stream.objects
+        .filter(
+            device=device,
+            billing_role__in=[
+                Stream.BillingRole.CONSUMPTION,
+                Stream.BillingRole.GRID_IMPORT,
+            ],
+        )
+        .values_list('id', flat=True)
+    )
+
+
+def _role_stream_ids(site, meter_role, billing_role) -> list[int]:
+    """Stream ids on ``site`` devices with the given meter_role + billing_role."""
+    from apps.metering.models import MeterProfile
+    from apps.readings.models import Stream
+
+    device_ids = (
+        MeterProfile.objects
+        .filter(device__site=site, meter_role=meter_role)
+        .values_list('device_id', flat=True)
+    )
+    return list(
+        Stream.objects
+        .filter(device_id__in=list(device_ids), billing_role=billing_role)
+        .values_list('id', flat=True)
+    )
+
+
+def _sum_aggregates_total(stream_ids, period, win_start, win_end) -> Decimal:
+    """Total of sum-kind IntervalAggregate values across streams over a window."""
+    from apps.readings.models import IntervalAggregate
+
+    if not stream_ids:
+        return Decimal('0')
+    total = Decimal('0')
+    for agg in IntervalAggregate.objects.filter(
+        stream_id__in=stream_ids,
+        period=period,
+        aggregation_kind='sum',
+        period_start__gte=win_start,
+        period_start__lt=win_end,
+    ):
+        if agg.value is not None:
+            total += Decimal(str(agg.value))
+    return total
+
+
+def _get_or_create_internal_account(tenant, device):
+    """Idempotent `internal` billing account for a common-area meter device."""
+    from .models import BillingAccount
+
+    account, _ = BillingAccount.objects.get_or_create(
+        tenant=tenant,
+        customer_reference=f'common-area-meter-{device.id}',
+        defaults={
+            'name': f'Common Area — {device.name}',
+            'account_type': BillingAccount.AccountType.INTERNAL,
+        },
+    )
+    return account
+
+
+def _apportionment_weights(method, children) -> dict:
+    """Return {account_id: weight} for the site's apportionment method."""
+    from apps.devices.models import Site
+    from .models import BillingRun
+
+    weights = {}
+    for account, import_total, _stream in children:
+        if method == Site.CommonAreaApportionmentMethod.EQUAL_SHARE:
+            weights[account.id] = Decimal('1')
+        elif method == Site.CommonAreaApportionmentMethod.BY_FLOOR_AREA:
+            area = account.floor_area_sqm
+            if area is None or Decimal(str(area)) <= 0:
+                raise StepError(
+                    BillingRun.Step.COMPUTE_LINE_ITEMS,
+                    f'by_floor_area apportionment needs floor_area_sqm on every '
+                    f'active child; account "{account.name}" (id {account.id}) is '
+                    f'missing it.',
+                )
+            weights[account.id] = Decimal(str(area))
+        else:  # PRO_RATA_CONSUMPTION (default)
+            weights[account.id] = import_total if import_total > 0 else Decimal('0')
+    return weights
+
+
+def _representative_rate(account, import_stream, tenant_tz, mid_date):
+    """The child's consumption (grid/EN) rate at mid-period, or None.
+
+    Common-area apportioned energy is a period-level total, so it is costed at a
+    single representative rate: the child's `consumption` tariff resolved at noon
+    on the mid-period date. (TOU-splitting apportioned common-area energy is out
+    of scope for v1.)
+    """
+    from apps.readings.models import Stream
+
+    from .tariff_resolver import (
+        candidate_rows,
+        find_assignment,
+        get_rate,
+        row_at,
+    )
+
+    assignment = find_assignment(
+        account, import_stream, mid_date,
+        applies_to_role=Stream.BillingRole.CONSUMPTION,
+    )
+    if assignment is None:
+        # Fall back to an untagged assignment (single-rate configs).
+        assignment = find_assignment(account, import_stream, mid_date)
+    if assignment is None:
+        return None
+    rows = candidate_rows(assignment, mid_date)
+    tz = ZoneInfo(tenant_tz)
+    sample = datetime.combine(mid_date, datetime.min.time(), tzinfo=tz).replace(hour=12)
+    row = row_at(assignment, rows, sample)
+    return get_rate(row)
+
+
+def _emit_common_area_shares(billing_run, accounts_in_scope, tenant_tz, gst_rate) -> None:
+    """Apportion common-area meter energy across active child accounts.
+
+    Hierarchical sites only. For each common-area meter, an `internal` billing
+    account is auto-created (idempotent), the meter's period-total energy is
+    apportioned across active embedded-network tenant accounts by the site's
+    `common_area_apportionment_method`, and one `common_area_share` line item is
+    written per child (costed at the child's consumption tariff, `source_account`
+    linking back to the internal account for audit).
+    """
+    from apps.readings.models import Stream
+
+    from .models import (
+        BillingAccount,
+        BillingAccountMeter,
+        BillingLineItem,
+        BillingRun,
+    )
+
+    site = billing_run.site
+    if not site.is_hierarchical:
+        return
+
+    common_meters = _common_area_meter_devices(site)
+    if not common_meters:
+        return
+
+    period = billing_run.aggregate_period
+    win_start, win_end = billing_run.period_start, billing_run.period_end
+    method = site.common_area_apportionment_method
+
+    # Active child (EN tenant) accounts with a grid_import stream, plus each
+    # child's period-total import (pro-rata weight) and a representative import
+    # stream (for tariff resolution).
+    children = []  # (account, import_total, import_stream)
+    for account, cstart, cend in accounts_in_scope:
+        if account.account_type != BillingAccount.AccountType.EN_TENANT:
+            continue
+        import_ids = _child_import_stream_ids(
+            BillingAccountMeter, account, cstart, cend,
+        )
+        if not import_ids:
+            continue
+        import_total = _sum_aggregates_total(import_ids, period, cstart, cend)
+        import_stream = Stream.objects.filter(id=import_ids[0]).first()
+        children.append((account, import_total, import_stream))
+
+    if not children:
+        return
+
+    mid = win_start + (win_end - win_start) / 2
+    mid_date = mid.astimezone(ZoneInfo(tenant_tz)).date()
+
+    for device in common_meters:
+        internal = _get_or_create_internal_account(billing_run.tenant, device)
+        ca_total = _sum_aggregates_total(
+            _meter_energy_stream_ids(device), period, win_start, win_end,
+        )
+        if ca_total <= 0:
+            continue
+
+        weights = _apportionment_weights(method, children)
+        if sum(weights.values(), Decimal('0')) <= 0:
+            continue  # nothing to weight against (e.g. no child consumed)
+
+        shares = _allocate_pool(ca_total, weights)
+        for account, _import_total, import_stream in children:
+            share = shares.get(account.id, Decimal('0'))
+            if share <= 0:
+                continue
+            rate = _representative_rate(account, import_stream, tenant_tz, mid_date)
+            if rate is None:
+                raise StepError(
+                    BillingRun.Step.COMPUTE_LINE_ITEMS,
+                    f'Embedded-network tenant "{account.name}" (id {account.id}) has '
+                    f'no consumption tariff to cost its common-area share. Assign a '
+                    f'tariff with applies_to_role="consumption".',
+                )
+            amount = _round_cents(share * rate)
+            gst = _round_cents(Decimal(amount) * gst_rate)
+            BillingLineItem.objects.create(
+                billing_run=billing_run,
+                billing_account=account,
+                stream=None,
+                line_kind=BillingLineItem.LineKind.COMMON_AREA_SHARE,
+                period_name='',
+                kwh=share.quantize(Decimal('0.000001')),
+                rate_cents_per_kwh=rate.quantize(Decimal('0.000001')),
+                amount_cents=amount,
+                gst_cents=gst,
+                quality_summary={},
+                source_account=internal,
+            )
+
+
+# ---------------------------------------------------------------------------
+# Step — reconcile (Sprint 34, hierarchical sites only)
+# ---------------------------------------------------------------------------
+
+def step_reconcile(billing_run) -> None:
+    """Compute the energy-balance ReconciliationReport for the run.
+
+    No-op (clears any stale report) for non-hierarchical sites. Runs at draft
+    time so the variance is visible before finalize; the finalize gate re-checks
+    it. Does not itself block or change run status — it only records the balance.
+
+    input  = gate_import + Σ generation − gate_export
+    output = Σ child_grid_import + common_area
+    losses = input − output ; variance = |losses| / input × 100
+    """
+    from apps.metering.models import MeterProfile
+    from apps.readings.models import Stream
+
+    from .models import ReconciliationReport
+
+    site = billing_run.site
+    with transaction.atomic():
+        ReconciliationReport.objects.filter(billing_run=billing_run).delete()
+        if not site.is_hierarchical:
+            return
+
+        period = billing_run.aggregate_period
+        win_start, win_end = billing_run.period_start, billing_run.period_end
+
+        gate_import = _sum_aggregates_total(
+            _role_stream_ids(site, MeterProfile.MeterRole.GATE, Stream.BillingRole.GRID_IMPORT),
+            period, win_start, win_end,
+        )
+        gate_export = _sum_aggregates_total(
+            _role_stream_ids(site, MeterProfile.MeterRole.GATE, Stream.BillingRole.GRID_EXPORT),
+            period, win_start, win_end,
+        )
+        generation = _sum_aggregates_total(
+            _stream_ids_by_role(site, Stream.BillingRole.GENERATION),
+            period, win_start, win_end,
+        )
+        child_import = _sum_aggregates_total(
+            _role_stream_ids(site, MeterProfile.MeterRole.CHILD, Stream.BillingRole.GRID_IMPORT),
+            period, win_start, win_end,
+        )
+        common_area = Decimal('0')
+        for device in _common_area_meter_devices(site):
+            common_area += _sum_aggregates_total(
+                _meter_energy_stream_ids(device), period, win_start, win_end,
+            )
+
+        input_kwh = gate_import + generation - gate_export
+        output_kwh = child_import + common_area
+        losses = input_kwh - output_kwh
+        if input_kwh > 0:
+            variance = (abs(losses) / input_kwh * Decimal('100')).quantize(Decimal('0.0001'))
+        else:
+            variance = Decimal('0.0000')
+
+        tol = Decimal(str(site.reconciliation_tolerance_percent or 0))
+        within = variance <= tol
+
+        ReconciliationReport.objects.create(
+            billing_run=billing_run,
+            site=site,
+            gate_import_kwh=gate_import,
+            generation_kwh=generation,
+            gate_export_kwh=gate_export,
+            child_grid_import_total_kwh=child_import,
+            common_area_total_kwh=common_area,
+            computed_losses_kwh=losses.quantize(Decimal('0.000001')),
+            variance_percent=variance,
+            within_tolerance=within,
+            status=(
+                ReconciliationReport.ReconStatus.OK if within
+                else ReconciliationReport.ReconStatus.EXCEEDED
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
 # Step 4 — mark_draft
 # ---------------------------------------------------------------------------
 
@@ -841,6 +1162,7 @@ def _build_dispatch():
         BillingRun.Step.SNAPSHOT: step_snapshot,
         BillingRun.Step.ALLOCATE_SOLAR: step_allocate_solar,
         BillingRun.Step.COMPUTE_LINE_ITEMS: step_compute_line_items,
+        BillingRun.Step.RECONCILE: step_reconcile,
         BillingRun.Step.MARK_DRAFT: step_mark_draft,
     }
 
@@ -866,6 +1188,7 @@ def run_pipeline(billing_run, from_step=None) -> None:
         BillingRun.Step.SNAPSHOT,
         BillingRun.Step.ALLOCATE_SOLAR,
         BillingRun.Step.COMPUTE_LINE_ITEMS,
+        BillingRun.Step.RECONCILE,
         BillingRun.Step.MARK_DRAFT,
     )
     start_idx = steps.index(from_step) if from_step else 0

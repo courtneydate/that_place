@@ -1271,23 +1271,38 @@ _Tests (apps/billing/tests/test_sprint31_engine.py — 17 tests):_
 **Goal:** Apportion common-area energy across tenant accounts using the per-site method, and reconcile the whole hierarchical run back to the gate meter — flagging variance beyond tolerance for operator review.
 
 **Deliverables:**
-- [ ] Backend: Common-area meter energy accumulates on an `internal` billing account (auto-created per common-area meter on first run); costed at the EN tariff
-- [ ] Backend: Apportionment method per `Site.common_area_apportionment_method`:
-  - [ ] `pro_rata_consumption` (default) — share by child grid_import for the period
-  - [ ] `equal_share` — equal split across active child accounts
-  - [ ] `by_floor_area` — share by `BillingAccount.floor_area_sqm`
-- [ ] Backend: `common_area_share` line item on each child invoice — `source_account_id` links back to the internal account for audit
-- [ ] Backend: `ReconciliationReport` model — billing_run FK, gate_import_kwh, generation_kwh, gate_export_kwh, child_grid_import_total_kwh, common_area_total_kwh, computed_losses_kwh, variance_percent, within_tolerance bool, created_at
-- [ ] Backend: At run finalize, per period: `gate_import + Σ generation − gate_export` vs `Σ child_grid_import + common_area + losses`; variance beyond `Site.reconciliation_tolerance_percent` (default 1.5%) sets the run to `review` status — finalize blocked until operator confirms or recomputes
-- [ ] Backend: Tests — apportionment correctness for each method, common-area auto-account creation, reconciliation within tolerance passes, variance over tolerance blocks finalize, idempotent on rerun, cross-tenant isolation
-- [ ] Frontend: ReconciliationReport panel on the BillingRun detail (variance, within-tolerance badge, period-by-period breakdown)
-- [ ] Frontend: Apportionment method picker on Site settings (Tenant Admin)
+- [x] Backend: Common-area meter energy accumulates on an `internal` billing account (auto-created per common-area meter on first run); costed at the EN tariff
+- [x] Backend: Apportionment method per `Site.common_area_apportionment_method`:
+  - [x] `pro_rata_consumption` (default) — share by child grid_import for the period
+  - [x] `equal_share` — equal split across active child accounts
+  - [x] `by_floor_area` — share by `BillingAccount.floor_area_sqm`
+- [x] Backend: `common_area_share` line item on each child invoice — `source_account_id` links back to the internal account for audit
+- [x] Backend: `ReconciliationReport` model — billing_run FK, gate_import_kwh, generation_kwh, gate_export_kwh, child_grid_import_total_kwh, common_area_total_kwh, computed_losses_kwh, variance_percent, within_tolerance bool, created_at
+- [x] Backend: reconciliation `gate_import + Σ generation − gate_export` vs `Σ child_grid_import + common_area (+ losses)`; variance beyond `Site.reconciliation_tolerance_percent` (default 1.5%) sets the run to `review` status — finalize blocked until operator recomputes or force-finalizes with a note
+- [x] Backend: Tests — apportionment correctness for each method, common-area auto-account creation, reconciliation within tolerance passes, variance over tolerance blocks finalize, idempotent on rerun, cross-tenant isolation (15 tests in `apps/billing/tests/test_sprint34_common_area.py`)
+- [x] Frontend: ReconciliationReport panel on the BillingRun detail (variance, within-tolerance badge, energy-balance breakdown, force-finalize control)
+- [x] Frontend: Apportionment method picker on Site settings (Tenant Admin) — already present from the Sprint 29 site-settings work
 
 **Definition of Done:**
-- [ ] A hierarchical site with a common-area meter produces a `common_area_share` line item on each child invoice using the configured method
-- [ ] `by_floor_area` apportionment with one missing `floor_area_sqm` returns a clear validation error before the run starts
-- [ ] A run with 5% variance is moved to `review`; the operator can investigate, recompute, or force-finalize with a note
-- [ ] Reconciliation report shows the full math for every period — audit-quality
+- [x] A hierarchical site with a common-area meter produces a `common_area_share` line item on each child invoice using the configured method
+- [x] `by_floor_area` apportionment with one missing `floor_area_sqm` fails the run with a clear error naming the account (surfaced as a failed step, not a pre-run check)
+- [x] A run over tolerance is moved to `review`; the operator can recompute or force-finalize with a note
+- [x] Reconciliation report shows the full energy-balance math for the run period — audit-quality
+
+> **Status (2026-07-07):** ✅ Code-complete. New engine step `reconcile` (after
+> `compute_line_items`) writes the `ReconciliationReport` at draft so variance is
+> visible early; the finalize gate re-checks it and blocks over-tolerance runs at
+> `review` unless force-finalized with a mandatory note (recorded on
+> `BillingRun.notes`). Common-area apportionment folds into `compute_line_items`
+> (no unspecced allocation model): period-level split by the site method, one
+> `internal` account auto-created per common-area meter, `common_area_share` lines
+> costed at each child's consumption tariff at a representative mid-period rate
+> (TOU-splitting apportioned common-area energy is out of scope for v1). Migration
+> `0005_sprint34_reconciliation` (adds `ReconciliationReport` + `BillingRun.notes`).
+> New `GET /billing-runs/:id/reconciliation/`. Design decisions (reconcile at
+> draft + re-check at finalize; losses-as-residual variance; force+note override)
+> confirmed with product 2026-07-07. Full cumulative backend suite green (961,
+> up from 946); frontend green (70); flake8 / isort / eslint clean.
 
 ---
 

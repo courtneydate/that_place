@@ -30,6 +30,7 @@ from .models import (
     BillingRun,
     BillingRunSnapshot,
     BillingSchedule,
+    ReconciliationReport,
     SolarAllocationRecord,
 )
 
@@ -652,5 +653,41 @@ class SolarAllocationRecordSerializer(serializers.ModelSerializer):
             'pool_kwh',
             'child_grid_import_kwh',
             'allocation_method',
+        )
+        read_only_fields = fields
+
+
+# ---------------------------------------------------------------------------
+# Sprint 34 — reconciliation report serializer
+# ---------------------------------------------------------------------------
+
+
+class ReconciliationReportSerializer(serializers.ModelSerializer):
+    """Read-only serializer for a run's ReconciliationReport (Sprint 34)."""
+
+    tolerance_percent = serializers.DecimalField(
+        source='site.reconciliation_tolerance_percent',
+        max_digits=6, decimal_places=3, read_only=True,
+    )
+    apportionment_method = serializers.CharField(
+        source='site.common_area_apportionment_method', read_only=True,
+    )
+
+    class Meta:
+        model = ReconciliationReport
+        fields = (
+            'id',
+            'gate_import_kwh',
+            'generation_kwh',
+            'gate_export_kwh',
+            'child_grid_import_total_kwh',
+            'common_area_total_kwh',
+            'computed_losses_kwh',
+            'variance_percent',
+            'tolerance_percent',
+            'apportionment_method',
+            'within_tolerance',
+            'status',
+            'created_at',
         )
         read_only_fields = fields

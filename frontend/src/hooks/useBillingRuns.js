@@ -27,6 +27,7 @@ export const RUNS_KEY = ['billing-runs'];
 export const runKey = (id) => ['billing-run', id];
 export const runLineItemsKey = (id) => ['billing-run-line-items', id];
 export const runSnapshotKey = (id) => ['billing-run-snapshot', id];
+export const runReconciliationKey = (id) => ['billing-run-reconciliation', id];
 export const INVOICES_KEY = ['billing-invoices'];
 export const invoiceKey = (id) => ['billing-invoice', id];
 export const SCHEDULES_KEY = ['billing-schedules'];
@@ -74,6 +75,25 @@ export function useBillingRunSnapshot(runId) {
   });
 }
 
+/**
+ * Reconciliation report for a hierarchical run (Sprint 34).
+ * 404s for PPA / single-tier runs — treated as "no report" (null), not an error.
+ */
+export function useReconciliation(runId) {
+  return useQuery({
+    queryKey: runReconciliationKey(runId),
+    queryFn: () =>
+      api
+        .get(`/api/v1/billing-runs/${runId}/reconciliation/`)
+        .then((r) => r.data)
+        .catch((err) => {
+          if (err.response?.status === 404) return null;
+          throw err;
+        }),
+    enabled: !!runId,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // BillingRun mutations
 // ---------------------------------------------------------------------------
@@ -116,12 +136,19 @@ export function useRecomputeBillingRun(id) {
 export function useFinalizeBillingRun(id) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api.post(`/api/v1/billing-runs/${id}/finalize/`).then((r) => r.data),
+    // Sprint 34: `force` + `note` override the reconciliation tolerance gate.
+    mutationFn: ({ force, note } = {}) =>
+      api
+        .post(`/api/v1/billing-runs/${id}/finalize/`, {
+          force: Boolean(force),
+          note: note || '',
+        })
+        .then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: runKey(id) });
       qc.invalidateQueries({ queryKey: RUNS_KEY });
       qc.invalidateQueries({ queryKey: INVOICES_KEY });
+      qc.invalidateQueries({ queryKey: runReconciliationKey(id) });
     },
   });
 }

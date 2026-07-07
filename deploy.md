@@ -141,7 +141,86 @@ docker-compose exec backend python manage.py smoke_b1   # Phase B1
 docker-compose exec backend python manage.py smoke_b2   # Phase B2
 ```
 
-### 1.9 Common issues
+### 1.9 Using the app — a first walkthrough
+
+Two ways to get a login you can use immediately:
+
+**Option A — seed the demo fixture (fastest):**
+
+```bash
+docker-compose exec backend python manage.py seed_e2e
+```
+
+Creates ready-to-use accounts (both share password `e2e-password`):
+
+| Role | Email | What they see |
+|------|-------|---------------|
+| That Place Admin (platform) | `e2e_tp_admin@test.thatplace.local` | Device Type library, tenant management, device approvals, all tenants |
+| Tenant Admin | `e2e_tenant_admin@test.thatplace.local` | The `E2E Tenant` org — sites, devices, dashboards, rules, users |
+
+Plus tenant `E2E Tenant`, site `Default Site`, device type `E2E Test Scout`, and
+an approved device `E2E-DEVICE-001` ready to ingest telemetry.
+
+**Option B — create your own platform admin:**
+
+```bash
+docker-compose exec backend python manage.py createsuperuser
+```
+
+A superuser is automatically a **That Place Admin** (`is_that_place_admin=True`),
+so you can then walk the full onboarding flow yourself.
+
+**Log in:** open the web app at http://localhost:5173 and sign in. The UI adapts
+to the role — That Place Admins get the platform console (device types, tenants,
+approvals); tenant users get their organisation's console.
+
+**The two-tier model:**
+
+- **That Place Admin** (platform staff) — device type library, approve device
+  provisioning, 3rd-party provider library, access across all tenants.
+- **Tenant roles** — Admin (full org control), Operator (dashboards, commands,
+  acknowledge alerts, export), View-Only (read).
+
+**Full onboarding flow (SPEC §3):**
+
+1. As **That Place Admin**: create a Tenant, then send the first Tenant Admin an invite.
+2. Dev sends email via the **console backend**, so the invite link appears in the
+   backend logs rather than a real inbox:
+   ```bash
+   docker-compose logs -f backend
+   ```
+   Copy the link (built from `FRONTEND_URL`) to accept the invite and set a password.
+3. As **Tenant Admin**: create Sites, then register Devices — they start **pending**.
+4. As **That Place Admin**: approve the pending device → it becomes **active** and
+   MQTT credentials are provisioned automatically.
+5. Send telemetry (below) → streams auto-discover → configure streams, build
+   dashboards, write rules, and wire alerts.
+
+**Send test telemetry (exercise ingestion + health):**
+
+```bash
+docker-compose exec backend python manage.py send_test_telemetry --duration 60 --interval 5
+```
+
+Publishes both legacy-v1 and v2 telemetry to Mosquitto, auto-creating test
+devices, storing `StreamReading`s, and updating `DeviceHealth`. Useful flags:
+`--v2-serial`, `--interval`, `--duration`, `--broker-host` / `--broker-port`
+(defaults to the plain 1883 listener), and `--cleanup` to delete the test data
+afterward. Watch it flow through:
+
+```bash
+docker-compose logs -f mqtt_subscriber celery_worker
+```
+
+**Then try the rest of the platform:**
+
+- **Dashboards** — add value-card / line-chart / gauge / status / health widgets bound to a stream.
+- **Rules & alerts** — build a threshold rule, publish telemetry that crosses it, watch an Alert fire and a notification appear, then acknowledge / resolve it.
+- **Commands** — send a device command (Admin / Operator) and see it in command history.
+- **Reporting** — export stream data as CSV.
+- **Billing (Phase B)** — billing accounts, tariffs, runs, invoices; the `smoke_b1` / `smoke_b2` commands (§1.8) drive this surface end-to-end.
+
+### 1.10 Common issues
 
 - **Port already in use (5432 / 8000 / 9000 / …)** — another project (or a prior
   stack) holds the host port. Stop the offending container

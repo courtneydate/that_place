@@ -41,6 +41,18 @@
   color: #EF4444;
 }
 
+.heading {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1F2937;
+  /* Clear the absolutely-positioned edit/remove buttons in the top-right. */
+  padding-right: 3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .header {
   /* TimeRangeSelector sits here */
 }

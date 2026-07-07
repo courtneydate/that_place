@@ -414,24 +414,37 @@ EMAIL_SIGNED_URL_EXPIRY = 14 * 24 * 60 * 60  # 1 209 600 seconds
     max_retries=3,
     default_retry_delay=30,
 )
-def finalize_billing_run(self, billing_run_id: int, finalized_by_user_id) -> None:
+def finalize_billing_run(
+    self, billing_run_id: int, finalized_by_user_id, force: bool = False, note: str = '',
+) -> None:
     """Lock a draft BillingRun and create + dispatch invoices.
 
     Steps (all in one DB transaction):
       1. Verify run.status == draft; re-queue with countdown if not (run
          may still be computing when auto_finalize dispatches early).
       2. Lock the run row (select_for_update).
-      3. Create BillingInvoice per account: allocate invoice number, sum
+      3. Sprint 34 — reconciliation gate (hierarchical sites): re-run reconcile;
+         if the variance exceeds tolerance and ``force`` is not set, move the run
+         to ``review`` and stop (no invoices). ``force=True`` requires ``note``
+         (recorded on the run) and proceeds anyway.
+      4. Create BillingInvoice per account: allocate invoice number, sum
          line items, write record.
-      4. Render + upload PDF per invoice.
-      5. Mark run status=finalized, finalized_at, finalized_by.
+      5. Render + upload PDF per invoice.
+      6. Mark run status=finalized, finalized_at, finalized_by.
 
     Then (outside the transaction) dispatch one send_invoice_email per invoice.
     """
     from django.db import transaction
     from django.utils import timezone
 
-    from .models import BillingAccount, BillingInvoice, BillingLineItem, BillingRun
+    from .engine import step_reconcile
+    from .models import (
+        BillingAccount,
+        BillingInvoice,
+        BillingLineItem,
+        BillingRun,
+        ReconciliationReport,
+    )
 
     try:
         run = BillingRun.objects.select_related('tenant', 'site').get(pk=billing_run_id)
@@ -471,6 +484,26 @@ def finalize_billing_run(self, billing_run_id: int, finalized_by_user_id) -> Non
                 billing_run_id,
             )
             return
+
+        # Sprint 34 — reconciliation gate (hierarchical sites only).
+        if run.site.is_hierarchical:
+            step_reconcile(run)
+            report = ReconciliationReport.objects.filter(billing_run=run).first()
+            if report and not report.within_tolerance and not force:
+                run.status = BillingRun.Status.REVIEW
+                run.failure_detail = (
+                    f'Reconciliation variance {report.variance_percent}% exceeds '
+                    f'tolerance {run.site.reconciliation_tolerance_percent}%. '
+                    f'Recompute with corrected data, or force-finalize with a note.'
+                )
+                run.save(update_fields=['status', 'failure_detail'])
+                logger.warning(
+                    'finalize_billing_run: BillingRun %d blocked at review '
+                    '(variance %s%%)', billing_run_id, report.variance_percent,
+                )
+                return
+            if force and note:
+                run.notes = note
 
         # Collect accounts involved in this run.
         account_ids = list(
@@ -516,7 +549,7 @@ def finalize_billing_run(self, billing_run_id: int, finalized_by_user_id) -> Non
         run.status = BillingRun.Status.FINALIZED
         run.finalized_at = timezone.now()
         run.finalized_by = finalized_by
-        run.save(update_fields=['status', 'finalized_at', 'finalized_by'])
+        run.save(update_fields=['status', 'finalized_at', 'finalized_by', 'notes'])
 
     # Outside the transaction: render PDFs + dispatch email tasks.
     # PDF rendering is slow (WeasyPrint) — don't hold the DB lock.

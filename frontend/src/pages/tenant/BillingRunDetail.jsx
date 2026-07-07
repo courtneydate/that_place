@@ -18,6 +18,7 @@ import {
   useBillingRunLineItems,
   useBillingRunSnapshot,
   useFinalizeBillingRun,
+  useReconciliation,
   useRecomputeBillingRun,
   useRetryBillingRun,
   useVoidBillingRun,
@@ -161,7 +162,7 @@ VoidModal.propTypes = { runId: PropTypes.number.isRequired, onDone: PropTypes.fu
 // Tabs
 // ---------------------------------------------------------------------------
 
-const TABS = ['Overview', 'Line Items', 'Invoices', 'Snapshot'];
+const TABS = ['Overview', 'Reconciliation', 'Line Items', 'Invoices', 'Snapshot'];
 
 // ---------------------------------------------------------------------------
 // Tab content — Overview
@@ -375,6 +376,136 @@ function SnapshotTab({ runId }) {
 SnapshotTab.propTypes = { runId: PropTypes.number.isRequired };
 
 // ---------------------------------------------------------------------------
+// Tab content — Reconciliation (Sprint 34)
+// ---------------------------------------------------------------------------
+
+function ReconciliationTab({ runId }) {
+  const { data: report, isLoading } = useReconciliation(runId);
+
+  if (isLoading) return <p className={styles.loading}>Loading…</p>;
+  if (!report) {
+    return (
+      <p className={styles.empty}>
+        Reconciliation applies to hierarchical (embedded-network) sites only.
+      </p>
+    );
+  }
+
+  const rows = [
+    ['Gate import', report.gate_import_kwh],
+    ['Generation', report.generation_kwh],
+    ['Gate export', report.gate_export_kwh],
+    ['Σ child grid import', report.child_grid_import_total_kwh],
+    ['Common area', report.common_area_total_kwh],
+    ['Computed losses', report.computed_losses_kwh],
+  ];
+
+  return (
+    <div className={styles.section}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+        <span className={report.within_tolerance ? styles.badgeActive : styles.badgeDanger}>
+          {report.within_tolerance ? 'Within tolerance' : 'Variance exceeded'}
+        </span>
+        <span style={{ fontSize: '0.9375rem', color: '#111827' }}>
+          Variance <strong>{Number(report.variance_percent).toFixed(2)}%</strong>
+          {' '}(tolerance {Number(report.tolerance_percent).toFixed(2)}%)
+        </span>
+      </div>
+      <table className={styles.table}>
+        <thead><tr><th>Component</th><th>kWh</th></tr></thead>
+        <tbody>
+          {rows.map(([label, val]) => (
+            <tr key={label}>
+              <td>{label}</td>
+              <td className={styles.mono}>{Number(val).toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p style={{ marginTop: '0.75rem', fontSize: '0.8125rem', color: '#6B7280' }}>
+        Apportionment method: <strong>{report.apportionment_method}</strong>. Balance:
+        gate import + generation − gate export vs Σ child import + common area.
+        {!report.within_tolerance && (
+          <> Finalize is blocked until you recompute with corrected data or
+          force-finalize with a note.</>
+        )}
+      </p>
+    </div>
+  );
+}
+ReconciliationTab.propTypes = { runId: PropTypes.number.isRequired };
+
+// ---------------------------------------------------------------------------
+// Force-finalize modal (Sprint 34)
+// ---------------------------------------------------------------------------
+
+function ForceFinalizeModal({ runId, onDone }) {
+  const finalize = useFinalizeBillingRun(runId);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!note.trim()) {
+      setError('A note is required to force-finalize over tolerance.');
+      return;
+    }
+    try {
+      await finalize.mutateAsync({ force: true, note: note.trim() });
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.error?.message || 'Finalize failed.');
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 8, padding: '2rem',
+        width: 480, boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+      }}>
+        <h2 style={{ margin: '0 0 1rem', fontSize: '1.125rem', fontWeight: 700 }}>
+          Force-finalize over tolerance
+        </h2>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: '#6B7280' }}>
+          This run’s reconciliation variance exceeds the site tolerance. Finalizing
+          anyway issues invoices; your note is recorded on the run for audit.
+        </p>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <div className={styles.field}>
+            <label className={styles.label}>Justification note (required)</label>
+            <textarea
+              className={styles.input}
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Known gate CT fault under repair; variance accepted this cycle."
+            />
+          </div>
+          {error && <p className={styles.error}>{error}</p>}
+          <div className={styles.actions}>
+            <button type="submit" className={styles.primaryButton} disabled={finalize.isPending}>
+              {finalize.isPending ? 'Finalizing…' : 'Force-finalize'}
+            </button>
+            <button type="button" className={styles.secondaryButton} onClick={onDone}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+ForceFinalizeModal.propTypes = {
+  runId: PropTypes.number.isRequired,
+  onDone: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -385,6 +516,7 @@ export default function BillingRunDetail() {
 
   const [tab, setTab] = useState('Overview');
   const [showVoidModal, setShowVoidModal] = useState(false);
+  const [showForceModal, setShowForceModal] = useState(false);
   const [actionError, setActionError] = useState('');
 
   const { data: run, isLoading, isError } = useBillingRun(id);
@@ -397,7 +529,10 @@ export default function BillingRunDetail() {
 
   const canRetry = isAdmin && run.status === 'failed';
   const canRecompute = isAdmin && (run.status === 'draft' || run.status === 'review');
-  const canFinalize = isAdmin && (run.status === 'draft' || run.status === 'review');
+  const canFinalize = isAdmin && run.status === 'draft';
+  // A run parked at `review` failed the reconciliation gate — the only way
+  // forward (besides recompute) is a force-finalize with a note.
+  const canForceFinalize = isAdmin && run.status === 'review';
   const canVoid = isAdmin && run.status === 'finalized';
 
   const doAction = async (fn) => {
@@ -445,9 +580,17 @@ export default function BillingRunDetail() {
               <button
                 className={styles.primaryButton}
                 disabled={finalize.isPending}
-                onClick={() => doAction(() => finalize.mutateAsync())}
+                onClick={() => doAction(() => finalize.mutateAsync({}))}
               >
                 {finalize.isPending ? 'Finalizing…' : 'Finalize'}
+              </button>
+            )}
+            {canForceFinalize && (
+              <button
+                className={styles.primaryButton}
+                onClick={() => setShowForceModal(true)}
+              >
+                Force-finalize…
               </button>
             )}
             {canVoid && (
@@ -477,12 +620,16 @@ export default function BillingRunDetail() {
       </div>
 
       {tab === 'Overview' && <OverviewTab run={run} />}
+      {tab === 'Reconciliation' && <ReconciliationTab runId={Number(id)} />}
       {tab === 'Line Items' && <LineItemsTab runId={Number(id)} />}
       {tab === 'Invoices' && <InvoicesTab runId={Number(id)} />}
       {tab === 'Snapshot' && <SnapshotTab runId={Number(id)} />}
 
       {showVoidModal && (
         <VoidModal runId={Number(id)} onDone={() => setShowVoidModal(false)} />
+      )}
+      {showForceModal && (
+        <ForceFinalizeModal runId={Number(id)} onDone={() => setShowForceModal(false)} />
       )}
     </div>
   );
