@@ -1,6 +1,6 @@
-"""Billing engine — Sprint 31.
+"""Billing engine — Sprint 31 + Sprint 33.
 
-Four-step pipeline executed by ``apps.billing.tasks.run_billing_run``:
+Five-step pipeline executed by ``apps.billing.tasks.run_billing_run``:
 
   1. resolve_scope     — validate site, find active BillingAccounts in the
                          period, clamp each account's billable window by
@@ -8,11 +8,19 @@ Four-step pipeline executed by ``apps.billing.tasks.run_billing_run``:
   2. snapshot          — walk each (account, billed stream), fetch the run's
                          IntervalAggregates over the (possibly clamped)
                          window, write BillingRunSnapshot rows.
-  3. compute_line_items — split each interval at TOU boundaries via
+  3. allocate_solar    — Sprint 33. Hierarchical sites only (no-op otherwise):
+                         per interval compute the solar pool
+                         (Σ generation − gate_export) and allocate it across
+                         active child accounts pro-rata by grid_import; write
+                         SolarAllocationRecord rows.
+  4. compute_line_items — split each interval at TOU boundaries via
                          tariff_resolver, accumulate per (account, stream,
                          period_name) totals, write BillingLineItem rows:
-                         `energy`, `supply`, and `credit` (feed-in).
-  4. mark_draft        — set status=draft, computed_at=now.
+                         `energy`, `supply`, and `credit` (feed-in). For
+                         hierarchical embedded-network tenants the consumption
+                         line splits into two energy legs — solar-allocated kWh
+                         at the solar rate, remaining at the grid rate.
+  5. mark_draft        — set status=draft, computed_at=now.
 
 Each step is its own DB transaction. Any exception sets the run's
 failed_step + failure_detail; the caller's task records the run as
@@ -29,15 +37,26 @@ Per Sprint 31 design decisions:
     billing_role=grid_export stream
   - GST per line: amount_cents * tenant.gst_rate, half-up rounding
 
+Per Sprint 33 design decisions:
+  - solar pool = max(0, Σ generation − gate_export), clamped to total child
+    import (a child can't be allocated more solar than it consumed);
+    bess_discharge is excluded (it carries its own billing_role)
+  - pro-rata allocation by grid_import; largest-remainder rounding so the
+    children's allocations sum to the pool exactly at 6 dp
+  - the embedded-network tenant consumption line splits into two energy legs
+    resolved via BillingAccountTariffAssignment.applies_to_role
+    (consumption_from_solar = solar leg, consumption = grid leg)
+
 Ref: SPEC.md § Feature: Billing Runs & Invoicing
-     ROADMAP Sprint 31
+     SPEC.md § Feature: Embedded-Network Billing (Hierarchical Metering)
+     ROADMAP Sprint 31, Sprint 33
 """
 from __future__ import annotations
 
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
@@ -222,7 +241,200 @@ def _q_or_null(field_lookup: str, value):
 
 
 # ---------------------------------------------------------------------------
-# Step 3 — compute_line_items
+# Step 3 — allocate_solar (Sprint 33, hierarchical sites only)
+# ---------------------------------------------------------------------------
+
+def step_allocate_solar(billing_run) -> None:
+    """Compute per-interval solar allocation for a hierarchical billing run.
+
+    No-op (and clears any stale records) when the site is not hierarchical —
+    PPA / single-tier runs skip straight through.
+
+    For a hierarchical site, per interval:
+      pool = max(0, Σ generation − gate_export)        # solar kept on-site
+      pool = min(pool, Σ child grid_import)            # can't exceed consumption
+    then allocate ``pool`` across active child accounts pro-rata by each
+    child's grid_import (largest-remainder rounding → children sum to pool
+    exactly at 6 dp). One SolarAllocationRecord per (interval, child).
+
+    Idempotent: wipes and rewrites this run's records on every execution, so
+    recompute / retry-from-here produce the identical end state.
+    """
+    from apps.readings.models import Stream
+
+    from .models import (
+        BillingAccount,
+        BillingAccountMeter,
+        BillingRun,
+        SolarAllocationRecord,
+    )
+
+    site = billing_run.site
+
+    with transaction.atomic():
+        SolarAllocationRecord.objects.filter(billing_run=billing_run).delete()
+
+        if not site.is_hierarchical:
+            return
+
+        accounts_in_scope = getattr(billing_run, '_resolved_scope', None)
+        if accounts_in_scope is None:
+            step_resolve_scope(billing_run)
+            accounts_in_scope = billing_run._resolved_scope
+
+        period = billing_run.aggregate_period
+        win_start, win_end = billing_run.period_start, billing_run.period_end
+
+        # Site-level solar pool inputs. generation excludes bess_discharge by
+        # construction (battery output carries billing_role=bess_discharge,
+        # never generation). gate_export is the site's grid_export (≤ 1 gate
+        # meter per site in v1, so this is the gate's export).
+        gen_ids = _stream_ids_by_role(site, Stream.BillingRole.GENERATION)
+        export_ids = _stream_ids_by_role(site, Stream.BillingRole.GRID_EXPORT)
+        gen_by_ts = _sum_aggregates_by_ts(gen_ids, period, win_start, win_end)
+        export_by_ts = _sum_aggregates_by_ts(export_ids, period, win_start, win_end)
+
+        # Active embedded-network tenant (child) accounts with a grid_import
+        # stream, each clamped to its own billable window.
+        children = []  # (account_id, child_win_start, child_win_end, import_by_ts)
+        for account, child_start, child_end in accounts_in_scope:
+            if account.account_type != BillingAccount.AccountType.EN_TENANT:
+                continue
+            import_ids = _child_import_stream_ids(
+                BillingAccountMeter, account, child_start, child_end,
+            )
+            if not import_ids:
+                continue
+            import_by_ts = _sum_aggregates_by_ts(
+                import_ids, period, child_start, child_end,
+            )
+            children.append((account.id, child_start, child_end, import_by_ts))
+
+        if not children:
+            return
+
+        timestamps = sorted(set(gen_by_ts) | set(export_by_ts))
+        records = []
+        for ts in timestamps:
+            pool = gen_by_ts.get(ts, Decimal('0')) - export_by_ts.get(ts, Decimal('0'))
+            if pool <= 0:
+                continue  # gate_export ≥ generation → nothing stayed on-site
+
+            imports = {}
+            for account_id, child_start, child_end, import_by_ts in children:
+                if not (child_start <= ts < child_end):
+                    continue
+                imp = import_by_ts.get(ts, Decimal('0'))
+                if imp > 0:
+                    imports[account_id] = imp
+
+            total_import = sum(imports.values(), Decimal('0'))
+            if total_import <= 0:
+                continue
+
+            # A child can't be allocated more solar than it actually consumed,
+            # so the allocatable pool is capped at total child import. With
+            # physically valid data (pool ≤ total consumption) this is a no-op.
+            effective_pool = min(pool, total_import)
+            allocations = _allocate_pool(effective_pool, imports)
+            for account_id, allocated in allocations.items():
+                records.append(SolarAllocationRecord(
+                    billing_run=billing_run,
+                    billing_account_id=account_id,
+                    interval_start=ts,
+                    allocated_kwh=allocated,
+                    pool_kwh=effective_pool,
+                    child_grid_import_kwh=imports[account_id],
+                    allocation_method=(
+                        SolarAllocationRecord.AllocationMethod.PRO_RATA_CONSUMPTION
+                    ),
+                ))
+
+        if records:
+            SolarAllocationRecord.objects.bulk_create(records)
+
+    _ = BillingRun  # imported for symmetry with sibling steps
+
+
+def _stream_ids_by_role(site, role) -> list[int]:
+    """Return ids of streams at ``site`` carrying ``billing_role == role``."""
+    from apps.readings.models import Stream
+
+    return list(
+        Stream.objects
+        .filter(device__site=site, billing_role=role)
+        .values_list('id', flat=True)
+    )
+
+
+def _child_import_stream_ids(meter_model, account, win_start, win_end) -> list[int]:
+    """Return grid_import stream ids linked to ``account`` over its window."""
+    from apps.readings.models import Stream
+
+    links = (
+        meter_model.objects
+        .filter(billing_account=account, effective_from__lte=win_end.date())
+        .filter(_q_or_null('effective_to__gte', win_start.date()))
+        .select_related('stream')
+    )
+    return [
+        link.stream_id
+        for link in links
+        if link.stream.billing_role == Stream.BillingRole.GRID_IMPORT
+    ]
+
+
+def _sum_aggregates_by_ts(stream_ids, period, win_start, win_end) -> dict:
+    """Sum sum-kind IntervalAggregates across ``stream_ids`` keyed by period_start."""
+    from collections import defaultdict
+
+    from apps.readings.models import IntervalAggregate
+
+    out: dict = defaultdict(lambda: Decimal('0'))
+    if not stream_ids:
+        return out
+    aggs = IntervalAggregate.objects.filter(
+        stream_id__in=stream_ids,
+        period=period,
+        aggregation_kind='sum',
+        period_start__gte=win_start,
+        period_start__lt=win_end,
+    )
+    for agg in aggs:
+        if agg.value is not None:
+            out[agg.period_start] += Decimal(str(agg.value))
+    return out
+
+
+def _allocate_pool(pool: Decimal, imports: dict) -> dict:
+    """Allocate ``pool`` across ``imports`` pro-rata, summing to ``pool`` exactly.
+
+    Largest-remainder method at 6 dp: floor each raw share, then hand the
+    leftover micro-kWh units to the accounts with the largest fractional
+    remainders. Guarantees Σ allocations == pool with no rounding leakage.
+    """
+    q = Decimal('0.000001')
+    total = sum(imports.values(), Decimal('0'))
+    raw = {k: (pool * v / total) for k, v in imports.items()}
+    floored = {k: r.quantize(q, rounding=ROUND_DOWN) for k, r in raw.items()}
+    remainder = pool - sum(floored.values(), Decimal('0'))
+    units = int((remainder / q).to_integral_value(rounding=ROUND_HALF_UP))
+
+    # Order by descending fractional remainder; ties broken by account id for
+    # determinism (reproducible runs).
+    order = sorted(
+        imports.keys(),
+        key=lambda k: (raw[k] - floored[k], -k),
+        reverse=True,
+    )
+    out = dict(floored)
+    for i in range(units):
+        out[order[i % len(order)]] += q
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Step 4 — compute_line_items
 # ---------------------------------------------------------------------------
 
 def step_compute_line_items(billing_run) -> None:
@@ -241,9 +453,11 @@ def step_compute_line_items(billing_run) -> None:
     from apps.readings.models import IntervalAggregate, Stream
 
     from .models import (
+        BillingAccount,
         BillingLineItem,
         BillingRun,
         BillingRunSnapshot,
+        SolarAllocationRecord,
     )
     from .tariff_resolver import (
         TariffResolutionError,
@@ -263,6 +477,15 @@ def step_compute_line_items(billing_run) -> None:
         accounts_in_scope = billing_run._resolved_scope
 
     account_windows = {a.id: (s, e) for (a, s, e) in accounts_in_scope}
+
+    # Sprint 33: on a hierarchical site, embedded-network tenant consumption
+    # splits into a solar leg + a grid leg. Load the per-(account, interval)
+    # solar allocations written by step_allocate_solar.
+    is_hierarchical = billing_run.site.is_hierarchical
+    alloc_map: dict[int, dict] = defaultdict(dict)
+    if is_hierarchical:
+        for rec in SolarAllocationRecord.objects.filter(billing_run=billing_run):
+            alloc_map[rec.billing_account_id][rec.interval_start] = rec.allocated_kwh
 
     with transaction.atomic():
         BillingLineItem.objects.filter(billing_run=billing_run).delete()
@@ -285,10 +508,40 @@ def step_compute_line_items(billing_run) -> None:
             stream = snap.stream
             win_start, win_end = account_windows[account.id]
 
-            # Find the tariff assignment as-of mid-window (assignments are
-            # date-bounded and rarely change inside a run period; mid-window
+            # The tariff assignment is resolved as-of mid-window (assignments
+            # are date-bounded and rarely change inside a run period; mid-window
             # gives a stable choice).
             mid = win_start + (win_end - win_start) / 2
+
+            # Sprint 33 — embedded-network tenant consumption splits into two
+            # energy legs (solar-allocated + remaining grid). Handled separately
+            # from the single-rate path below.
+            is_split = (
+                is_hierarchical
+                and account.account_type == BillingAccount.AccountType.EN_TENANT
+                and stream.billing_role == Stream.BillingRole.GRID_IMPORT
+            )
+            if is_split:
+                try:
+                    grid_assignment = _accumulate_split_legs(
+                        billing_run, account, stream, snap, mid,
+                        alloc_map.get(account.id, {}), tenant_tz,
+                        per_account_lines[account.id],
+                    )
+                    supply_rate = _supply_rate_for_assignment(
+                        grid_assignment, mid.date(), tenant_tz,
+                    )
+                except TariffResolutionError as exc:
+                    raise StepError(
+                        BillingRun.Step.COMPUTE_LINE_ITEMS, str(exc),
+                    ) from exc
+                if supply_rate is not None:
+                    for day in _days_in_window(win_start, win_end, tenant_tz):
+                        per_account_supply_days[account.id].add(day)
+                        per_account_supply_rates[account.id][day] = supply_rate
+                continue
+
+            # Find the tariff assignment as-of mid-window.
             try:
                 assignment = find_assignment(account, stream, mid.date())
             except TariffResolutionError as exc:
@@ -407,6 +660,107 @@ def step_compute_line_items(billing_run) -> None:
             )
 
 
+def _accumulate_split_legs(
+    billing_run, account, stream, snap, mid, child_alloc, tenant_tz, buckets,
+):
+    """Accumulate the two energy legs for an embedded-network tenant (Sprint 33).
+
+    The child's measured grid_import splits each interval into:
+      - a solar leg: the interval's SolarAllocationRecord kWh, priced at the
+        ``consumption_from_solar`` tariff
+      - a grid leg: the remaining consumption, priced at the ``consumption``
+        tariff
+
+    When no solar tariff is configured (or nothing was allocated this
+    interval) the whole interval bills at the grid rate. Returns the resolved
+    grid (consumption) assignment so the caller can derive the supply charge.
+    """
+    from apps.readings.models import IntervalAggregate, Stream
+
+    from .models import BillingRun
+    from .tariff_resolver import find_assignment
+
+    solar_assignment = find_assignment(
+        account, stream, mid.date(),
+        applies_to_role=Stream.BillingRole.CONSUMPTION_FROM_SOLAR,
+    )
+    grid_assignment = find_assignment(
+        account, stream, mid.date(),
+        applies_to_role=Stream.BillingRole.CONSUMPTION,
+    )
+    if grid_assignment is None:
+        raise StepError(
+            BillingRun.Step.COMPUTE_LINE_ITEMS,
+            f'Embedded-network tenant account "{account.name}" (id {account.id}) '
+            f'has no grid tariff for its grid_import stream. Assign a tariff with '
+            f'applies_to_role="consumption".',
+        )
+
+    aggs = list(
+        IntervalAggregate.objects.filter(pk__in=snap.interval_aggregate_ids)
+        .order_by('period_start')
+    )
+    for agg in aggs:
+        if agg.value is None or agg.count == 0:
+            continue
+        import_kwh = Decimal(str(agg.value))
+        allocated = child_alloc.get(agg.period_start, Decimal('0'))
+        if allocated > import_kwh:
+            allocated = import_kwh  # defensive: never allocate beyond consumption
+        interval_end = _interval_end(agg)
+
+        if solar_assignment is not None and allocated > 0:
+            _accumulate_leg(
+                buckets, solar_assignment, agg, allocated, interval_end,
+                tenant_tz, stream, 'solar',
+            )
+            grid_kwh = import_kwh - allocated
+        else:
+            grid_kwh = import_kwh
+
+        if grid_kwh > 0:
+            _accumulate_leg(
+                buckets, grid_assignment, agg, grid_kwh, interval_end,
+                tenant_tz, stream, 'grid',
+            )
+
+    return grid_assignment
+
+
+def _accumulate_leg(buckets, assignment, agg, leg_kwh, interval_end, tenant_tz, stream, leg):
+    """TOU-split one energy leg and accumulate it into ``buckets``.
+
+    The leg name is folded into period_name (e.g. "peak (solar)") so the solar
+    and grid legs land in distinct buckets and read clearly on the invoice.
+    """
+    from .models import BillingLineItem
+    from .tariff_resolver import derive_period_name, get_rate, split_interval
+
+    for row, fraction in split_interval(
+        assignment, agg.period_start, interval_end, tenant_tz,
+    ):
+        rate = get_rate(row)
+        if rate is None:
+            continue
+        period_name = f'{derive_period_name(row)} ({leg})'
+        key = (stream.id, period_name)
+        bucket = buckets.setdefault(
+            key,
+            {
+                'stream': stream,
+                'line_kind': BillingLineItem.LineKind.ENERGY,
+                'period_name': period_name,
+                'rate': rate,
+                'kwh': Decimal('0'),
+                'sign': Decimal('1'),
+                'quality': defaultdict(int),
+            },
+        )
+        bucket['kwh'] += leg_kwh * fraction
+        for q, n in (agg.quality_breakdown or {}).items():
+            bucket['quality'][q] += n
+
+
 def _interval_end(agg):
     """Return the exclusive end timestamp of an IntervalAggregate's bucket."""
     from apps.readings.aggregates import period_end
@@ -485,6 +839,7 @@ def _build_dispatch():
     return {
         BillingRun.Step.RESOLVE_SCOPE: step_resolve_scope,
         BillingRun.Step.SNAPSHOT: step_snapshot,
+        BillingRun.Step.ALLOCATE_SOLAR: step_allocate_solar,
         BillingRun.Step.COMPUTE_LINE_ITEMS: step_compute_line_items,
         BillingRun.Step.MARK_DRAFT: step_mark_draft,
     }
@@ -509,6 +864,7 @@ def run_pipeline(billing_run, from_step=None) -> None:
     steps = (
         BillingRun.Step.RESOLVE_SCOPE,
         BillingRun.Step.SNAPSHOT,
+        BillingRun.Step.ALLOCATE_SOLAR,
         BillingRun.Step.COMPUTE_LINE_ITEMS,
         BillingRun.Step.MARK_DRAFT,
     )

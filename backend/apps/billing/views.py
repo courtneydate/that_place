@@ -33,6 +33,7 @@ from .models import (
     BillingRun,
     BillingRunSnapshot,
     BillingSchedule,
+    SolarAllocationRecord,
 )
 from .serializers import (
     BillingAccountAuditLogSerializer,
@@ -46,6 +47,7 @@ from .serializers import (
     BillingRunSnapshotSerializer,
     BillingScheduleSerializer,
     BulkBillingAccountImportSerializer,
+    SolarAllocationRecordSerializer,
 )
 from .signals import clear_audit_actor, set_audit_actor
 from .tasks import (
@@ -327,7 +329,10 @@ class BillingRunViewSet(viewsets.GenericViewSet):
 
     def get_permissions(self):
         """Read = any tenant user; write = Tenant Admin."""
-        if self.action in ('list', 'retrieve', 'line_items', 'snapshot', 'line_items_csv'):
+        if self.action in (
+            'list', 'retrieve', 'line_items', 'snapshot',
+            'line_items_csv', 'allocations',
+        ):
             return [IsAuthenticated(), IsViewOnly()]
         return [IsAuthenticated(), IsTenantAdmin()]
 
@@ -458,6 +463,22 @@ class BillingRunViewSet(viewsets.GenericViewSet):
             .select_related('billing_account', 'stream')
         )
         return Response(BillingRunSnapshotSerializer(snaps, many=True).data)
+
+    @action(detail=True, methods=['get'])
+    def allocations(self, request, pk=None):
+        """GET /api/v1/billing-runs/:id/allocations/ — solar allocations (Sprint 33).
+
+        Hierarchical sites only; returns an empty list for PPA / single-tier
+        runs (which never write SolarAllocationRecords). Tenant-scoped via
+        ``_qs``; cross-tenant access 404s on the run lookup.
+        """
+        run = get_object_or_404(self._qs(request), pk=pk)
+        records = (
+            SolarAllocationRecord.objects
+            .filter(billing_run=run)
+            .select_related('billing_account')
+        )
+        return Response(SolarAllocationRecordSerializer(records, many=True).data)
 
     @action(detail=True, methods=['post'])
     def finalize(self, request, pk=None):

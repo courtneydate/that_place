@@ -39,11 +39,18 @@ class TariffResolutionError(Exception):
 # Assignment resolution
 # ---------------------------------------------------------------------------
 
-def find_assignment(account, stream, on_date: date):
+def find_assignment(account, stream, on_date: date, applies_to_role: str | None = None):
     """Return the active BillingAccountTariffAssignment for an (account, stream).
 
     Stream-specific (assignment.stream_id == stream.id) wins over a catch-all
     (assignment.stream_id is None) when both cover ``on_date``.
+
+    ``applies_to_role`` (Sprint 33) narrows the search to assignments tagged
+    for a specific billing leg — e.g. ``consumption_from_solar`` for the
+    solar-allocated leg of an embedded-network tenant invoice, ``consumption``
+    for the remaining grid leg. When None (the PPA single-rate path),
+    assignment legs are ignored so existing untagged assignments resolve as
+    before.
 
     Returns None when no assignment applies — the caller decides whether that
     is a hard error (energy line) or fine (e.g. grid_export with no feed-in
@@ -62,6 +69,9 @@ def find_assignment(account, stream, on_date: date):
             models_or_null('effective_to__gte', on_date),
         )
     )
+
+    if applies_to_role is not None:
+        candidates = [a for a in candidates if a.applies_to_role == applies_to_role]
 
     stream_specific = [
         a for a in candidates if a.stream_id == stream.id

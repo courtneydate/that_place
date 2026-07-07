@@ -208,6 +208,18 @@ class BillingAccountTariffAssignment(models.Model):
         blank=True,
         help_text='Pinned version (e.g. "2025-26"). Null follows the latest active.',
     )
+    applies_to_role = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text=(
+            'Sprint 33: which billing leg this tariff prices. Mirrors '
+            'readings.Stream.BillingRole values — e.g. "consumption_from_solar" '
+            'for the solar-allocated leg of an embedded-network tenant invoice, '
+            '"consumption" for the remaining grid leg. Blank means the assignment '
+            'applies regardless of leg (the single-rate PPA path).'
+        ),
+    )
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -354,6 +366,7 @@ class BillingRun(models.Model):
     class Step(models.TextChoices):
         RESOLVE_SCOPE = 'resolve_scope', 'Resolve scope'
         SNAPSHOT = 'snapshot', 'Snapshot'
+        ALLOCATE_SOLAR = 'allocate_solar', 'Allocate solar (hierarchical)'
         COMPUTE_LINE_ITEMS = 'compute_line_items', 'Compute line items'
         MARK_DRAFT = 'mark_draft', 'Mark draft'
 
@@ -781,3 +794,91 @@ class BillingInvoice(models.Model):
 
     def __str__(self) -> str:
         return f'{self.invoice_number} ({self.billing_account.name})'
+
+
+# ---------------------------------------------------------------------------
+# Sprint 33 — Embedded-network solar allocation
+# ---------------------------------------------------------------------------
+
+
+class SolarAllocationRecord(models.Model):
+    """Per-interval, per-child solar allocation for a hierarchical billing run.
+
+    Written by the engine's `allocate_solar` step (only for sites where
+    `Site.is_hierarchical`). For each interval the engine computes the solar
+    pool that stayed inside the embedded network — `Σ generation − gate_export`
+    (`bess_discharge` is excluded because it carries its own billing_role and
+    is never tagged `generation`) — and allocates it across active child
+    accounts pro-rata by each child's `grid_import` for that interval.
+
+    Storing `pool_kwh` and `child_grid_import_kwh` alongside `allocated_kwh`
+    makes every allocation reproducible from the record alone — the AER and
+    tenants both scrutinise the method, so the inputs are persisted, not just
+    the output. (Richer-than-SPEC-§4 shape, agreed at Sprint 33 kickoff.)
+
+    Reproducibility contract: re-running `allocate_solar` against the same
+    aggregates wipes and rewrites this run's rows to the identical end state.
+    """
+
+    class AllocationMethod(models.TextChoices):
+        PRO_RATA_CONSUMPTION = 'pro_rata_consumption', 'Pro-rata by consumption'
+        EQUAL_SHARE = 'equal_share', 'Equal share'
+        FIXED_PROPORTION = 'fixed_proportion', 'Fixed proportion'
+
+    billing_run = models.ForeignKey(
+        BillingRun,
+        on_delete=models.CASCADE,
+        related_name='solar_allocations',
+    )
+    billing_account = models.ForeignKey(
+        BillingAccount,
+        on_delete=models.PROTECT,
+        related_name='solar_allocations',
+        help_text='The child (embedded-network tenant) account receiving the allocation.',
+    )
+    interval_start = models.DateTimeField(
+        help_text='UTC start of the interval this allocation covers (aligned to the run aggregate_period).',
+    )
+    allocated_kwh = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        help_text='Solar kWh allocated to this child for this interval.',
+    )
+    pool_kwh = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        help_text=(
+            'The allocatable solar pool for this interval (max(0, Σ generation '
+            '− gate_export), clamped to total child import). Σ allocated_kwh '
+            'across children equals this value exactly.'
+        ),
+    )
+    child_grid_import_kwh = models.DecimalField(
+        max_digits=18,
+        decimal_places=6,
+        help_text="This child's grid_import for the interval — the pro-rata weight.",
+    )
+    allocation_method = models.CharField(
+        max_length=30,
+        choices=AllocationMethod.choices,
+        default=AllocationMethod.PRO_RATA_CONSUMPTION,
+    )
+
+    class Meta:
+        ordering = ['interval_start', 'billing_account_id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['billing_run', 'billing_account', 'interval_start'],
+                name='solar_allocation_unique_per_run_account_interval',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['billing_run', 'billing_account']),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f'SolarAllocation(run={self.billing_run_id}, '
+            f'account={self.billing_account_id}, {self.interval_start:%Y-%m-%d %H:%M}, '
+            f'{self.allocated_kwh} kWh)'
+        )

@@ -30,6 +30,7 @@ from .models import (
     BillingRun,
     BillingRunSnapshot,
     BillingSchedule,
+    SolarAllocationRecord,
 )
 
 # CSV import limits — mirror feeds / metering for consistency
@@ -200,12 +201,24 @@ class BillingAccountTariffAssignmentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'dataset', 'dataset_name', 'dataset_slug',
             'stream', 'stream_label',
-            'dimension_filter', 'version',
+            'dimension_filter', 'version', 'applies_to_role',
             'effective_from', 'effective_to', 'created_at',
         )
         read_only_fields = (
             'id', 'dataset_name', 'dataset_slug', 'stream_label', 'created_at',
         )
+
+    def validate_applies_to_role(self, value):
+        """Blank, or one of the Stream.BillingRole values (Sprint 33 leg tag)."""
+        if not value:
+            return ''
+        from apps.readings.models import Stream
+        valid = {choice for choice, _ in Stream.BillingRole.choices}
+        if value not in valid:
+            raise serializers.ValidationError(
+                f'applies_to_role must be blank or one of: {", ".join(sorted(valid))}.'
+            )
+        return value
 
     def validate_dataset(self, dataset: ReferenceDataset):
         """Only scope=tenant datasets can be assigned to a billing account.
@@ -612,5 +625,32 @@ class BillingInvoiceSerializer(serializers.ModelSerializer):
             'issued_at',
             'delivered_at',
             'voided_at',
+        )
+        read_only_fields = fields
+
+
+# ---------------------------------------------------------------------------
+# Sprint 33 — solar allocation serializer
+# ---------------------------------------------------------------------------
+
+
+class SolarAllocationRecordSerializer(serializers.ModelSerializer):
+    """Read-only serializer for SolarAllocationRecord (Sprint 33)."""
+
+    billing_account_name = serializers.CharField(
+        source='billing_account.name', read_only=True,
+    )
+
+    class Meta:
+        model = SolarAllocationRecord
+        fields = (
+            'id',
+            'billing_account',
+            'billing_account_name',
+            'interval_start',
+            'allocated_kwh',
+            'pool_kwh',
+            'child_grid_import_kwh',
+            'allocation_method',
         )
         read_only_fields = fields

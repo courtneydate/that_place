@@ -32,6 +32,7 @@ Sprint 31 routes (BillingRun + BillingSchedule):
     POST   /api/v1/billing-runs/{id}/recompute/        — rebuild draft run
     GET    /api/v1/billing-runs/{id}/line-items/       — list line items
     GET    /api/v1/billing-runs/{id}/snapshot/         — list snapshots
+    GET    /api/v1/billing-runs/{id}/allocations/      — solar allocations (Sprint 33, hierarchical)
 
     GET    /api/v1/billing-schedules/
     POST   /api/v1/billing-schedules/
